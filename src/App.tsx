@@ -4,12 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Heart, MapPin, Recycle, ArrowsClockwise, Leaf, Search, Plus, User } from '@phosphor-icons/react'
+import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, Plus, User } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
-import { ItemListing } from './components/ItemListing'
-import { ProfileDashboard } from './components/ProfileDashboard'
-import { DropOffMap } from './components/DropOffMap'
-import { CarbonTracker } from './components/CarbonTracker'
+import { ItemListing, ProfileDashboard, DropOffMap, CarbonTracker } from './components'
 
 function App() {
   const [currentTab, setCurrentTab] = useState('browse')
