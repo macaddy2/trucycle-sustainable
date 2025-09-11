@@ -149,31 +149,15 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
           payment: false,
           community: false
         },
-        status: 'active',
-        views: 3,
-        interested: []
-      }
-    ]
-      },
-      {
-        id: 'item_3',
-        title: 'Designer Winter Coat',
-        description: 'Barely worn designer winter coat, size Medium. Perfect for the upcoming season.',
-        category: 'clothing',
-        condition: 'excellent',
-        location: 'Hackney, London',
-        distance: '3.1 miles',
-        actionType: 'exchange',
-        photos: [],
-        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-        listedDate: '5 hours ago',
-        co2Impact: 15,
-        verified: false,
-        userId: 'user_donor_3',
-        userName: 'Emma Thompson',
-        ownerId: 'user_donor_3',
-        ownerName: 'Emma Thompson',
-        ownerAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
+        ownerRating: 4.2,
+        ownerVerificationLevel: {
+          email: true,
+          phone: false,
+          identity: false,
+          address: true,
+          payment: false,
+          community: false
+        },
         status: 'active',
         views: 3,
         interested: []

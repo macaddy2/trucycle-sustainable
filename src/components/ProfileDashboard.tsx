@@ -19,7 +19,8 @@ import {
   ChatCircle,
   Bell,
   Shield,
-  CheckCircle
+  CheckCircle,
+  QrCode
 } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { AuthDialog } from './auth/AuthDialog'
@@ -28,6 +29,7 @@ import { useMessaging, useInitializeSampleData } from '@/hooks'
 import { VerificationBadge, VerificationLevel } from './VerificationBadge'
 import { RatingDisplay, RatingList, useUserRatingStats } from './RatingSystem'
 import { VerificationCenter } from './VerificationCenter'
+import { QRCodeDisplay, QRCodeData } from './QRCode'
 import { toast } from 'sonner'
 
 interface UserProfile {
@@ -74,6 +76,8 @@ export function ProfileDashboard() {
   const [showAuthDialog, setShowAuthDialog] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
+  const [selectedQRCode, setSelectedQRCode] = useState<QRCodeData | null>(null)
+  const [userQRCodes] = useKV<QRCodeData[]>('user-qr-codes', [])
   
   const { chats, getTotalUnreadCount } = useMessaging()
   const { initializeSampleChats } = useInitializeSampleData()
@@ -254,7 +258,7 @@ export function ProfileDashboard() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="messages" className="flex items-center space-x-2">
               <ChatCircle size={16} />
@@ -262,6 +266,15 @@ export function ProfileDashboard() {
               {getTotalUnreadCount() > 0 && (
                 <Badge variant="destructive" className="text-xs ml-1">
                   {getTotalUnreadCount()}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="qrcodes" className="flex items-center space-x-2">
+              <QrCode size={16} />
+              <span>QR Codes</span>
+              {userQRCodes.length > 0 && (
+                <Badge variant="secondary" className="text-xs ml-1">
+                  {userQRCodes.length}
                 </Badge>
               )}
             </TabsTrigger>
@@ -598,6 +611,147 @@ export function ProfileDashboard() {
             </div>
           </TabsContent>
 
+          <TabsContent value="qrcodes">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-h3 flex items-center space-x-2">
+                    <QrCode size={20} />
+                    <span>Your QR Codes</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Manage drop-off and pickup QR codes for your transactions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {userQRCodes.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                        <QrCode size={32} className="text-muted-foreground" />
+                      </div>
+                      <h3 className="text-h3 mb-2">No QR codes yet</h3>
+                      <p className="text-muted-foreground mb-4">
+                        QR codes will appear here when you generate them during transactions
+                      </p>
+                      <p className="text-small text-muted-foreground">
+                        Start a conversation with another user and use the "Generate QR Code" action
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {userQRCodes.map((qrCode) => {
+                        const isExpired = new Date() > new Date(qrCode.metadata.expiresAt)
+                        const timeUntilExpiry = new Date(qrCode.metadata.expiresAt).getTime() - Date.now()
+                        const hoursUntilExpiry = Math.floor(timeUntilExpiry / (1000 * 60 * 60))
+
+                        return (
+                          <Card key={qrCode.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                            <CardContent className="p-4">
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <Badge 
+                                    variant={qrCode.type === 'donor' ? 'default' : 'secondary'}
+                                    className="capitalize"
+                                  >
+                                    {qrCode.type}
+                                  </Badge>
+                                  <Badge 
+                                    variant={
+                                      isExpired ? 'destructive' : 
+                                      qrCode.status === 'active' ? 'default' : 
+                                      'secondary'
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {isExpired ? 'Expired' : qrCode.status}
+                                  </Badge>
+                                </div>
+
+                                <div>
+                                  <h4 className="font-medium text-sm line-clamp-1">{qrCode.itemTitle}</h4>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    ID: {qrCode.transactionId}
+                                  </p>
+                                </div>
+
+                                <div className="space-y-1 text-xs text-muted-foreground">
+                                  <div className="flex items-center justify-between">
+                                    <span>Category:</span>
+                                    <span className="capitalize">{qrCode.metadata.category}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span>CO₂ Impact:</span>
+                                    <span className="text-green-600">-{qrCode.metadata.co2Impact}kg</span>
+                                  </div>
+                                  {!isExpired && (
+                                    <div className="flex items-center justify-between">
+                                      <span>Expires:</span>
+                                      <span className={hoursUntilExpiry < 2 ? 'text-red-600' : ''}>
+                                        {hoursUntilExpiry < 1 ? 'Soon' : `${hoursUntilExpiry}h`}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="w-full"
+                                  onClick={() => setSelectedQRCode(qrCode)}
+                                  disabled={isExpired}
+                                >
+                                  {isExpired ? 'Expired' : 'View QR Code'}
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* QR Code Instructions */}
+              <Card className="bg-muted/50">
+                <CardHeader>
+                  <CardTitle className="text-h3">How QR Codes Work</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="font-medium mb-2 flex items-center space-x-2">
+                        <Badge variant="default">Donor</Badge>
+                        <span>Drop-off Process</span>
+                      </h4>
+                      <div className="space-y-2 text-sm text-muted-foreground">
+                        <p>1. Generate a drop-off QR code during conversation</p>
+                        <p>2. Take your item to the selected partner shop</p>
+                        <p>3. Show the QR code to the shop attendant</p>
+                        <p>4. Shop attendant scans and confirms receipt</p>
+                        <p>5. Collector is notified that item is available for pickup</p>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-medium mb-2 flex items-center space-x-2">
+                        <Badge variant="secondary">Collector</Badge>
+                        <span>Pickup Process</span>
+                      </h4>
+                      <div className="space-y-2 text-sm text-muted-foreground">
+                        <p>1. Generate a pickup QR code during conversation</p>
+                        <p>2. Wait for donor to drop off item at partner shop</p>
+                        <p>3. Visit the partner shop when notified</p>
+                        <p>4. Show your QR code to the shop attendant</p>
+                        <p>5. Shop attendant verifies and releases item to you</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           <TabsContent value="activity">
             <Card>
               <CardHeader>
@@ -807,6 +961,14 @@ export function ProfileDashboard() {
         }}
         initialMode={authMode}
       />
+
+      {/* QR Code Display Dialog */}
+      {selectedQRCode && (
+        <QRCodeDisplay
+          qrData={selectedQRCode}
+          onClose={() => setSelectedQRCode(null)}
+        />
+      )}
     </>
   )
 }

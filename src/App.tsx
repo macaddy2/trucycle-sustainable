@@ -4,9 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, Plus, User } from '@phosphor-icons/react'
+import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, Plus, User, QrCode } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
-import { ItemListing, ItemListingForm, ProfileDashboard, DropOffMap, CarbonTracker } from './components'
+import { ItemListing, ItemListingForm, ProfileDashboard, DropOffMap, CarbonTracker, ShopScanner } from './components'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
 import { useInitializeSampleData } from '@/hooks'
@@ -19,8 +19,17 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showMessageCenter, setShowMessageCenter] = useState(false)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
+  const [showShopScanner, setShowShopScanner] = useState(false)
   
   const { initializeSampleChats } = useInitializeSampleData()
+
+  // Check for shop scanner mode in URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('mode') === 'shop-scanner') {
+      setShowShopScanner(true)
+    }
+  }, [])
 
   // Check if user needs onboarding
   useEffect(() => {
@@ -61,6 +70,11 @@ function App() {
     // Search functionality will be implemented in ItemListing component
   }
 
+  // If in shop scanner mode, render only the scanner
+  if (showShopScanner) {
+    return <ShopScanner />
+  }
+
   return (
     <div className="min-h-screen bg-background font-roboto">
       {/* Header */}
@@ -94,6 +108,14 @@ function App() {
                   <Button 
                     variant="outline" 
                     size="sm"
+                    onClick={() => setShowShopScanner(true)}
+                    title="Shop Scanner (For Partner Shops)"
+                  >
+                    <QrCode size={16} />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
                     onClick={() => setCurrentTab('profile')}
                   >
                     <User size={16} className="mr-2" />
@@ -102,6 +124,14 @@ function App() {
                 </div>
               ) : (
                 <div className="flex items-center space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setShowShopScanner(true)}
+                    title="Shop Scanner (For Partner Shops)"
+                  >
+                    <QrCode size={16} />
+                  </Button>
                   <Button variant="outline" size="sm" onClick={handleSignIn}>
                     Sign In
                   </Button>

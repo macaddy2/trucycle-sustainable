@@ -15,10 +15,12 @@ import {
   Package, 
   CalendarCheck,
   Phone,
-  Camera 
+  Camera,
+  QrCode 
 } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
+import { QRCodeGenerator, QRCodeDisplay, QRCodeData } from '../QRCode'
 
 interface Message {
   id: string
@@ -66,6 +68,8 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const [isTyping, setIsTyping] = useState(false)
+  const [showQRCode, setShowQRCode] = useState<QRCodeData | null>(null)
+  const [selectedDropOffLocation, setSelectedDropOffLocation] = useState<string>('')
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const selectedChat = chats.find(chat => chat.id === selectedChatId)
@@ -250,12 +254,37 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
     }
   }
 
+  const handleQRCodeGenerated = (qrData: QRCodeData) => {
+    setShowQRCode(qrData)
+    
+    // Send system message about QR code generation
+    const message = qrData.type === 'donor' 
+      ? 'Drop-off QR code generated. Please take this item and QR code to the selected drop-off location.'
+      : 'Pickup QR code generated. Show this to the shop attendant to collect your item.'
+    
+    sendSystemMessage('qr_generated', message)
+  }
+
   const quickActions = [
     {
       label: 'Share Location',
       icon: MapPin,
       action: shareLocation,
       color: 'text-blue-600'
+    },
+    {
+      label: 'Generate QR Code',
+      icon: QrCode,
+      action: () => {
+        if (!selectedChat) return
+        
+        // Determine if current user is donor or collector
+        const isDonor = currentUser.id === selectedChat.donorId
+        
+        // For demo purposes, set a sample drop-off location
+        setSelectedDropOffLocation('TruCycle Partner Shop - Camden Market, London NW1 8AH')
+      },
+      color: 'text-purple-600'
     },
     {
       label: 'Confirm Collection',
@@ -526,6 +555,62 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
             )}
           </div>
         </div>
+
+        {/* QR Code Generation Dialog */}
+        {selectedDropOffLocation && selectedChat && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-background p-6 rounded-lg max-w-md w-full mx-4">
+              <h3 className="text-h3 mb-4">Generate QR Code</h3>
+              <p className="text-muted-foreground mb-4">
+                Choose your role for this transaction:
+              </p>
+              
+              <div className="space-y-3">
+                {currentUser.id === selectedChat.donorId && (
+                  <QRCodeGenerator
+                    itemId={selectedChat.itemId}
+                    itemTitle={selectedChat.itemTitle}
+                    category="general" // You can derive this from item data
+                    condition="good" // You can derive this from item data
+                    co2Impact={25} // You can derive this from item data
+                    dropOffLocation={selectedDropOffLocation}
+                    type="donor"
+                    onGenerated={handleQRCodeGenerated}
+                  />
+                )}
+                
+                {currentUser.id === selectedChat.collectorId && (
+                  <QRCodeGenerator
+                    itemId={selectedChat.itemId}
+                    itemTitle={selectedChat.itemTitle}
+                    category="general" // You can derive this from item data
+                    condition="good" // You can derive this from item data
+                    co2Impact={25} // You can derive this from item data
+                    dropOffLocation={selectedDropOffLocation}
+                    type="collector"
+                    onGenerated={handleQRCodeGenerated}
+                  />
+                )}
+                
+                <Button 
+                  variant="outline" 
+                  onClick={() => setSelectedDropOffLocation('')}
+                  className="w-full"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* QR Code Display Dialog */}
+        {showQRCode && (
+          <QRCodeDisplay
+            qrData={showQRCode}
+            onClose={() => setShowQRCode(null)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   )
