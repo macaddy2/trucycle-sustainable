@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, Plus, User } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
-import { ItemListing, ProfileDashboard, DropOffMap, CarbonTracker } from './components'
+import { ItemListing, ItemListingForm, ProfileDashboard, DropOffMap, CarbonTracker } from './components'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
 import { useInitializeSampleData } from '@/hooks'
@@ -153,28 +153,7 @@ function App() {
           </TabsContent>
           
           <TabsContent value="list">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-h2 flex items-center space-x-2">
-                  <Plus size={24} className="text-primary" />
-                  <span>List Your Item</span>
-                </CardTitle>
-                <CardDescription>
-                  Help reduce waste by listing items for exchange, donation, or responsible disposal
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Plus size={32} className="text-primary" />
-                  </div>
-                  <p className="text-muted-foreground mb-4">
-                    This feature is coming soon! You'll be able to list items with photos, descriptions, and categories.
-                  </p>
-                  <Button disabled>Create Listing</Button>
-                </div>
-              </CardContent>
-            </Card>
+            <ItemListingForm onComplete={() => setCurrentTab('browse')} />
           </TabsContent>
 
           <TabsContent value="dropoff">

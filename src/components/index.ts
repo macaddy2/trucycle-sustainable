@@ -1,4 +1,5 @@
 export { ItemListing } from './ItemListing'
+export { ItemListingForm } from './ItemListingForm'
 export { ProfileDashboard } from './ProfileDashboard'
 export { DropOffMap } from './DropOffMap'
 export { CarbonTracker } from './CarbonTracker'

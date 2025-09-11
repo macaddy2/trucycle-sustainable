@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Heart, MapPin, ArrowsClockwise, Clock, Package, ChatCircle } from '@phosphor-icons/react'
+import { Heart, MapPin, ArrowsClockwise, Clock, Package, ChatCircle, Recycle } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { useMessaging } from '@/hooks'
 import { InlineMessage } from './messaging'
@@ -20,22 +20,29 @@ interface Item {
   title: string
   description: string
   category: string
-  condition: 'excellent' | 'good' | 'fair' | 'needs-repair'
+  condition: 'excellent' | 'good' | 'fair' | 'poor'
   location: string
-  distance: string
-  type: 'exchange' | 'donation' | 'sale'
+  distance?: string
+  actionType: 'exchange' | 'donate' | 'recycle'
   photos: string[]
-  listedDate: string
-  co2Impact: number
-  verified: boolean
-  ownerId: string
-  ownerName: string
+  createdAt: string
+  listedDate?: string
+  co2Impact?: number
+  verified?: boolean
+  userId: string
+  userName: string
+  ownerName?: string
+  ownerId?: string
   ownerAvatar?: string
+  status: string
+  views: number
+  interested: string[]
 }
 
 export function ItemListing({ searchQuery }: ItemListingProps) {
   const [currentUser] = useKV('current-user', null)
-  const [items, setItems] = useKV<Item[]>('sample-items', [])
+  const [globalListings] = useKV<Item[]>('global-listings', [])
+  const [items, setItems] = useState<Item[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedCondition, setSelectedCondition] = useState<string>('all')
   const [selectedType, setSelectedType] = useState<string>('all')
@@ -43,63 +50,84 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
   
   const { createOrGetChat, getChatForItem } = useMessaging()
 
-  // Initialize sample items if empty
-  if (items.length === 0) {
+  // Initialize with sample items and global listings
+  useEffect(() => {
     const sampleItems: Item[] = [
       {
         id: 'item_1',
         title: 'Vintage Oak Dining Table',
         description: 'Beautiful solid oak dining table, seats 6 people comfortably. Some minor scratches but structurally sound.',
-        category: 'Furniture',
+        category: 'furniture',
         condition: 'good',
         location: 'Camden, London',
         distance: '2.3 miles',
-        type: 'donation',
+        actionType: 'donate',
         photos: [],
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
         listedDate: '2 days ago',
         co2Impact: 45,
         verified: true,
+        userId: 'user_donor_1',
+        userName: 'Sarah Johnson',
         ownerId: 'user_donor_1',
         ownerName: 'Sarah Johnson',
-        ownerAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150'
+        ownerAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150',
+        status: 'active',
+        views: 12,
+        interested: []
       },
       {
         id: 'item_2',
         title: 'Working Laptop - Dell XPS 13',
         description: 'Dell XPS 13 in excellent condition. Perfect for students or remote work. Includes charger.',
-        category: 'Electronics',
+        category: 'electronics',
         condition: 'excellent',
         location: 'Islington, London',
         distance: '1.8 miles',
-        type: 'exchange',
+        actionType: 'exchange',
         photos: [],
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
         listedDate: '1 day ago',
         co2Impact: 120,
         verified: true,
+        userId: 'user_donor_2',
+        userName: 'Michael Chen',
         ownerId: 'user_donor_2',
         ownerName: 'Michael Chen',
-        ownerAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'
+        ownerAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+        status: 'active',
+        views: 8,
+        interested: []
       },
       {
         id: 'item_3',
         title: 'Designer Winter Coat',
         description: 'Barely worn designer winter coat, size Medium. Perfect for the upcoming season.',
-        category: 'Clothing',
+        category: 'clothing',
         condition: 'excellent',
         location: 'Hackney, London',
         distance: '3.1 miles',
-        type: 'sale',
+        actionType: 'exchange',
         photos: [],
+        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
         listedDate: '5 hours ago',
         co2Impact: 15,
         verified: false,
+        userId: 'user_donor_3',
+        userName: 'Emma Thompson',
         ownerId: 'user_donor_3',
         ownerName: 'Emma Thompson',
-        ownerAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150'
+        ownerAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
+        status: 'active',
+        views: 3,
+        interested: []
       }
     ]
-    setItems(sampleItems)
-  }
+
+    // Combine sample items with global listings
+    const allItems = [...sampleItems, ...globalListings]
+    setItems(allItems)
+  }, [globalListings])
 
   const handleClaimItem = async (item: Item) => {
     if (!currentUser) {
@@ -107,7 +135,7 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
       return
     }
 
-    if (currentUser.id === item.ownerId) {
+    if (currentUser.id === (item.ownerId || item.userId)) {
       toast.error('You cannot claim your own item')
       return
     }
@@ -117,15 +145,15 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
         item.id,
         item.title,
         item.photos[0],
-        item.ownerId,
-        item.ownerName,
+        item.ownerId || item.userId,
+        item.ownerName || item.userName,
         item.ownerAvatar,
         currentUser.id,
         currentUser.name,
         currentUser.avatar
       )
 
-      toast.success(`Item claimed! You can now message ${item.ownerName} about pickup details.`)
+      toast.success(`Item claimed! You can now message ${item.ownerName || item.userName} about pickup details.`)
       setSelectedItem(null)
     } catch (error) {
       toast.error('Failed to claim item. Please try again.')
@@ -143,8 +171,8 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
         item.id,
         item.title,
         item.photos[0],
-        item.ownerId,
-        item.ownerName,
+        item.ownerId || item.userId,
+        item.ownerName || item.userName,
         item.ownerAvatar,
         currentUser.id,
         currentUser.name,
@@ -157,12 +185,12 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
     }
   }
 
-  const categories = ['Furniture', 'Electronics', 'Clothing', 'Books', 'Kitchen', 'Sports', 'Garden']
+  const categories = ['Electronics', 'Furniture', 'Clothing', 'Books', 'Kitchen Items', 'Garden Tools', 'Sports Equipment', 'Toys & Games', 'Home Decor', 'Other']
   const conditions = [
     { value: 'excellent', label: 'Excellent' },
     { value: 'good', label: 'Good' },
     { value: 'fair', label: 'Fair' },
-    { value: 'needs-repair', label: 'Needs Repair' }
+    { value: 'poor', label: 'Poor' }
   ]
 
   const filteredItems = items.filter(item => {
@@ -170,9 +198,9 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description.toLowerCase().includes(searchQuery.toLowerCase())
     
-    const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory
+    const matchesCategory = selectedCategory === 'all' || item.category.toLowerCase() === selectedCategory.toLowerCase()
     const matchesCondition = selectedCondition === 'all' || item.condition === selectedCondition
-    const matchesType = selectedType === 'all' || item.type === selectedType
+    const matchesType = selectedType === 'all' || item.actionType === selectedType
 
     return matchesSearch && matchesCategory && matchesCondition && matchesType
   })
@@ -182,27 +210,40 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
       case 'excellent': return 'bg-green-100 text-green-800'
       case 'good': return 'bg-blue-100 text-blue-800'
       case 'fair': return 'bg-yellow-100 text-yellow-800'
-      case 'needs-repair': return 'bg-orange-100 text-orange-800'
+      case 'poor': return 'bg-orange-100 text-orange-800'
       default: return 'bg-gray-100 text-gray-800'
     }
   }
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
+  const getTypeIcon = (actionType: string) => {
+    switch (actionType) {
       case 'exchange': return <ArrowsClockwise size={16} />
-      case 'donation': return <Heart size={16} />
-      case 'sale': return <Package size={16} />
+      case 'donate': return <Heart size={16} />
+      case 'recycle': return <Recycle size={16} />
       default: return <Package size={16} />
     }
   }
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
+  const getTypeColor = (actionType: string) => {
+    switch (actionType) {
       case 'exchange': return 'bg-accent text-accent-foreground'
-      case 'donation': return 'bg-primary text-primary-foreground'
-      case 'sale': return 'bg-secondary text-secondary-foreground'
+      case 'donate': return 'bg-primary text-primary-foreground'
+      case 'recycle': return 'bg-secondary text-secondary-foreground'
       default: return 'bg-muted text-muted-foreground'
     }
+  }
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffDays = Math.floor(diffHours / 24)
+    
+    if (diffHours < 1) return 'Just now'
+    if (diffHours < 24) return `${diffHours} hours ago`
+    if (diffDays === 1) return '1 day ago'
+    return `${diffDays} days ago`
   }
 
   return (
@@ -254,8 +295,8 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="exchange">Exchange</SelectItem>
-                <SelectItem value="donation">Donation</SelectItem>
-                <SelectItem value="sale">For Sale</SelectItem>
+                <SelectItem value="donate">Donate</SelectItem>
+                <SelectItem value="recycle">Recycle</SelectItem>
               </SelectContent>
             </Select>
 
@@ -302,9 +343,9 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
                 )}
                 
                 <div className="absolute top-3 left-3 flex space-x-2">
-                  <Badge className={getTypeColor(item.type)}>
-                    {getTypeIcon(item.type)}
-                    <span className="ml-1 capitalize">{item.type}</span>
+                  <Badge className={getTypeColor(item.actionType)}>
+                    {getTypeIcon(item.actionType)}
+                    <span className="ml-1 capitalize">{item.actionType}</span>
                   </Badge>
                   {item.verified && (
                     <Badge variant="secondary">✓ Verified</Badge>
@@ -334,10 +375,10 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-1 text-small text-muted-foreground">
                       <Clock size={14} />
-                      <span>{item.listedDate}</span>
+                      <span>{item.listedDate || formatTimeAgo(item.createdAt)}</span>
                     </div>
                     <div className="text-small text-primary font-medium">
-                      -{item.co2Impact}kg CO₂
+                      -{item.co2Impact || 5}kg CO₂
                     </div>
                   </div>
 
@@ -354,7 +395,7 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
                       </DialogTrigger>
                     </Dialog>
                     
-                    {currentUser && currentUser.id !== item.ownerId && (
+                    {currentUser && currentUser.id !== (item.ownerId || item.userId) && (
                       <Button 
                         className="flex-1"
                         onClick={() => handleClaimItem(item)}
@@ -422,8 +463,8 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Type:</span>
-                      <Badge className={getTypeColor(selectedItem.type)}>
-                        {selectedItem.type}
+                      <Badge className={getTypeColor(selectedItem.actionType)}>
+                        {selectedItem.actionType}
                       </Badge>
                     </div>
                     <div className="flex justify-between">
@@ -432,7 +473,7 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Distance:</span>
-                      <span>{selectedItem.distance}</span>
+                      <span>{selectedItem.distance || 'Unknown'}</span>
                     </div>
                   </div>
                 </div>
@@ -442,7 +483,7 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
                     <h4 className="font-medium mb-2">Environmental Impact</h4>
                     <div className="bg-green-50 p-3 rounded-lg">
                       <p className="text-green-700 font-medium">
-                        -{selectedItem.co2Impact}kg CO₂ saved
+                        -{selectedItem.co2Impact || 5}kg CO₂ saved
                       </p>
                       <p className="text-small text-green-600 mt-1">
                         By choosing this item, you're helping reduce carbon emissions
@@ -457,17 +498,17 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
                         {selectedItem.ownerAvatar ? (
                           <img 
                             src={selectedItem.ownerAvatar} 
-                            alt={selectedItem.ownerName}
+                            alt={selectedItem.ownerName || selectedItem.userName}
                             className="w-full h-full rounded-full object-cover"
                           />
                         ) : (
                           <span className="text-primary-foreground font-medium">
-                            {selectedItem.ownerName[0]}
+                            {(selectedItem.ownerName || selectedItem.userName)[0]}
                           </span>
                         )}
                       </div>
                       <div>
-                        <p className="font-medium">{selectedItem.ownerName}</p>
+                        <p className="font-medium">{selectedItem.ownerName || selectedItem.userName}</p>
                         <p className="text-small text-muted-foreground">
                           {selectedItem.verified ? '✓ Verified Member' : 'Community Member'}
                         </p>
@@ -475,14 +516,15 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
                     </div>
                   </div>
 
-                  {currentUser && currentUser.id !== selectedItem.ownerId && (
+                  {currentUser && currentUser.id !== (selectedItem.ownerId || selectedItem.userId) && (
                     <div className="space-y-2">
                       <Button 
                         className="w-full"
                         onClick={() => handleClaimItem(selectedItem)}
                       >
-                        {selectedItem.type === 'donation' ? 'Claim Item' : 
-                         selectedItem.type === 'exchange' ? 'Exchange Item' : 'Contact Owner'}
+                        {selectedItem.actionType === 'donate' ? 'Claim Item' : 
+                         selectedItem.actionType === 'exchange' ? 'Exchange Item' : 
+                         selectedItem.actionType === 'recycle' ? 'Request Pickup' : 'Contact Owner'}
                       </Button>
                       
                       {getChatForItem(selectedItem.id) && (
