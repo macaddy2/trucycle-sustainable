@@ -4,8 +4,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Heart, MapPin, ArrowsClockwise, Clock, Package } from '@phosphor-icons/react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Heart, MapPin, ArrowsClockwise, Clock, Package, ChatCircle } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
+import { useMessaging } from '@/hooks'
+import { InlineMessage } from './messaging'
+import { toast } from 'sonner'
 
 interface ItemListingProps {
   searchQuery: string
@@ -24,13 +28,134 @@ interface Item {
   listedDate: string
   co2Impact: number
   verified: boolean
+  ownerId: string
+  ownerName: string
+  ownerAvatar?: string
 }
 
 export function ItemListing({ searchQuery }: ItemListingProps) {
-  const [items] = useKV<Item[]>('sample-items', [])
+  const [currentUser] = useKV('current-user', null)
+  const [items, setItems] = useKV<Item[]>('sample-items', [])
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedCondition, setSelectedCondition] = useState<string>('all')
   const [selectedType, setSelectedType] = useState<string>('all')
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null)
+  
+  const { createOrGetChat, getChatForItem } = useMessaging()
+
+  // Initialize sample items if empty
+  if (items.length === 0) {
+    const sampleItems: Item[] = [
+      {
+        id: 'item_1',
+        title: 'Vintage Oak Dining Table',
+        description: 'Beautiful solid oak dining table, seats 6 people comfortably. Some minor scratches but structurally sound.',
+        category: 'Furniture',
+        condition: 'good',
+        location: 'Camden, London',
+        distance: '2.3 miles',
+        type: 'donation',
+        photos: [],
+        listedDate: '2 days ago',
+        co2Impact: 45,
+        verified: true,
+        ownerId: 'user_donor_1',
+        ownerName: 'Sarah Johnson',
+        ownerAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150'
+      },
+      {
+        id: 'item_2',
+        title: 'Working Laptop - Dell XPS 13',
+        description: 'Dell XPS 13 in excellent condition. Perfect for students or remote work. Includes charger.',
+        category: 'Electronics',
+        condition: 'excellent',
+        location: 'Islington, London',
+        distance: '1.8 miles',
+        type: 'exchange',
+        photos: [],
+        listedDate: '1 day ago',
+        co2Impact: 120,
+        verified: true,
+        ownerId: 'user_donor_2',
+        ownerName: 'Michael Chen',
+        ownerAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'
+      },
+      {
+        id: 'item_3',
+        title: 'Designer Winter Coat',
+        description: 'Barely worn designer winter coat, size Medium. Perfect for the upcoming season.',
+        category: 'Clothing',
+        condition: 'excellent',
+        location: 'Hackney, London',
+        distance: '3.1 miles',
+        type: 'sale',
+        photos: [],
+        listedDate: '5 hours ago',
+        co2Impact: 15,
+        verified: false,
+        ownerId: 'user_donor_3',
+        ownerName: 'Emma Thompson',
+        ownerAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150'
+      }
+    ]
+    setItems(sampleItems)
+  }
+
+  const handleClaimItem = async (item: Item) => {
+    if (!currentUser) {
+      toast.error('Please sign in to claim items')
+      return
+    }
+
+    if (currentUser.id === item.ownerId) {
+      toast.error('You cannot claim your own item')
+      return
+    }
+
+    try {
+      const chatId = await createOrGetChat(
+        item.id,
+        item.title,
+        item.photos[0],
+        item.ownerId,
+        item.ownerName,
+        item.ownerAvatar,
+        currentUser.id,
+        currentUser.name,
+        currentUser.avatar
+      )
+
+      toast.success(`Item claimed! You can now message ${item.ownerName} about pickup details.`)
+      setSelectedItem(null)
+    } catch (error) {
+      toast.error('Failed to claim item. Please try again.')
+    }
+  }
+
+  const handleStartChat = async (item: Item) => {
+    if (!currentUser) {
+      toast.error('Please sign in to contact the owner')
+      return
+    }
+
+    try {
+      const chatId = await createOrGetChat(
+        item.id,
+        item.title,
+        item.photos[0],
+        item.ownerId,
+        item.ownerName,
+        item.ownerAvatar,
+        currentUser.id,
+        currentUser.name,
+        currentUser.avatar
+      )
+
+      setSelectedItem(null)
+    } catch (error) {
+      toast.error('Failed to start conversation. Please try again.')
+    }
+  }
 
   const categories = ['Furniture', 'Electronics', 'Clothing', 'Books', 'Kitchen', 'Sports', 'Garden']
   const conditions = [
@@ -216,15 +341,167 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
                     </div>
                   </div>
 
-                  <Button className="w-full">
-                    {item.type === 'donation' ? 'Claim' : 
-                     item.type === 'exchange' ? 'Exchange' : 'View Details'}
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          className="flex-1"
+                          onClick={() => setSelectedItem(item)}
+                        >
+                          View Details
+                        </Button>
+                      </DialogTrigger>
+                    </Dialog>
+                    
+                    {currentUser && currentUser.id !== item.ownerId && (
+                      <Button 
+                        className="flex-1"
+                        onClick={() => handleClaimItem(item)}
+                      >
+                        {item.type === 'donation' ? 'Claim' : 
+                         item.type === 'exchange' ? 'Exchange' : 'Contact'}
+                      </Button>
+                    )}
+
+                    {currentUser && currentUser.id !== item.ownerId && getChatForItem(item.id) && (
+                      <Button 
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleStartChat(item)}
+                      >
+                        <ChatCircle size={16} />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
+      )}
+
+      {/* Item Details Dialog */}
+      {selectedItem && (
+        <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{selectedItem.title}</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+                {selectedItem.photos.length > 0 ? (
+                  <img 
+                    src={selectedItem.photos[0]} 
+                    alt={selectedItem.title}
+                    className="w-full h-full object-cover rounded-lg"
+                  />
+                ) : (
+                  <Package size={64} className="text-muted-foreground" />
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium mb-2">Description</h4>
+                    <p className="text-muted-foreground">{selectedItem.description}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Category:</span>
+                      <span>{selectedItem.category}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Condition:</span>
+                      <Badge variant="outline" className={getConditionColor(selectedItem.condition)}>
+                        {selectedItem.condition.replace('-', ' ')}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Type:</span>
+                      <Badge className={getTypeColor(selectedItem.type)}>
+                        {selectedItem.type}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Location:</span>
+                      <span>{selectedItem.location}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Distance:</span>
+                      <span>{selectedItem.distance}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium mb-2">Environmental Impact</h4>
+                    <div className="bg-green-50 p-3 rounded-lg">
+                      <p className="text-green-700 font-medium">
+                        -{selectedItem.co2Impact}kg CO₂ saved
+                      </p>
+                      <p className="text-small text-green-600 mt-1">
+                        By choosing this item, you're helping reduce carbon emissions
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-2">Item Owner</h4>
+                    <div className="flex items-center space-x-3 p-3 bg-muted rounded-lg">
+                      <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                        {selectedItem.ownerAvatar ? (
+                          <img 
+                            src={selectedItem.ownerAvatar} 
+                            alt={selectedItem.ownerName}
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-primary-foreground font-medium">
+                            {selectedItem.ownerName[0]}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium">{selectedItem.ownerName}</p>
+                        <p className="text-small text-muted-foreground">
+                          {selectedItem.verified ? '✓ Verified Member' : 'Community Member'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {currentUser && currentUser.id !== selectedItem.ownerId && (
+                    <div className="space-y-2">
+                      <Button 
+                        className="w-full"
+                        onClick={() => handleClaimItem(selectedItem)}
+                      >
+                        {selectedItem.type === 'donation' ? 'Claim Item' : 
+                         selectedItem.type === 'exchange' ? 'Exchange Item' : 'Contact Owner'}
+                      </Button>
+                      
+                      {getChatForItem(selectedItem.id) && (
+                        <Button 
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => handleStartChat(selectedItem)}
+                        >
+                          <ChatCircle size={16} className="mr-2" />
+                          Continue Conversation
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   )

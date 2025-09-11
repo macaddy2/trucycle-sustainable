@@ -8,6 +8,8 @@ import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, Plus, User 
 import { useKV } from '@github/spark/hooks'
 import { ItemListing, ProfileDashboard, DropOffMap, CarbonTracker } from './components'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
+import { MessageCenter, MessageNotification } from './components/messaging'
+import { useInitializeSampleData } from '@/hooks'
 
 function App() {
   const [currentTab, setCurrentTab] = useState('browse')
@@ -15,12 +17,22 @@ function App() {
   const [user] = useKV('current-user', null)
   const [showAuthDialog, setShowAuthDialog] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showMessageCenter, setShowMessageCenter] = useState(false)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
+  
+  const { initializeSampleChats } = useInitializeSampleData()
 
   // Check if user needs onboarding
   useEffect(() => {
     if (user && !user.onboardingCompleted) {
       setShowOnboarding(true)
+    }
+  }, [user])
+
+  // Initialize sample data when user logs in
+  useEffect(() => {
+    if (user) {
+      initializeSampleChats()
     }
   }, [user])
 
@@ -77,14 +89,17 @@ function App() {
               </form>
               
               {user ? (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setCurrentTab('profile')}
-                >
-                  <User size={16} className="mr-2" />
-                  {user.name.split(' ')[0]}
-                </Button>
+                <div className="flex items-center space-x-2">
+                  <MessageNotification onOpenMessages={() => setShowMessageCenter(true)} />
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setCurrentTab('profile')}
+                  >
+                    <User size={16} className="mr-2" />
+                    {user.name.split(' ')[0]}
+                  </Button>
+                </div>
               ) : (
                 <div className="flex items-center space-x-2">
                   <Button variant="outline" size="sm" onClick={handleSignIn}>
@@ -249,6 +264,12 @@ function App() {
         open={showOnboarding} 
         onOpenChange={setShowOnboarding}
         onComplete={handleOnboardingComplete}
+      />
+
+      {/* Message Center */}
+      <MessageCenter 
+        open={showMessageCenter}
+        onOpenChange={setShowMessageCenter}
       />
     </div>
   )

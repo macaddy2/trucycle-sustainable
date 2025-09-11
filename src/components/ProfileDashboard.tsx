@@ -1,14 +1,27 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
-import { User, Leaf, Package, Heart, ArrowsClockwise, Star, Settings, Award, SignOut } from '@phosphor-icons/react'
+import { 
+  User, 
+  Leaf, 
+  Package, 
+  Heart, 
+  ArrowsClockwise, 
+  Star, 
+  Settings, 
+  Award, 
+  SignOut,
+  ChatCircle,
+  Bell
+} from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { AuthDialog } from './auth/AuthDialog'
 import { ProfileOnboarding } from './auth/ProfileOnboarding'
+import { useMessaging, useInitializeSampleData } from '@/hooks'
 import { toast } from 'sonner'
 
 interface UserProfile {
@@ -47,6 +60,16 @@ export function ProfileDashboard() {
   const [showAuthDialog, setShowAuthDialog] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
+  
+  const { chats, getTotalUnreadCount } = useMessaging()
+  const { initializeSampleChats } = useInitializeSampleData()
+
+  // Initialize sample data when user is signed in
+  useEffect(() => {
+    if (user) {
+      initializeSampleChats()
+    }
+  }, [user])
 
   const [stats] = useKV<UserStats>('user-stats', {
     itemsListed: 0,
@@ -213,8 +236,17 @@ export function ProfileDashboard() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="messages" className="flex items-center space-x-2">
+              <ChatCircle size={16} />
+              <span>Messages</span>
+              {getTotalUnreadCount() > 0 && (
+                <Badge variant="destructive" className="text-xs ml-1">
+                  {getTotalUnreadCount()}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
             <TabsTrigger value="achievements">Achievements</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -266,7 +298,7 @@ export function ProfileDashboard() {
               {/* Stats Overview */}
               <div className="lg:col-span-2 space-y-6">
                 {/* Impact Stats */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                   <Card>
                     <CardContent className="p-4">
                       <div className="flex items-center space-x-3">
@@ -290,6 +322,27 @@ export function ProfileDashboard() {
                         <div>
                           <p className="text-small text-muted-foreground">Exchanges</p>
                           <p className="text-h3 font-bold text-accent">{stats.successfulExchanges}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
+                          <ChatCircle size={20} className="text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-small text-muted-foreground">Active Chats</p>
+                          <div className="flex items-center space-x-2">
+                            <p className="text-h3 font-bold text-blue-600">{chats.length}</p>
+                            {getTotalUnreadCount() > 0 && (
+                              <Badge variant="destructive" className="text-xs">
+                                {getTotalUnreadCount()} new
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </CardContent>
@@ -320,6 +373,83 @@ export function ProfileDashboard() {
                 </Card>
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="messages">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-h3 flex items-center space-x-2">
+                  <ChatCircle size={20} />
+                  <span>Messages</span>
+                </CardTitle>
+                <CardDescription>
+                  Conversations about your items and exchanges
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {chats.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                      <ChatCircle size={24} className="text-muted-foreground" />
+                    </div>
+                    <p className="text-body text-muted-foreground mb-4">
+                      No conversations yet. Start by claiming an item!
+                    </p>
+                    <Button>Browse Items</Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {chats.map((chat) => (
+                      <div key={chat.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center space-x-4">
+                          <Avatar>
+                            <AvatarImage src={
+                              user.id === chat.donorId ? chat.collectorAvatar : chat.donorAvatar
+                            } />
+                            <AvatarFallback>
+                              {(user.id === chat.donorId ? chat.collectorName : chat.donorName)[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">
+                              {user.id === chat.donorId ? chat.collectorName : chat.donorName}
+                            </p>
+                            <p className="text-small text-muted-foreground">
+                              About: {chat.itemTitle}
+                            </p>
+                            {chat.lastMessage && (
+                              <p className="text-small text-muted-foreground truncate max-w-md">
+                                {chat.lastMessage.senderName === user.name ? 'You: ' : ''}
+                                {chat.lastMessage.content}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <Badge 
+                            variant={chat.status === 'active' ? 'default' : 'secondary'}
+                            className="text-xs"
+                          >
+                            {chat.status.replace('_', ' ')}
+                          </Badge>
+                          {chat.unreadCount > 0 && (
+                            <Badge variant="destructive" className="text-xs">
+                              {chat.unreadCount} new
+                            </Badge>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            {chat.lastMessage 
+                              ? new Date(chat.lastMessage.timestamp).toLocaleDateString()
+                              : new Date(chat.createdAt).toLocaleDateString()
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="activity">

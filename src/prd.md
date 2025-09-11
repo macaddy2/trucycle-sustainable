@@ -1,12 +1,13 @@
-# TruCycle Authentication & Profile System PRD
+# TruCycle Authentication & Messaging System PRD
 
 ## Core Purpose & Success
-- **Mission Statement**: Enable secure, streamlined user onboarding and profile management for TruCycle's sustainable item exchange platform
+- **Mission Statement**: Enable secure user onboarding and real-time communication for TruCycle's sustainable item exchange platform
 - **Success Indicators**: 
   - >90% authentication completion rate
   - <2-minute profile setup time
+  - >80% message response rate within 24 hours
   - Zero authentication-related security incidents
-- **Experience Qualities**: Trustworthy, Effortless, Secure
+- **Experience Qualities**: Trustworthy, Effortless, Secure, Connected
 
 ## Project Classification & Approach
 - **Complexity Level**: Light Application (authentication, profile creation, basic user management)
@@ -39,9 +40,19 @@
 - **Success Criteria**: Accurate location verification with privacy protection
 
 ### Profile Management Dashboard
-- **Functionality**: View/edit profile, track activity, manage privacy settings
-- **Purpose**: Give users control over their account and track engagement metrics
-- **Success Criteria**: Users can easily manage their profiles and understand their platform usage
+- **Functionality**: View/edit profile, track activity, manage privacy settings, view message conversations
+- **Purpose**: Give users control over their account, track engagement metrics, and manage communications
+- **Success Criteria**: Users can easily manage their profiles, understand their platform usage, and access messaging
+
+### Real-time Messaging System
+- **Functionality**: Secure chat between donors and collectors about specific items, with quick actions for location sharing and pickup coordination
+- **Purpose**: Enable safe, efficient communication for item exchanges while maintaining user privacy
+- **Success Criteria**: Users can successfully start conversations, exchange pickup details, and complete transactions through messaging
+
+### Message Notifications & Management
+- **Functionality**: Unread message indicators, conversation history, message status tracking, and quick access from header
+- **Purpose**: Keep users informed of communication activity and ensure timely responses
+- **Success Criteria**: Users are notified of new messages and can easily manage multiple conversations
 
 ## Design Direction
 
@@ -76,6 +87,16 @@
 - **Social Auth Buttons**: Recognizable brand icons with consistent styling
 - **Profile Type Cards**: Visual selection cards with descriptive content
 - **Verification Badges**: Clear trust indicators for completed verification steps
+- **Message Interface**: Clean chat bubbles with clear sender identification
+- **Notification Badges**: Unobtrusive but visible unread message indicators
+- **Quick Actions**: Contextual buttons for location sharing and pickup coordination
+
+### Messaging UX Patterns
+- **Chat Bubbles**: Distinct styling for sent vs received messages
+- **System Messages**: Clearly differentiated automated notifications
+- **Message Status**: Visual indicators for delivery and read status
+- **Conversation List**: Recent conversations with preview and timestamp
+- **Quick Actions**: One-tap location sharing and status updates
 
 ### Animations
 - **Purposeful Meaning**: Smooth transitions reduce anxiety during sensitive operations like registration
@@ -85,9 +106,12 @@
 ## Implementation Considerations
 - **Security**: Proper password validation, secure storage simulation, GDPR compliance messaging
 - **Accessibility**: WCAG AA compliance, keyboard navigation, screen reader support
-- **Mobile Responsiveness**: Touch-friendly authentication on all device sizes
-- **Data Persistence**: UseKV for user profiles and authentication state
+- **Mobile Responsiveness**: Touch-friendly authentication and messaging on all device sizes
+- **Data Persistence**: UseKV for user profiles, authentication state, chat history, and messages
 - **Error Handling**: Clear, helpful error messages with recovery suggestions
+- **Real-time Simulation**: Mock real-time messaging with simulated responses and delivery status
+- **Message Threading**: Organized conversation history with proper message ordering
+- **Privacy Protection**: User contact information remains private until exchange is confirmed
 
 ## Edge Cases & Problem Scenarios
 - **Invalid Postcodes**: Clear feedback with suggestion to contact support
@@ -95,6 +119,10 @@
 - **Failed Social Auth**: Fallback to email registration with clear error explanation
 - **Duplicate Accounts**: Prevention and clear messaging about existing accounts
 - **Incomplete Onboarding**: Persistent prompts to complete profile setup
+- **Message Delivery Failures**: Retry mechanisms and offline message queuing
+- **Inappropriate Content**: Reporting mechanisms and content moderation simulation
+- **No Response**: Gentle reminders and alternative contact suggestions
+- **Location Sharing**: Privacy-first approach with clear consent
 
 ## Reflection
-This authentication system establishes the foundation of trust needed for TruCycle's marketplace. By focusing on security, simplicity, and clear progress indication, users will feel confident proceeding to use the platform's exchange features. The emphasis on verification and location checking reinforces the platform's commitment to safe, local transactions.
+This authentication and messaging system establishes the foundation of trust and communication needed for TruCycle's marketplace. By focusing on security, simplicity, and clear progress indication, users will feel confident proceeding to use the platform's exchange features. The real-time messaging capability enables safe coordination between users while maintaining privacy. The emphasis on verification, location checking, and secure communication reinforces the platform's commitment to safe, local transactions that build community connections around sustainability.
