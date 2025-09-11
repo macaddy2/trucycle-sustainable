@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/tex
 import { Badge } from '@/components/ui/badge'
+import { Plus, Camera, MapPin, Recycle, Heart, Arro
+import { toast } from 'sonner'
+const CATEGORIES = [
 import { Progress } from '@/components/ui/progress'
 import { Plus, Camera, MapPin, Recycle, Heart, ArrowsClockwise } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
@@ -14,56 +14,55 @@ import { toast } from 'sonner'
 const CATEGORIES = [
   'Electronics',
   'Furniture',
-  'Clothing',
-  'Books',
-  'Kitchen Items',
-  'Garden Tools',
-  'Sports Equipment',
-  'Toys & Games',
-  'Home Decor',
   'Other'
-]
 
-const CONDITIONS = [
-  { value: 'excellent', label: 'Excellent', description: 'Like new, minimal wear' },
-  { value: 'good', label: 'Good', description: 'Well maintained, minor wear' },
-  { value: 'fair', label: 'Fair', description: 'Used but functional' },
-  { value: 'poor', label: 'Poor', description: 'Needs repair or refurbishment' }
+  { value: 'excell
+  { value: 'fair'
 ]
+const ACTION_TYPE
+    value: 'exc
+    icon:
+ 
 
-const ACTION_TYPES = [
-  { 
-    value: 'exchange', 
-    label: 'Exchange', 
-    icon: ArrowsClockwise, 
-    description: 'Trade for another item',
-    color: 'text-accent'
-  },
-  { 
-    value: 'donate', 
-    label: 'Donate', 
-    icon: Heart, 
+    label: 'Donate',
     description: 'Give away for free',
-    color: 'text-primary'
   },
-  { 
     value: 'recycle', 
-    label: 'Recycle', 
     icon: Recycle, 
-    description: 'Proper disposal/recycling',
-    color: 'text-secondary'
-  }
-]
+ 
 
-interface ItemListingFormProps {
-  onComplete?: () => void
+interface ItemListingF
 }
+export function ItemLis
+  const [user] = useKV(
+  
+  const [formData, setFormData] = useState
+    description: '',
+    
+    
+    contactMethod: 'p
 
-export function ItemListingForm({ onComplete }: ItemListingFormProps) {
-  const [currentStep, setCurrentStep] = useState(1)
-  const [user] = useKV('current-user', null)
-  const [listings, setListings] = useKV('user-listings', [])
-  const [globalListings, setGlobalListings] = useKV('global-listings', [])
+
+  const progress = (currentStep / tota
+  const handleInputChange
+  }
+  co
+    const newPhotoUrl 
+      ...prev,
+    }))
+  }
+  const removePhoto = (inde
+   
+ 
+
+    switch (step) {
+        return formData.t
+ 
+
+        return formData.location.trim() !== ''
+        return false
+  }
+  const nextStep = () => {
   
   // Form state
   const [formData, setFormData] = useState({
@@ -88,8 +87,7 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
 
   const handlePhotoUpload = () => {
     // Simulate photo upload - in real app this would handle file selection
-    const photoIndex = formData.photos.length + 1
-    const newPhotoUrl = `https://images.unsplash.com/photo-1586953208448-b95a79798f07?w=400&h=300&fit=crop&auto=format&q=60&random=${photoIndex}`
+    const newPhotoUrl = `/api/placeholder/400/300?random=${Date.now()}`
     setFormData(prev => ({
       ...prev,
       photos: [...prev.photos, newPhotoUrl]
@@ -160,7 +158,8 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
       setListings(currentListings => [...currentListings, newListing])
 
       // Add to global listings for browsing
-      setGlobalListings(currentGlobalListings => [...currentGlobalListings, newListing])
+      const globalListings = await spark.kv.get('global-listings') || []
+      await spark.kv.set('global-listings', [...globalListings, newListing])
 
       // Update user's carbon footprint based on action type
       if (user.carbonFootprint) {
@@ -252,10 +251,10 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
                 placeholder="e.g., Vintage Wooden Coffee Table"
                 value={formData.title}
                 onChange={(e) => handleInputChange('title', e.target.value)}
-              />
-            </div>
+                
+                  
             
-            <div>
+
               <Label htmlFor="description">Description *</Label>
               <Textarea
                 id="description"
@@ -267,170 +266,169 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
             </div>
 
             <div>
-              <Label>Photos ({formData.photos.length}/5)</Label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2">
-                {formData.photos.map((photo, index) => (
-                  <div key={index} className="relative aspect-square bg-muted rounded-lg overflow-hidden">
-                    <img src={photo} alt={`Item photo ${index + 1}`} className="w-full h-full object-cover" />
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      className="absolute top-2 right-2 h-6 w-6 p-0"
-                      onClick={() => removePhoto(index)}
-                    >
-                      ×
-                    </Button>
-                  </div>
-                ))}
-                {formData.photos.length < 5 && (
-                  <Button
-                    variant="outline"
-                    className="aspect-square h-auto flex-col"
-                    onClick={handlePhotoUpload}
                   >
-                    <Camera size={24} className="mb-2" />
-                    <span className="text-xs">Add Photo</span>
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Category and Condition */}
-        {currentStep === 2 && (
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="category">Category *</Label>
-              <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map(category => (
-                    <SelectItem key={category} value={category.toLowerCase()}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>Condition *</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                {CONDITIONS.map(condition => (
-                  <Card
-                    key={condition.value}
-                    className={`cursor-pointer transition-colors ${
-                      formData.condition === condition.value 
-                        ? 'ring-2 ring-primary bg-primary/5' 
-                        : 'hover:bg-muted/50'
-                    }`}
-                    onClick={() => handleInputChange('condition', condition.value)}
-                  >
-                    <CardContent className="p-4">
                       <div className="font-medium">{condition.label}</div>
-                      <div className="text-sm text-muted-foreground">{condition.description}</div>
                     </CardContent>
-                  </Card>
                 ))}
-              </div>
             </div>
-          </div>
         )}
-
-        {/* Step 3: Action Type */}
-        {currentStep === 3 && (
+        {/* Step 3: Action Type
           <div className="space-y-4">
-            <div>
-              <Label>What would you like to do with this item? *</Label>
-              <div className="grid grid-cols-1 gap-3 mt-4">
+              <Label>What would you like to do with this item? *</La
                 {ACTION_TYPES.map(action => {
-                  const Icon = action.icon
-                  return (
-                    <Card
-                      key={action.value}
-                      className={`cursor-pointer transition-colors ${
-                        formData.actionType === action.value 
-                          ? 'ring-2 ring-primary bg-primary/5' 
-                          : 'hover:bg-muted/50'
-                      }`}
-                      onClick={() => handleInputChange('actionType', action.value)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-center space-x-3">
-                          <Icon size={24} className={action.color} />
-                          <div>
-                            <div className="font-medium">{action.label}</div>
-                            <div className="text-sm text-muted-foreground">{action.description}</div>
+                  ret
+                      k
+                        formD
+                        
+                   
+                      <CardContent className="p-
+                         
+                            <div clas
                           </div>
-                        </div>
                       </CardContent>
-                    </Card>
                   )
-                })}
               </div>
-            </div>
           </div>
-        )}
 
-        {/* Step 4: Location and Contact */}
-        {currentStep === 4 && (
-          <div className="space-y-4">
+        {currentSt
             <div>
-              <Label htmlFor="location">Location *</Label>
-              <div className="relative">
-                <MapPin size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="location"
-                  placeholder="e.g., Camden, North London"
-                  value={formData.location}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                General area only - exact address will be shared privately
-              </p>
-            </div>
-
-            {/* Summary */}
-            <div className="bg-muted/50 rounded-lg p-4">
-              <h3 className="font-medium mb-3">Listing Summary</h3>
-              <div className="space-y-2 text-sm">
-                <div><span className="font-medium">Title:</span> {formData.title}</div>
-                <div><span className="font-medium">Category:</span> {formData.category}</div>
-                <div><span className="font-medium">Condition:</span> {formData.condition}</div>
-                <div><span className="font-medium">Action:</span> {formData.actionType}</div>
-                <div><span className="font-medium">Location:</span> {formData.location}</div>
-                <div><span className="font-medium">Photos:</span> {formData.photos.length} uploaded</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Navigation */}
-        <div className="flex justify-between pt-6">
-          <Button
-            variant="outline"
-            onClick={prevStep}
-            disabled={currentStep === 1}
-          >
-            Previous
-          </Button>
+              <div
+                
           
-          {currentStep < totalSteps ? (
-            <Button onClick={nextStep}>
+
+                />
+              <p className="tex
+              </p>
+
+            <div className="bg-muted/50 rounded-lg p-4">
+              <div className="space-y-2 text-sm">
+                <div><span clas
+                <div><span className="font-medium">Action:</span>
+                <div><span class
+            </div>
+        )}
+        {/* Navigation */}
+          <Button
+            onClick={prevStep}
+          >
+          </Button>
+          {currentStep 
               Next
-            </Button>
-          ) : (
-            <Button onClick={handleSubmit} disabled={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Listing'}
-            </Button>
+
+              {is
           )}
-        </div>
       </CardContent>
-    </Card>
   )
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
