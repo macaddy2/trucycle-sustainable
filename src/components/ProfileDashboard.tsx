@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
+import { Label } from '@/components/ui/label'
 import { 
   User, 
   Leaf, 
@@ -16,12 +17,17 @@ import {
   Award, 
   SignOut,
   ChatCircle,
-  Bell
+  Bell,
+  Shield,
+  CheckCircle
 } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { AuthDialog } from './auth/AuthDialog'
 import { ProfileOnboarding } from './auth/ProfileOnboarding'
 import { useMessaging, useInitializeSampleData } from '@/hooks'
+import { VerificationBadge, VerificationLevel } from './VerificationBadge'
+import { RatingDisplay, RatingList, useUserRatingStats } from './RatingSystem'
+import { VerificationCenter } from './VerificationCenter'
 import { toast } from 'sonner'
 
 interface UserProfile {
@@ -35,6 +41,14 @@ interface UserProfile {
   avatar?: string
   verified?: boolean
   rating?: number
+  verificationLevel?: {
+    email: boolean
+    phone: boolean
+    identity: boolean
+    address: boolean
+    payment: boolean
+    community: boolean
+  }
 }
 
 interface UserStats {
@@ -71,6 +85,9 @@ export function ProfileDashboard() {
     }
   }, [user])
 
+  // Get user rating statistics
+  const ratingStats = useUserRatingStats(user?.id || '')
+
   const [stats] = useKV<UserStats>('user-stats', {
     itemsListed: 0,
     itemsDonated: 0,
@@ -81,6 +98,7 @@ export function ProfileDashboard() {
   })
 
   const [activities] = useKV<Activity[]>('user-activities', [])
+  const [userRatings] = useKV('user-ratings', [])
 
   const handleSignOut = () => {
     setUser(null)
@@ -236,7 +254,7 @@ export function ProfileDashboard() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="messages" className="flex items-center space-x-2">
               <ChatCircle size={16} />
@@ -244,6 +262,15 @@ export function ProfileDashboard() {
               {getTotalUnreadCount() > 0 && (
                 <Badge variant="destructive" className="text-xs ml-1">
                   {getTotalUnreadCount()}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="ratings" className="flex items-center space-x-2">
+              <Star size={16} />
+              <span>Ratings</span>
+              {ratingStats.totalRatings > 0 && (
+                <Badge variant="secondary" className="text-xs ml-1">
+                  {ratingStats.totalRatings}
                 </Badge>
               )}
             </TabsTrigger>
@@ -268,20 +295,40 @@ export function ProfileDashboard() {
                     <div>
                       <h3 className="text-h3 flex items-center justify-center space-x-2">
                         <span>{user.name}</span>
-                        {user.verified && (
-                          <Badge variant="secondary">✓ Verified</Badge>
-                        )}
                       </h3>
-                      <p className="text-small text-muted-foreground capitalize">
+                      <div className="flex items-center justify-center space-x-2 mt-2">
+                        <VerificationBadge 
+                          verified={user.verificationLevel || {
+                            email: true,
+                            phone: false,
+                            identity: false,
+                            address: true,
+                            payment: false,
+                            community: stats.successfulExchanges >= 5
+                          }}
+                          variant="compact"
+                        />
+                      </div>
+                      <p className="text-small text-muted-foreground capitalize mt-1">
                         {user.userType} • {user.postcode || 'Location not set'}
                       </p>
-                      <div className="flex items-center justify-center space-x-1 mt-2">
-                        <Star size={16} className="text-yellow-500 fill-current" />
-                        <span className="text-small font-medium">{(user.rating || 5.0).toFixed(1)}</span>
-                        <span className="text-small text-muted-foreground">
-                          ({stats.reviews} reviews)
-                        </span>
+                      
+                      {/* Rating Display */}
+                      <div className="mt-3">
+                        <RatingDisplay
+                          rating={ratingStats.averageRating || 5.0}
+                          totalRatings={ratingStats.totalRatings || 0}
+                          size="md"
+                          className="justify-center"
+                        />
+                        {ratingStats.totalRatings > 0 && (
+                          <div className="flex justify-center space-x-4 mt-2 text-xs text-muted-foreground">
+                            <span>Communication: {(ratingStats.categoryAverages?.communication || 5.0).toFixed(1)}</span>
+                            <span>Punctuality: {(ratingStats.categoryAverages?.punctuality || 5.0).toFixed(1)}</span>
+                          </div>
+                        )}
                       </div>
+                      
                       <p className="text-xs text-muted-foreground mt-2">
                         Joined {new Date(user.createdAt).toLocaleDateString()}
                       </p>
@@ -452,6 +499,105 @@ export function ProfileDashboard() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="ratings">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Rating Summary */}
+              <Card className="lg:col-span-1">
+                <CardHeader>
+                  <CardTitle className="text-h3 flex items-center space-x-2">
+                    <Star size={20} />
+                    <span>Rating Summary</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-center">
+                    <RatingDisplay
+                      rating={ratingStats.averageRating || 5.0}
+                      totalRatings={ratingStats.totalRatings || 0}
+                      size="lg"
+                      className="justify-center"
+                    />
+                  </div>
+
+                  {/* Rating Distribution */}
+                  {ratingStats.totalRatings > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm">Rating Breakdown</h4>
+                      {[5, 4, 3, 2, 1].map((rating) => (
+                        <div key={rating} className="flex items-center space-x-2 text-sm">
+                          <span className="w-8">{rating}★</span>
+                          <Progress 
+                            value={(ratingStats.ratingDistribution[rating as keyof typeof ratingStats.ratingDistribution] / ratingStats.totalRatings) * 100} 
+                            className="flex-1 h-2" 
+                          />
+                          <span className="w-8 text-muted-foreground">
+                            {ratingStats.ratingDistribution[rating as keyof typeof ratingStats.ratingDistribution]}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Category Averages */}
+                  {ratingStats.totalRatings > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm">Category Scores</h4>
+                      {[
+                        { label: 'Communication', value: ratingStats.categoryAverages?.communication || 0 },
+                        { label: 'Punctuality', value: ratingStats.categoryAverages?.punctuality || 0 },
+                        { label: 'Item Condition', value: ratingStats.categoryAverages?.itemCondition || 0 },
+                        { label: 'Politeness', value: ratingStats.categoryAverages?.politeness || 0 }
+                      ].map((category) => (
+                        <div key={category.label} className="flex items-center justify-between text-sm">
+                          <span>{category.label}</span>
+                          <div className="flex items-center space-x-1">
+                            <Star size={14} className="text-yellow-500 fill-current" />
+                            <span className="font-medium">{category.value.toFixed(1)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Verification Status */}
+                  <div className="pt-4 border-t">
+                    <h4 className="font-medium text-sm mb-2">Trust & Verification</h4>
+                    <VerificationBadge 
+                      verified={user.verificationLevel || {
+                        email: true,
+                        phone: false,
+                        identity: false,
+                        address: true,
+                        payment: false,
+                        community: stats.successfulExchanges >= 5
+                      }}
+                      variant="detailed"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Reviews List */}
+              <div className="lg:col-span-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-h3">Reviews</CardTitle>
+                    <CardDescription>
+                      What others say about exchanging with {user.name}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <RatingList
+                      userId={user.id}
+                      ratings={userRatings}
+                      showAll={false}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+
           <TabsContent value="activity">
             <Card>
               <CardHeader>
@@ -524,25 +670,123 @@ export function ProfileDashboard() {
           </TabsContent>
 
           <TabsContent value="settings">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-h3">Account Settings</CardTitle>
-                <CardDescription>
-                  Manage your preferences and account information
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Settings size={24} className="text-muted-foreground" />
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-h3">Account Settings</CardTitle>
+                  <CardDescription>
+                    Manage your preferences and account information
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {/* Profile Information */}
+                    <div className="space-y-4">
+                      <h4 className="font-medium">Profile Information</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>Display Name</Label>
+                          <div className="text-sm text-muted-foreground">{user.name}</div>
+                        </div>
+                        <div>
+                          <Label>Email Address</Label>
+                          <div className="text-sm text-muted-foreground">{user.email}</div>
+                        </div>
+                        <div>
+                          <Label>User Type</Label>
+                          <div className="text-sm text-muted-foreground capitalize">{user.userType}</div>
+                        </div>
+                        <div>
+                          <Label>Location</Label>
+                          <div className="text-sm text-muted-foreground">{user.postcode || 'Not set'}</div>
+                        </div>
+                      </div>
+                      <Button variant="outline">Edit Profile</Button>
+                    </div>
+
+                    {/* Notification Preferences */}
+                    <div className="space-y-4 pt-6 border-t">
+                      <h4 className="font-medium">Notification Preferences</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">Email Notifications</p>
+                            <p className="text-xs text-muted-foreground">Receive updates about your exchanges</p>
+                          </div>
+                          <Button variant="outline" size="sm">Enabled</Button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">SMS Notifications</p>
+                            <p className="text-xs text-muted-foreground">Get text updates for urgent messages</p>
+                          </div>
+                          <Button variant="outline" size="sm">Disabled</Button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">Marketing Communications</p>
+                            <p className="text-xs text-muted-foreground">Tips and platform updates</p>
+                          </div>
+                          <Button variant="outline" size="sm">Enabled</Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Privacy Settings */}
+                    <div className="space-y-4 pt-6 border-t">
+                      <h4 className="font-medium">Privacy Settings</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">Profile Visibility</p>
+                            <p className="text-xs text-muted-foreground">Who can see your profile information</p>
+                          </div>
+                          <Button variant="outline" size="sm">Community</Button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">Location Sharing</p>
+                            <p className="text-xs text-muted-foreground">Share approximate location in listings</p>
+                          </div>
+                          <Button variant="outline" size="sm">Enabled</Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Account Actions */}
+                    <div className="space-y-4 pt-6 border-t">
+                      <h4 className="font-medium">Account Actions</h4>
+                      <div className="space-y-2">
+                        <Button variant="outline" className="w-full justify-start">
+                          <Settings size={16} className="mr-2" />
+                          Download My Data
+                        </Button>
+                        <Button variant="outline" className="w-full justify-start text-red-600 hover:text-red-700">
+                          <SignOut size={16} className="mr-2" />
+                          Delete Account
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-body text-muted-foreground mb-4">
-                    Settings panel coming soon
-                  </p>
-                  <Button variant="outline">Update Profile</Button>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              {/* Verification Center */}
+              <VerificationCenter
+                userId={user.id}
+                currentVerification={user.verificationLevel || {
+                  email: true,
+                  phone: false,
+                  identity: false,
+                  address: true,
+                  payment: false,
+                  community: stats.successfulExchanges >= 5
+                }}
+                onVerificationUpdate={(verification) => {
+                  setUser((prev: any) => ({ ...prev, verificationLevel: verification }))
+                }}
+              />
+            </div>
           </TabsContent>
         </Tabs>
       </div>

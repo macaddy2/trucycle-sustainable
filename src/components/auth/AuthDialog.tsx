@@ -22,6 +22,18 @@ interface UserProfile {
   userType: 'donor' | 'collector'
   postcode?: string
   createdAt: string
+  onboardingCompleted?: boolean
+  avatar?: string
+  verified?: boolean
+  rating?: number
+  verificationLevel?: {
+    email: boolean
+    phone: boolean
+    identity: boolean
+    address: boolean
+    payment: boolean
+    community: boolean
+  }
 }
 
 export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthDialogProps) {
@@ -89,7 +101,17 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
           email: formData.email,
           name: formData.name,
           userType: 'donor', // Default type, will be set in onboarding
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          verified: true,
+          rating: 5.0,
+          verificationLevel: {
+            email: true,
+            phone: false,
+            identity: false,
+            address: false,
+            payment: false,
+            community: false
+          }
         }
 
         // Store user profile
@@ -109,7 +131,17 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
           name: 'Demo User',
           userType: 'donor',
           postcode: 'SW1A 1AA',
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          verified: true,
+          rating: 4.7,
+          verificationLevel: {
+            email: true,
+            phone: true,
+            identity: true,
+            address: true,
+            payment: true,
+            community: true
+          }
         }
 
         setUser(mockUser)
@@ -136,7 +168,17 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
         email: `user@${provider}.com`,
         name: `${provider === 'google' ? 'Google' : 'Facebook'} User`,
         userType: 'donor',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        verified: true,
+        rating: 4.8,
+        verificationLevel: {
+          email: true,
+          phone: false,
+          identity: false,
+          address: false,
+          payment: false,
+          community: false
+        }
       }
 
       setUser(mockUser)

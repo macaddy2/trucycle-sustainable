@@ -34,13 +34,137 @@ interface Message {
   type: 'text' | 'system' | 'location' | 'image'
 }
 
+interface Rating {
+  id: string
+  exchangeId: string
+  itemTitle: string
+  reviewerId: string
+  reviewerName: string
+  reviewerAvatar?: string
+  targetUserId: string
+  targetUserName: string
+  rating: number
+  review: string
+  category: 'punctuality' | 'communication' | 'item_condition' | 'overall'
+  subcategories: {
+    punctuality: number
+    communication: number
+    itemCondition: number
+    politeness: number
+  }
+  isPositive: boolean
+  helpfulVotes: number
+  createdAt: string
+  verified: boolean
+}
+
 export function useInitializeSampleData() {
   const [currentUser] = useKV('current-user', null)
   const [chats, setChats] = useKV('user-chats', [] as Chat[])
   const [messages, setMessages] = useKV('chat-messages', {} as Record<string, Message[]>)
+  const [ratings, setRatings] = useKV('user-ratings', [] as Rating[])
 
   const initializeSampleChats = () => {
     if (!currentUser || chats.length > 0) return
+
+    // Initialize sample ratings if none exist
+    if (ratings.length === 0) {
+      const sampleRatings: Rating[] = [
+        {
+          id: 'rating_1',
+          exchangeId: 'exchange_1',
+          itemTitle: 'Vintage Oak Dining Table',
+          reviewerId: 'user_reviewer_1',
+          reviewerName: 'Alex Johnson',
+          reviewerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+          targetUserId: 'user_donor_1',
+          targetUserName: 'Sarah Johnson',
+          rating: 5,
+          review: 'Sarah was amazing! The table was exactly as described and she was very flexible with pickup timing. Highly recommended!',
+          category: 'overall',
+          subcategories: {
+            punctuality: 5,
+            communication: 5,
+            itemCondition: 5,
+            politeness: 5
+          },
+          isPositive: true,
+          helpfulVotes: 3,
+          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          verified: true
+        },
+        {
+          id: 'rating_2',
+          exchangeId: 'exchange_2',
+          itemTitle: 'Garden Tools Set',
+          reviewerId: 'user_reviewer_2',
+          reviewerName: 'Maria Garcia',
+          reviewerAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150',
+          targetUserId: 'user_donor_1',
+          targetUserName: 'Sarah Johnson',
+          rating: 4,
+          review: 'Great exchange! Tools were in good condition. Sarah was a bit late but apologized and was very friendly.',
+          category: 'overall',
+          subcategories: {
+            punctuality: 3,
+            communication: 5,
+            itemCondition: 4,
+            politeness: 5
+          },
+          isPositive: true,
+          helpfulVotes: 1,
+          createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+          verified: true
+        },
+        {
+          id: 'rating_3',
+          exchangeId: 'exchange_3',
+          itemTitle: 'Electronics Bundle',
+          reviewerId: 'user_reviewer_3',
+          reviewerName: 'John Smith',
+          reviewerAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+          targetUserId: 'user_donor_2',
+          targetUserName: 'Michael Chen',
+          rating: 5,
+          review: 'Fantastic experience! Michael was punctual, well-organized, and the items were in perfect condition. Will definitely exchange again!',
+          category: 'overall',
+          subcategories: {
+            punctuality: 5,
+            communication: 5,
+            itemCondition: 5,
+            politeness: 5
+          },
+          isPositive: true,
+          helpfulVotes: 5,
+          createdAt: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString(),
+          verified: true
+        },
+        {
+          id: 'rating_4',
+          exchangeId: 'exchange_4',
+          itemTitle: 'Books Collection',
+          reviewerId: 'user_reviewer_4',
+          reviewerName: 'Lisa Wong',
+          reviewerAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
+          targetUserId: 'user_donor_3',
+          targetUserName: 'Emma Thompson',
+          rating: 4,
+          review: 'Nice collection of books! Emma was responsive and easy to coordinate with. One book had more wear than expected but overall happy.',
+          category: 'overall',
+          subcategories: {
+            punctuality: 4,
+            communication: 5,
+            itemCondition: 3,
+            politeness: 4
+          },
+          isPositive: true,
+          helpfulVotes: 2,
+          createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+          verified: true
+        }
+      ]
+      setRatings(sampleRatings)
+    }
 
     const sampleChats: Chat[] = [
       {

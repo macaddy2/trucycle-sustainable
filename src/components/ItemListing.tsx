@@ -9,6 +9,8 @@ import { Heart, MapPin, ArrowsClockwise, Clock, Package, ChatCircle, Recycle } f
 import { useKV } from '@github/spark/hooks'
 import { useMessaging } from '@/hooks'
 import { InlineMessage } from './messaging'
+import { VerificationBadge, VerificationLevel } from './VerificationBadge'
+import { RatingDisplay, useUserRatingStats } from './RatingSystem'
 import { toast } from 'sonner'
 
 interface ItemListingProps {
@@ -34,6 +36,8 @@ interface Item {
   ownerName?: string
   ownerId?: string
   ownerAvatar?: string
+  ownerRating?: number
+  ownerVerificationLevel?: VerificationLevel
   status: string
   views: number
   interested: string[]
@@ -72,6 +76,15 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
         ownerId: 'user_donor_1',
         ownerName: 'Sarah Johnson',
         ownerAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150',
+        ownerRating: 4.8,
+        ownerVerificationLevel: {
+          email: true,
+          phone: true,
+          identity: true,
+          address: true,
+          payment: true,
+          community: true
+        },
         status: 'active',
         views: 12,
         interested: []
@@ -95,9 +108,52 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
         ownerId: 'user_donor_2',
         ownerName: 'Michael Chen',
         ownerAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+        ownerRating: 4.9,
+        ownerVerificationLevel: {
+          email: true,
+          phone: true,
+          identity: false,
+          address: true,
+          payment: true,
+          community: true
+        },
         status: 'active',
         views: 8,
         interested: []
+      },
+      {
+        id: 'item_3',
+        title: 'Designer Winter Coat',
+        description: 'Barely worn designer winter coat, size Medium. Perfect for the upcoming season.',
+        category: 'clothing',
+        condition: 'excellent',
+        location: 'Hackney, London',
+        distance: '3.1 miles',
+        actionType: 'exchange',
+        photos: [],
+        createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+        listedDate: '5 hours ago',
+        co2Impact: 15,
+        verified: false,
+        userId: 'user_donor_3',
+        userName: 'Emma Thompson',
+        ownerId: 'user_donor_3',
+        ownerName: 'Emma Thompson',
+        ownerAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
+        ownerRating: 4.2,
+        ownerVerificationLevel: {
+          email: true,
+          phone: false,
+          identity: false,
+          address: true,
+          payment: false,
+          community: false
+        },
+        status: 'active',
+        views: 3,
+        interested: []
+      }
+    ]
       },
       {
         id: 'item_3',
@@ -493,26 +549,45 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
 
                   <div>
                     <h4 className="font-medium mb-2">Item Owner</h4>
-                    <div className="flex items-center space-x-3 p-3 bg-muted rounded-lg">
-                      <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                        {selectedItem.ownerAvatar ? (
-                          <img 
-                            src={selectedItem.ownerAvatar} 
-                            alt={selectedItem.ownerName || selectedItem.userName}
-                            className="w-full h-full rounded-full object-cover"
+                    <div className="space-y-3 p-3 bg-muted rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                          {selectedItem.ownerAvatar ? (
+                            <img 
+                              src={selectedItem.ownerAvatar} 
+                              alt={selectedItem.ownerName || selectedItem.userName}
+                              className="w-full h-full rounded-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-primary-foreground font-medium">
+                              {(selectedItem.ownerName || selectedItem.userName)[0]}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium">{selectedItem.ownerName || selectedItem.userName}</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            {selectedItem.ownerVerificationLevel && (
+                              <VerificationBadge 
+                                verified={selectedItem.ownerVerificationLevel}
+                                variant="compact"
+                                className="text-xs"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Owner Rating */}
+                      {selectedItem.ownerRating && (
+                        <div className="pt-2 border-t border-border">
+                          <RatingDisplay
+                            rating={selectedItem.ownerRating}
+                            totalRatings={Math.floor(Math.random() * 20) + 5} // Sample count
+                            size="sm"
                           />
-                        ) : (
-                          <span className="text-primary-foreground font-medium">
-                            {(selectedItem.ownerName || selectedItem.userName)[0]}
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium">{selectedItem.ownerName || selectedItem.userName}</p>
-                        <p className="text-small text-muted-foreground">
-                          {selectedItem.verified ? '✓ Verified Member' : 'Community Member'}
-                        </p>
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
