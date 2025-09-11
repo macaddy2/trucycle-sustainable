@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -7,11 +7,42 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, Plus, User } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { ItemListing, ProfileDashboard, DropOffMap, CarbonTracker } from './components'
+import { AuthDialog, ProfileOnboarding } from './components/auth'
 
 function App() {
   const [currentTab, setCurrentTab] = useState('browse')
   const [searchQuery, setSearchQuery] = useState('')
   const [user] = useKV('current-user', null)
+  const [showAuthDialog, setShowAuthDialog] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
+
+  // Check if user needs onboarding
+  useEffect(() => {
+    if (user && !user.onboardingCompleted) {
+      setShowOnboarding(true)
+    }
+  }, [user])
+
+  const handleSignIn = () => {
+    setAuthMode('signin')
+    setShowAuthDialog(true)
+  }
+
+  const handleSignUp = () => {
+    setAuthMode('signup')
+    setShowAuthDialog(true)
+  }
+
+  const handleAuthComplete = () => {
+    if (user && !user.onboardingCompleted) {
+      setShowOnboarding(true)
+    }
+  }
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false)
+  }
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,14 +77,22 @@ function App() {
               </form>
               
               {user ? (
-                <Button variant="outline" size="sm">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setCurrentTab('profile')}
+                >
                   <User size={16} className="mr-2" />
-                  Profile
+                  {user.name.split(' ')[0]}
                 </Button>
               ) : (
                 <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm">Sign In</Button>
-                  <Button size="sm">Sign Up</Button>
+                  <Button variant="outline" size="sm" onClick={handleSignIn}>
+                    Sign In
+                  </Button>
+                  <Button size="sm" onClick={handleSignUp}>
+                    Sign Up
+                  </Button>
                 </div>
               )}
             </div>
@@ -193,6 +232,24 @@ function App() {
           </div>
         </div>
       </footer>
+
+      {/* Authentication Dialogs */}
+      <AuthDialog 
+        open={showAuthDialog} 
+        onOpenChange={(open) => {
+          setShowAuthDialog(open)
+          if (!open) {
+            handleAuthComplete()
+          }
+        }}
+        initialMode={authMode}
+      />
+
+      <ProfileOnboarding 
+        open={showOnboarding} 
+        onOpenChange={setShowOnboarding}
+        onComplete={handleOnboardingComplete}
+      />
     </div>
   )
 }
