@@ -89,8 +89,8 @@ export function useRecommendationNotifications(user: UserProfile | null) {
     // Listen for demo notifications when profile switches
     const handleDemoNotification = (event: CustomEvent) => {
       const { notification } = event.detail
-      if (notification && notification.userId === user?.id || "") {
-        setNotifications(prev => [notification, ...prev])
+      if (notification && notification.userId === (user?.id || "")) {
+        setNotifications(prev => [notification, ...(prev || [])])
       }
     }
 
@@ -144,7 +144,7 @@ export function useRecommendationNotifications(user: UserProfile | null) {
           }
         ]
 
-        setNotifications(prev => [...urgentNotifications, ...prev])
+        setNotifications(prev => [...urgentNotifications, ...(prev || [])])
         
         urgentNotifications.forEach((notif) => {
           toast(notif.title, {
@@ -186,7 +186,7 @@ export function useRecommendationNotifications(user: UserProfile | null) {
           }
         ]
 
-        setNotifications(prev => [...urgentNotifications, ...prev])
+        setNotifications(prev => [...urgentNotifications, ...(prev || [])])
         
         urgentNotifications.forEach((notif) => {
           toast(notif.title, {
@@ -211,7 +211,7 @@ export function useRecommendationNotifications(user: UserProfile | null) {
   // Mark notification as read
   const markAsRead = (notificationId: string) => {
     setNotifications(prev => 
-      prev.map(notif => 
+      (prev || []).map(notif => 
         notif.id === notificationId 
           ? { ...notif, read: true }
           : notif
@@ -221,14 +221,15 @@ export function useRecommendationNotifications(user: UserProfile | null) {
 
   // Get unread count
   const getUnreadCount = () => {
-    return notifications.filter(notif => !notif.read && notif.userId === user?.id).length
+    if (!notifications || !user) return 0
+    return notifications.filter(notif => !notif.read && notif.userId === (user?.id || "")).length
   }
 
   // Get recent notifications for user
   const getUserNotifications = () => {
-    if (!user) return []
+    if (!user || !notifications) return []
     return notifications
-      .filter(notif => notif.userId === user?.id || "")
+      .filter(notif => notif.userId === (user?.id || ""))
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 10) // Last 10 notifications
   }

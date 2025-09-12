@@ -29,6 +29,10 @@ export interface VerificationBadgeProps {
 
 // Calculate overall verification status
 export function getVerificationStatus(verified: VerificationLevel) {
+  if (!verified || typeof verified !== 'object') {
+    return 'basic'
+  }
+  
   const checks = Object.values(verified)
   const completedChecks = checks.filter(Boolean).length
   const totalChecks = checks.length

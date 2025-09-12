@@ -113,8 +113,8 @@ export function VerificationCenter({ userId, currentVerification, onVerification
     identityDoc: null as File | null
   })
 
-  const completedSteps = Object.values(currentVerification).filter(Boolean).length
-  const totalSteps = Object.keys(currentVerification).length
+  const completedSteps = Object.values(currentVerification || {}).filter(Boolean).length
+  const totalSteps = Object.keys(currentVerification || {}).length
   const completionPercentage = (completedSteps / totalSteps) * 100
 
   const handleVerificationStart = async (step: VerificationStep) => {

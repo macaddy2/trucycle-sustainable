@@ -34,13 +34,15 @@ interface UserProfile {
   name: string
   email: string
   userType: 'donor' | 'collector'
-  verificationLevel: VerificationLevel
   onboardingCompleted: boolean
   rating?: number
-  completedVerifications: {
+  verificationLevel: {
     email: boolean
     phone: boolean
     identity: boolean
+    address: boolean
+    payment: boolean
+    community: boolean
   }
 }
 
@@ -332,7 +334,14 @@ export function ProfileDashboard() {
                   <div className="space-y-2">
                     <h2 className="text-h2">{user.name || 'User'}</h2>
                     <VerificationBadge 
-                      level={user.verificationLevel || 'basic'}
+                      verified={{
+                        email: user.verificationLevel?.email ?? true,
+                        phone: user.verificationLevel?.phone ?? false,
+                        identity: user.verificationLevel?.identity ?? false,
+                        address: user.verificationLevel?.address ?? true,
+                        payment: user.verificationLevel?.payment ?? false,
+                        community: user.verificationLevel?.community ?? (stats.successfulExchanges >= 10)
+                      }}
                       className="mx-auto"
                     />
                     <Badge variant="secondary" className="capitalize">
@@ -691,14 +700,13 @@ export function ProfileDashboard() {
               </CardHeader>
               <CardContent>
                 <VerificationBadge 
-                  level={user.verificationLevel || 'basic'}
-                  completedVerifications={{
-                    email: true,
-                    phone: false,
-                    address: true,
-                    payment: false,
-                    identity: false,
-                    community: stats.successfulExchanges >= 10
+                  verified={{
+                    email: user.verificationLevel?.email ?? true,
+                    phone: user.verificationLevel?.phone ?? false,
+                    identity: user.verificationLevel?.identity ?? false,
+                    address: user.verificationLevel?.address ?? true,
+                    payment: user.verificationLevel?.payment ?? false,
+                    community: user.verificationLevel?.community ?? (stats.successfulExchanges >= 10)
                   }}
                 />
               </CardContent>
@@ -773,17 +781,23 @@ export function ProfileDashboard() {
             </Card>
 
             <VerificationCenter 
-              currentVerification={user.verificationLevel || 'basic'}
-              completedVerifications={{
-                email: true,
-                phone: false,
-                address: true,
-                payment: false,
-                identity: false,
-                community: stats.successfulExchanges >= 10
+              userId={user.id}
+              currentVerification={{
+                email: user.verificationLevel?.email ?? true,
+                phone: user.verificationLevel?.phone ?? false,
+                identity: user.verificationLevel?.identity ?? false,
+                address: user.verificationLevel?.address ?? true,
+                payment: user.verificationLevel?.payment ?? false,
+                community: user.verificationLevel?.community ?? (stats.successfulExchanges >= 10)
               }}
-              onVerificationComplete={(level) => 
-                setUser({ ...user, verificationLevel: level })
+              onVerificationUpdate={(verification) => 
+                setUser({ 
+                  ...user, 
+                  verificationLevel: {
+                    ...user.verificationLevel,
+                    ...verification
+                  }
+                })
               }
             />
           </div>

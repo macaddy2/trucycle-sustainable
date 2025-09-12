@@ -39,6 +39,14 @@ interface UserProfile {
   onboardingCompleted?: boolean
   addressVerified?: boolean
   addressVerifiedAt?: string
+  verificationLevel?: {
+    email: boolean
+    phone: boolean
+    identity: boolean
+    address: boolean
+    payment: boolean
+    community: boolean
+  }
 }
 
 export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnboardingProps) {
@@ -126,15 +134,27 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
 
       // Update user profile with verified address data
       const updatedUser: UserProfile = {
-        ...user,
+        ...(user || {}),
+        id: user?.id || `user_${Date.now()}`,
+        email: user?.email || '',
+        name: user?.name || '',
         userType: profileData.userType as 'donor' | 'collector',
         postcode: profileData.postcode.toUpperCase(),
         area: verificationData.area,
         district: verificationData.district,
         serviceArea: verificationData.serviceArea,
+        createdAt: user?.createdAt || new Date().toISOString(),
         onboardingCompleted: true,
         addressVerified: true,
-        addressVerifiedAt: new Date().toISOString()
+        addressVerifiedAt: new Date().toISOString(),
+        verificationLevel: {
+          email: true,
+          phone: false,
+          identity: false,
+          address: true,
+          payment: false,
+          community: false
+        }
       }
 
       // Save to user profiles

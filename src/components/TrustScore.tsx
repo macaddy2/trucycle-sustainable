@@ -75,6 +75,10 @@ export function calculateTrustScore(factors: TrustFactors): TrustScore {
 }
 
 function calculateVerificationScore(verification: VerificationLevel): number {
+  if (!verification || typeof verification !== 'object') {
+    return 0
+  }
+  
   const weights = {
     email: 5,      // Basic requirement
     phone: 8,      // Important for contact
@@ -150,7 +154,7 @@ function getTrustFactors(factors: TrustFactors, overallScore: number): string[] 
   const positiveFactors: string[] = []
   
   // Verification factors
-  const verificationCount = Object.values(factors.verificationLevel).filter(Boolean).length
+  const verificationCount = Object.values(factors.verificationLevel || {}).filter(Boolean).length
   if (verificationCount >= 5) positiveFactors.push('Fully verified identity')
   else if (verificationCount >= 3) positiveFactors.push('Well-verified profile')
   

@@ -18,13 +18,15 @@ interface UserProfile {
   name: string
   email: string
   userType: 'donor' | 'collector'
-  verificationLevel: 'basic' | 'verified' | 'trusted'
   onboardingCompleted: boolean
   rating?: number
-  completedVerifications: {
+  verificationLevel: {
     email: boolean
     phone: boolean
     identity: boolean
+    address: boolean
+    payment: boolean
+    community: boolean
   }
 }
 

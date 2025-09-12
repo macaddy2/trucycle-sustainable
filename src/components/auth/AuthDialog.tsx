@@ -102,6 +102,7 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
           name: formData.name,
           userType: 'donor', // Default type, will be set in onboarding
           createdAt: new Date().toISOString(),
+          onboardingCompleted: false,
           verified: true,
           rating: 5.0,
           verificationLevel: {
@@ -132,6 +133,7 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
           userType: 'donor',
           postcode: 'SW1A 1AA',
           createdAt: new Date().toISOString(),
+          onboardingCompleted: true,
           verified: true,
           rating: 4.7,
           verificationLevel: {
