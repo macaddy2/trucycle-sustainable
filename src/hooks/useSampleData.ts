@@ -24,6 +24,21 @@ interface Chat {
   updatedAt: Date
 }
 
+interface UserProfile {
+  id: string
+  name: string
+  email: string
+  userType: 'donor' | 'collector'
+  verificationLevel: 'basic' | 'verified' | 'trusted'
+  onboardingCompleted: boolean
+  rating?: number
+  completedVerifications: {
+    email: boolean
+    phone: boolean
+    identity: boolean
+  }
+}
+
 interface Message {
   id: string
   chatId: string
@@ -59,16 +74,16 @@ interface Rating {
 }
 
 export function useInitializeSampleData() {
-  const [currentUser] = useKV('current-user', null)
-  const [chats, setChats] = useKV('user-chats', [] as Chat[])
-  const [messages, setMessages] = useKV('chat-messages', {} as Record<string, Message[]>)
-  const [ratings, setRatings] = useKV('user-ratings', [] as Rating[])
+  const [currentUser] = useKV<UserProfile | null>('current-user', null)
+  const [chats, setChats] = useKV<Chat[]>('user-chats', [])
+  const [messages, setMessages] = useKV<Record<string, Message[]>>('chat-messages', {})
+  const [ratings, setRatings] = useKV<Rating[]>('user-ratings', [])
 
   const initializeSampleChats = () => {
-    if (!currentUser || chats.length > 0) return
+    if (!currentUser || chats?.length > 0) return
 
     // Initialize sample ratings if none exist
-    if (ratings.length === 0) {
+    if (ratings?.length === 0) {
       const sampleRatings: Rating[] = [
         {
           id: 'rating_1',

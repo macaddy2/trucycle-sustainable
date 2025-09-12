@@ -26,35 +26,35 @@ export function CarbonTracker() {
     weeklyData: []
   })
 
-  const progressPercentage = Math.min((carbonData.currentMonthSavings / carbonData.monthlyGoal) * 100, 100)
+  const progressPercentage = Math.min((carbonData?.currentMonthSavings || 0) / (carbonData?.monthlyGoal || 1) * 100, 100)
 
   const achievements = [
     {
       title: 'First Exchange',
       description: 'Complete your first item exchange',
       icon: <ArrowsClockwise size={24} />,
-      earned: carbonData.itemsExchanged > 0,
+      earned: (carbonData?.itemsExchanged || 0) > 0,
       color: 'bg-accent text-accent-foreground'
     },
     {
       title: 'Generous Heart',
       description: 'Donate 5 items',
       icon: <Leaf size={24} />,
-      earned: carbonData.itemsDonated >= 5,
+      earned: (carbonData?.itemsDonated || 0) >= 5,
       color: 'bg-primary text-primary-foreground'
     },
     {
       title: 'Carbon Saver',
       description: 'Save 25kg of CO₂',
       icon: <Trophy size={24} />,
-      earned: carbonData.totalCO2Saved >= 25,
+      earned: (carbonData?.totalCO2Saved || 0) >= 25,
       color: 'bg-secondary text-secondary-foreground'
     },
     {
       title: 'Eco Champion',
       description: 'Save 100kg of CO₂',
       icon: <TrendUp size={24} />,
-      earned: carbonData.totalCO2Saved >= 100,
+      earned: (carbonData?.totalCO2Saved || 0) >= 100,
       color: 'bg-green-600 text-white'
     }
   ]
@@ -81,7 +81,7 @@ export function CarbonTracker() {
               </div>
               <div>
                 <p className="text-small text-muted-foreground">Total CO₂ Saved</p>
-                <p className="text-h2 font-bold text-primary">{carbonData.totalCO2Saved}kg</p>
+                <p className="text-h2 font-bold text-primary">{carbonData?.totalCO2Saved || 0}kg</p>
               </div>
             </div>
           </CardContent>
@@ -95,7 +95,7 @@ export function CarbonTracker() {
               </div>
               <div>
                 <p className="text-small text-muted-foreground">Items Exchanged</p>
-                <p className="text-h2 font-bold text-accent">{carbonData.itemsExchanged}</p>
+                <p className="text-h2 font-bold text-accent">{carbonData?.itemsExchanged || 0}</p>
               </div>
             </div>
           </CardContent>
@@ -109,7 +109,7 @@ export function CarbonTracker() {
               </div>
               <div>
                 <p className="text-small text-muted-foreground">Items Donated</p>
-                <p className="text-h2 font-bold text-secondary">{carbonData.itemsDonated}</p>
+                <p className="text-h2 font-bold text-secondary">{carbonData?.itemsDonated || 0}</p>
               </div>
             </div>
           </CardContent>
@@ -128,7 +128,7 @@ export function CarbonTracker() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-small text-muted-foreground">
-                {carbonData.currentMonthSavings}kg of {carbonData.monthlyGoal}kg goal
+                {carbonData?.currentMonthSavings || 0}kg of {carbonData?.monthlyGoal || 100}kg goal
               </span>
               <span className="text-small font-medium">
                 {Math.round(progressPercentage)}%
@@ -142,7 +142,7 @@ export function CarbonTracker() {
                 </Badge>
               ) : (
                 <p className="text-small text-muted-foreground">
-                  {carbonData.monthlyGoal - carbonData.currentMonthSavings}kg to go
+                  {Math.max(0, (carbonData?.monthlyGoal || 100) - (carbonData?.currentMonthSavings || 0))}kg to go
                 </p>
               )}
             </div>

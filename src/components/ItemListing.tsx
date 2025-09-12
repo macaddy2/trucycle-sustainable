@@ -13,6 +13,21 @@ import { VerificationBadge, VerificationLevel } from './VerificationBadge'
 import { RatingDisplay, useUserRatingStats } from './RatingSystem'
 import { toast } from 'sonner'
 
+interface UserProfile {
+  id: string
+  name: string
+  email: string
+  userType: 'donor' | 'collector'
+  verificationLevel: 'basic' | 'verified' | 'trusted'
+  onboardingCompleted: boolean
+  rating?: number
+  completedVerifications: {
+    email: boolean
+    phone: boolean
+    identity: boolean
+  }
+}
+
 interface ItemListingProps {
   searchQuery: string
 }
@@ -44,7 +59,7 @@ interface Item {
 }
 
 export function ItemListing({ searchQuery }: ItemListingProps) {
-  const [currentUser] = useKV('current-user', null)
+  const [currentUser] = useKV<UserProfile | null>('current-user', null)
   const [globalListings] = useKV<Item[]>('global-listings', [])
   const [items, setItems] = useState<Item[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
@@ -175,7 +190,7 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
       return
     }
 
-    if (currentUser.id === (item.ownerId || item.userId)) {
+    if (currentUser?.id === (item.ownerId || item.userId)) {
       toast.error('You cannot claim your own item')
       return
     }
@@ -188,9 +203,9 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
         item.ownerId || item.userId,
         item.ownerName || item.userName,
         item.ownerAvatar,
-        currentUser.id,
-        currentUser.name,
-        currentUser.avatar
+        currentUser?.id || "",
+        currentUser?.name || "",
+        currentUser?.avatar
       )
 
       toast.success(`Item claimed! You can now message ${item.ownerName || item.userName} about pickup details.`)
@@ -214,9 +229,9 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
         item.ownerId || item.userId,
         item.ownerName || item.userName,
         item.ownerAvatar,
-        currentUser.id,
-        currentUser.name,
-        currentUser.avatar
+        currentUser?.id || "",
+        currentUser?.name || "",
+        currentUser?.avatar
       )
 
       setSelectedItem(null)
@@ -435,7 +450,7 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
                       </DialogTrigger>
                     </Dialog>
                     
-                    {currentUser && currentUser.id !== (item.ownerId || item.userId) && (
+                    {currentUser && currentUser?.id || "" !== (item.ownerId || item.userId) && (
                       <Button 
                         className="flex-1"
                         onClick={() => handleClaimItem(item)}
@@ -445,7 +460,7 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
                       </Button>
                     )}
 
-                    {currentUser && currentUser.id !== item.ownerId && getChatForItem(item.id) && (
+                    {currentUser && currentUser?.id || "" !== item.ownerId && getChatForItem(item.id) && (
                       <Button 
                         variant="outline"
                         size="icon"
@@ -575,7 +590,7 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
                     </div>
                   </div>
 
-                  {currentUser && currentUser.id !== (selectedItem.ownerId || selectedItem.userId) && (
+                  {currentUser && currentUser?.id || "" !== (selectedItem.ownerId || selectedItem.userId) && (
                     <div className="space-y-2">
                       <Button 
                         className="w-full"

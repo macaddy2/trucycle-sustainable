@@ -325,7 +325,7 @@ export function ProfileDashboard() {
                   <Avatar className="w-20 h-20">
                     <AvatarImage src={`https://avatar.vercel.sh/${user.email}`} alt={user.name || 'User'} />
                     <AvatarFallback>
-                      {user.name ? user.name.split(' ').map(n => n[0]).join('') : 'U'}
+                      {user?.name && typeof user.name === 'string' ? user.name.split(' ').map(n => n[0]).join('') : 'U'}
                     </AvatarFallback>
                   </Avatar>
                   
@@ -529,7 +529,7 @@ export function ProfileDashboard() {
                     <div key={chat.id} className="flex items-center space-x-3 p-3 hover:bg-muted/50 rounded-lg cursor-pointer">
                       <Avatar>
                         <AvatarImage src={`https://avatar.vercel.sh/${chat.recipientEmail}`} />
-                        <AvatarFallback>{chat.recipientName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                        <AvatarFallback>{chat?.recipientName && typeof chat.recipientName === 'string' ? chat.recipientName.split(' ').map(n => n[0]).join('') : 'U'}</AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
                         <div className="flex items-center justify-between">

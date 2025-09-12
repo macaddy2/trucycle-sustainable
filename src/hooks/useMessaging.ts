@@ -1,6 +1,21 @@
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
 
+interface UserProfile {
+  id: string
+  name: string
+  email: string
+  userType: 'donor' | 'collector'
+  verificationLevel: 'basic' | 'verified' | 'trusted'
+  onboardingCompleted: boolean
+  rating?: number
+  completedVerifications: {
+    email: boolean
+    phone: boolean
+    identity: boolean
+  }
+}
+
 interface Message {
   id: string
   chatId: string
@@ -37,9 +52,9 @@ interface Chat {
 }
 
 export function useMessaging() {
-  const [currentUser] = useKV('current-user', null)
-  const [chats, setChats] = useKV('user-chats', [] as Chat[])
-  const [messages, setMessages] = useKV('chat-messages', {} as Record<string, Message[]>)
+  const [currentUser] = useKV<UserProfile | null>('current-user', null)
+  const [chats, setChats] = useKV<Chat[]>('user-chats', [])
+  const [messages, setMessages] = useKV<Record<string, Message[]>>('chat-messages', {})
 
   const createOrGetChat = async (
     itemId: string,

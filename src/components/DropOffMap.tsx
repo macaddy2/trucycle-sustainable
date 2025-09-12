@@ -72,7 +72,7 @@ export function DropOffMap() {
       </Card>
 
       {/* Location List */}
-      {locations.length === 0 ? (
+      {(locations?.length || 0) === 0 ? (
         <Card>
           <CardContent className="text-center py-12">
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
@@ -87,7 +87,7 @@ export function DropOffMap() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {locations.map((location) => (
+          {(locations || []).map((location) => (
             <Card key={location.id} className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex items-start justify-between">

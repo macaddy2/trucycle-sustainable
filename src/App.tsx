@@ -13,16 +13,31 @@ import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
 import { useInitializeSampleData, useRecommendationNotifications } from '@/hooks'
 
+interface UserProfile {
+  id: string
+  name: string
+  email: string
+  userType: 'donor' | 'collector'
+  verificationLevel: 'basic' | 'verified' | 'trusted'
+  onboardingCompleted: boolean
+  rating?: number
+  completedVerifications: {
+    email: boolean
+    phone: boolean
+    identity: boolean
+  }
+}
+
 function App() {
   const [currentTab, setCurrentTab] = useState('browse')
   const [searchQuery, setSearchQuery] = useState('')
-  const [user, setUser] = useKV('current-user', null)
+  const [user, setUser] = useKV<UserProfile | null>('current-user', null)
   const [showAuthDialog, setShowAuthDialog] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showMessageCenter, setShowMessageCenter] = useState(false)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [showShopScanner, setShowShopScanner] = useState(false)
-  const [showDemoGuide, setShowDemoGuide] = useKV('show-demo-guide', true)
+  const [showDemoGuide, setShowDemoGuide] = useKV<boolean>('show-demo-guide', true)
   
   const { initializeSampleChats } = useInitializeSampleData()
   const { notifications, unreadCount, triggerUrgentNotifications } = useRecommendationNotifications(user)
@@ -203,7 +218,7 @@ function App() {
                     onClick={() => setCurrentTab('profile')}
                   >
                     <User size={16} className="mr-2" />
-                    {user.name ? user.name.split(' ')[0] : 'User'}
+                    {user?.name && typeof user.name === 'string' ? user.name.split(' ')[0] : 'User'}
                   </Button>
                 </div>
               ) : (
@@ -283,7 +298,7 @@ function App() {
               <DemoGuide
                 onSwitchProfile={handleToggleUserType}
                 currentUserType={user.userType}
-                userName={user.name ? user.name.split(' ')[0] : 'User'}
+                userName={user?.name && typeof user.name === 'string' ? user.name.split(' ')[0] : 'User'}
               />
             )}
             <ProfileDashboard />

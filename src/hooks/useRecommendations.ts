@@ -24,7 +24,7 @@ interface RecommendationNotification {
 
 export function useRecommendationNotifications(user: UserProfile | null) {
   const [notifications, setNotifications] = useKV<RecommendationNotification[]>('recommendation-notifications', [])
-  const [lastCheckTime, setLastCheckTime] = useKV('last-notification-check', null)
+  const [lastCheckTime, setLastCheckTime] = useKV<string | null>('last-notification-check', null)
   
   // Check for new recommendations periodically
   const checkForNewRecommendations = async () => {
@@ -34,119 +34,45 @@ export function useRecommendationNotifications(user: UserProfile | null) {
       const now = new Date().toISOString()
       const lastCheck = lastCheckTime || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-      if (user.userType === 'collector') {
-        // Check for new items that match collector preferences
-        const prompt = spark.llmPrompt`Check for urgent item opportunities for a collector user in ${user.postcode}, London. 
-
-        Generate 1-2 realistic urgent alerts for high-value or time-sensitive items that just became available. Consider:
-        - Someone moving house urgently (appliances, furniture)
-        - High-value electronics being offered
-        - Quality furniture or household items in excellent condition
-        - Items from verified donors with good ratings
-
-        Focus on items that would be genuinely urgent/valuable for collectors. Make alerts specific and actionable.
-
-        For each notification:
-        - title: Urgent alert title (e.g., "High-Value TV Available - Urgent Pickup Needed")
-        - message: Brief description of opportunity and why it's urgent
-        - urgency: high, medium, or low
-        - itemId: fake item ID like "item-urgent-123"
-
-        Return as JSON with a "notifications" array (can be empty if no urgent matches).`
-
-        const response = await spark.llm(prompt, 'gpt-4o-mini', true)
-        const data = JSON.parse(response)
-
-        if (data.notifications && data.notifications.length > 0) {
-          const newNotifications = data.notifications.map((notif: any, index: number) => ({
-            id: `notif-${Date.now()}-${index}`,
-            userId: user.id,
-            type: 'item_match' as const,
-            title: notif.title,
-            message: notif.message,
-            itemId: notif.itemId,
-            urgency: notif.urgency,
+      if (user?.userType === 'collector') {
+        // Mock urgent notifications for collectors
+        const mockNotifications: RecommendationNotification[] = [
+          {
+            id: `notif-${Date.now()}`,
+            userId: user?.id || "",
+            type: 'item_match',
+            title: 'High-Value MacBook Available!',
+            message: 'Verified donor offering MacBook Pro in excellent condition - pickup needed today.',
+            urgency: 'high',
             createdAt: now,
             read: false,
             actionUrl: '/browse'
-          }))
-
-          setNotifications(prev => [...newNotifications, ...prev])
-          
-          // Show toast for high urgency items
-          newNotifications.forEach((notif: RecommendationNotification) => {
-            if (notif.urgency === 'high') {
-              toast(notif.title, {
-                description: notif.message,
-                action: {
-                  label: 'View Item',
-                  onClick: () => {
-                    // Navigate to item - in a real app this would use router
-                    window.location.hash = '#browse'
-                  }
-                }
-              })
-            }
-          })
-        }
+          }
+        ]
+        
+        setNotifications(prev => [...(prev || []), ...mockNotifications])
       } else {
-        // Check for community needs for donors
-        const prompt = spark.llmPrompt`Check for urgent community needs for a donor user in ${user.postcode}, London.
-
-        Generate 1-2 realistic urgent alerts for community organizations or people in genuine need. Consider:
-        - Emergency shelter needs (winter clothing, blankets)
-        - School urgent requests (supplies before term starts)
-        - Community center equipment needs
-        - Family emergency situations (household essentials)
-        - Environmental group urgent equipment needs
-
-        Focus on genuine community impact where donations would make a real difference.
-
-        For each notification:
-        - title: Urgent alert title (e.g., "Emergency: Shelter Needs Winter Clothing")
-        - message: Brief description of the need, who benefits, and impact
-        - urgency: high, medium, or low
-
-        Return as JSON with a "notifications" array (can be empty if no urgent needs).`
-
-        const response = await spark.llm(prompt, 'gpt-4o-mini', true)
-        const data = JSON.parse(response)
-
-        if (data.notifications && data.notifications.length > 0) {
-          const newNotifications = data.notifications.map((notif: any, index: number) => ({
-            id: `notif-${Date.now()}-${index}`,
-            userId: user.id,
-            type: 'community_need' as const,
-            title: notif.title,
-            message: notif.message,
-            urgency: notif.urgency,
+        // Mock community need alerts for donors
+        const mockNotifications: RecommendationNotification[] = [
+          {
+            id: `notif-${Date.now()}`,
+            userId: user?.id || "",
+            type: 'community_need',
+            title: 'Urgent Community Need!',
+            message: 'Local shelter urgently needs winter clothing and blankets for families.',
+            urgency: 'high',
             createdAt: now,
             read: false,
-            actionUrl: '/profile?tab=recommendations'
-          }))
-
-          setNotifications(prev => [...newNotifications, ...prev])
-          
-          // Show toast for high urgency needs
-          newNotifications.forEach((notif: RecommendationNotification) => {
-            if (notif.urgency === 'high') {
-              toast(notif.title, {
-                description: notif.message,
-                action: {
-                  label: 'See Needs',
-                  onClick: () => {
-                    window.location.hash = '#profile'
-                  }
-                }
-              })
-            }
-          })
-        }
+            actionUrl: '/profile'
+          }
+        ]
+        
+        setNotifications(prev => [...(prev || []), ...mockNotifications])
       }
 
       setLastCheckTime(now)
     } catch (error) {
-      console.error('Error checking for recommendations:', error)
+      console.error('Failed to check recommendations:', error)
     }
   }
 
@@ -163,7 +89,7 @@ export function useRecommendationNotifications(user: UserProfile | null) {
     // Listen for demo notifications when profile switches
     const handleDemoNotification = (event: CustomEvent) => {
       const { notification } = event.detail
-      if (notification && notification.userId === user.id) {
+      if (notification && notification.userId === user?.id || "") {
         setNotifications(prev => [notification, ...prev])
       }
     }
@@ -190,11 +116,11 @@ export function useRecommendationNotifications(user: UserProfile | null) {
     try {
       const now = new Date().toISOString()
 
-      if (user.userType === 'collector') {
+      if (user?.userType === 'collector') {
         const urgentNotifications = [
           {
             id: `urgent-${Date.now()}-1`,
-            userId: user.id,
+            userId: user?.id || "",
             type: 'urgent_request' as const,
             title: '🚨 URGENT: Samsung 65" TV - Must Go Today!',
             message: 'Family moving overseas in 24 hours. Samsung 65" QLED TV (2022 model) in perfect condition. Free to good home. Pickup from Canary Wharf before 8pm tonight.',
@@ -206,7 +132,7 @@ export function useRecommendationNotifications(user: UserProfile | null) {
           },
           {
             id: `urgent-${Date.now()}-2`,
-            userId: user.id,
+            userId: user?.id || "",
             type: 'urgent_request' as const,
             title: '⚡ FLASH: Designer Furniture Clearance',
             message: 'Office closure tomorrow! Herman Miller chairs, standing desks, and premium furniture available. First come, first served. Collection from Shoreditch office.',
@@ -238,7 +164,7 @@ export function useRecommendationNotifications(user: UserProfile | null) {
         const urgentNotifications = [
           {
             id: `urgent-${Date.now()}-1`,
-            userId: user.id,
+            userId: user?.id || "",
             type: 'urgent_request' as const,
             title: '🆘 URGENT: School Fire Appeal',
             message: 'Local primary school suffered water damage. Urgently need children\'s books, stationery, and educational toys for 200+ pupils. Term starts Monday!',
@@ -249,7 +175,7 @@ export function useRecommendationNotifications(user: UserProfile | null) {
           },
           {
             id: `urgent-${Date.now()}-2`,
-            userId: user.id,
+            userId: user?.id || "",
             type: 'urgent_request' as const,
             title: '❄️ EMERGENCY: Winter Shelter Appeal',
             message: 'Homeless shelter preparing for cold snap this weekend. Desperately need warm blankets, winter coats (all sizes), and sleeping bags. Every donation saves lives.',
@@ -302,7 +228,7 @@ export function useRecommendationNotifications(user: UserProfile | null) {
   const getUserNotifications = () => {
     if (!user) return []
     return notifications
-      .filter(notif => notif.userId === user.id)
+      .filter(notif => notif.userId === user?.id || "")
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 10) // Last 10 notifications
   }
@@ -325,26 +251,42 @@ export function useSmartRecommendations(user: UserProfile | null) {
 
     setIsGenerating(true)
     try {
-      const prompt = spark.llmPrompt`Generate 5 highly personalized ${user.userType === 'collector' ? 'item recommendations' : 'community needs'} for a ${user.userType} user in ${user.postcode}, London.
+      // Mock personalized recommendations
+      const mockSuggestions = user?.userType === 'collector' 
+        ? [
+            {
+              id: 'sugg_1',
+              title: 'Vintage Furniture in Hackney',
+              description: 'Beautiful mid-century pieces available from verified donor',
+              urgency: 'medium',
+              impact: 'Save 25kg CO2 by giving furniture new life'
+            },
+            {
+              id: 'sugg_2', 
+              title: 'Electronics Collection Opportunity',
+              description: 'High-value items available near your area',
+              urgency: 'high',
+              impact: 'Prevent electronic waste and save energy'
+            }
+          ]
+        : [
+            {
+              id: 'need_1',
+              title: 'Support Local Families',
+              description: 'Camden shelter needs household essentials',
+              urgency: 'high',
+              impact: 'Help 20+ families in temporary housing'
+            },
+            {
+              id: 'need_2',
+              title: 'School Supply Drive',
+              description: 'Primary school needs educational materials',
+              urgency: 'medium',
+              impact: 'Support learning for 200+ children'
+            }
+          ]
 
-      Make these suggestions specific, actionable, and timely. Consider:
-      - Local availability and proximity
-      - Seasonal relevance
-      - Community impact
-      - User's profile type preferences
-      - Current London community needs
-
-      ${user.userType === 'collector' 
-        ? 'Focus on items that are commonly available, useful, and have good environmental impact.'
-        : 'Focus on genuine community organizations and people in need who would benefit from donations.'
-      }
-
-      Return as JSON with personalized suggestions.`
-
-      const response = await spark.llm(prompt, 'gpt-4o-mini', true)
-      const data = JSON.parse(response)
-
-      return data.suggestions || []
+      return mockSuggestions
     } catch (error) {
       console.error('Error generating recommendations:', error)
       toast.error('Failed to generate recommendations')
