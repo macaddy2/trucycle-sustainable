@@ -168,13 +168,119 @@ export function useRecommendationNotifications(user: UserProfile | null) {
       }
     }
 
+    // Listen for urgent notification requests
+    const handleUrgentRequest = () => {
+      checkForNewRecommendations()
+    }
+
     window.addEventListener('add-demo-notification', handleDemoNotification as EventListener)
+    window.addEventListener('request-urgent-notifications', handleUrgentRequest as EventListener)
 
     return () => {
       clearInterval(interval)
       window.removeEventListener('add-demo-notification', handleDemoNotification as EventListener)
+      window.removeEventListener('request-urgent-notifications', handleUrgentRequest as EventListener)
     }
   }, [user])
+
+  // Function to trigger urgent notifications manually
+  const triggerUrgentNotifications = async () => {
+    if (!user || !user.onboardingCompleted) return
+
+    try {
+      const now = new Date().toISOString()
+
+      if (user.userType === 'collector') {
+        const urgentNotifications = [
+          {
+            id: `urgent-${Date.now()}-1`,
+            userId: user.id,
+            type: 'urgent_request' as const,
+            title: '🚨 URGENT: Samsung 65" TV - Must Go Today!',
+            message: 'Family moving overseas in 24 hours. Samsung 65" QLED TV (2022 model) in perfect condition. Free to good home. Pickup from Canary Wharf before 8pm tonight.',
+            itemId: 'urgent-tv-123',
+            urgency: 'high' as const,
+            createdAt: now,
+            read: false,
+            actionUrl: '/browse?urgent=true'
+          },
+          {
+            id: `urgent-${Date.now()}-2`,
+            userId: user.id,
+            type: 'urgent_request' as const,
+            title: '⚡ FLASH: Designer Furniture Clearance',
+            message: 'Office closure tomorrow! Herman Miller chairs, standing desks, and premium furniture available. First come, first served. Collection from Shoreditch office.',
+            itemId: 'urgent-office-456',
+            urgency: 'high' as const,
+            createdAt: now,
+            read: false,
+            actionUrl: '/browse?category=furniture'
+          }
+        ]
+
+        setNotifications(prev => [...urgentNotifications, ...prev])
+        
+        urgentNotifications.forEach((notif) => {
+          toast(notif.title, {
+            description: notif.message,
+            duration: 10000,
+            action: {
+              label: 'Claim Now',
+              onClick: () => {
+                toast.success('Demo completed! 🎉', {
+                  description: 'In real use, this would take you directly to claim the urgent item.',
+                })
+              }
+            }
+          })
+        })
+      } else {
+        const urgentNotifications = [
+          {
+            id: `urgent-${Date.now()}-1`,
+            userId: user.id,
+            type: 'urgent_request' as const,
+            title: '🆘 URGENT: School Fire Appeal',
+            message: 'Local primary school suffered water damage. Urgently need children\'s books, stationery, and educational toys for 200+ pupils. Term starts Monday!',
+            urgency: 'high' as const,
+            createdAt: now,
+            read: false,
+            actionUrl: '/profile?tab=recommendations'
+          },
+          {
+            id: `urgent-${Date.now()}-2`,
+            userId: user.id,
+            type: 'urgent_request' as const,
+            title: '❄️ EMERGENCY: Winter Shelter Appeal',
+            message: 'Homeless shelter preparing for cold snap this weekend. Desperately need warm blankets, winter coats (all sizes), and sleeping bags. Every donation saves lives.',
+            urgency: 'high' as const,
+            createdAt: now,
+            read: false,
+            actionUrl: '/list?category=clothing'
+          }
+        ]
+
+        setNotifications(prev => [...urgentNotifications, ...prev])
+        
+        urgentNotifications.forEach((notif) => {
+          toast(notif.title, {
+            description: notif.message,
+            duration: 10000,
+            action: {
+              label: 'Help Now',
+              onClick: () => {
+                toast.success('Demo completed! 🎉', {
+                  description: 'In real use, this would take you directly to donation options.',
+                })
+              }
+            }
+          })
+        })
+      }
+    } catch (error) {
+      console.error('Error generating urgent notifications:', error)
+    }
+  }
 
   // Mark notification as read
   const markAsRead = (notificationId: string) => {
@@ -205,7 +311,8 @@ export function useRecommendationNotifications(user: UserProfile | null) {
     notifications: getUserNotifications(),
     unreadCount: getUnreadCount(),
     markAsRead,
-    checkForNewRecommendations
+    checkForNewRecommendations,
+    triggerUrgentNotifications
   }
 }
 

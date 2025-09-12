@@ -4,8 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Toaster } from '@/components/ui/sonner'
 import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, Plus, User, QrCode, Bell } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
+import { toast } from 'sonner'
 import { ItemListing, ItemListingForm, ProfileDashboard, DropOffMap, CarbonTracker, ShopScanner, DemoGuide } from './components'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
@@ -23,7 +25,7 @@ function App() {
   const [showDemoGuide, setShowDemoGuide] = useKV('show-demo-guide', true)
   
   const { initializeSampleChats } = useInitializeSampleData()
-  const { notifications, unreadCount } = useRecommendationNotifications(user)
+  const { notifications, unreadCount, triggerUrgentNotifications } = useRecommendationNotifications(user)
 
   // Check for shop scanner mode in URL
   useEffect(() => {
@@ -65,6 +67,51 @@ function App() {
 
   const handleOnboardingComplete = () => {
     setShowOnboarding(false)
+  }
+
+  const handleToggleUserType = () => {
+    if (!user) return
+    
+    const newUserType = user.userType === 'donor' ? 'collector' : 'donor'
+    const updatedUser = { ...user, userType: newUserType }
+    setUser(updatedUser)
+    
+    // Trigger demo notification for the switched profile
+    const demoNotification = {
+      id: `demo-${Date.now()}`,
+      userId: user.id,
+      type: newUserType === 'collector' ? 'item_match' : 'community_need',
+      title: newUserType === 'collector' 
+        ? 'New High-Value Items Available!' 
+        : 'Urgent Community Need Alert!',
+      message: newUserType === 'collector'
+        ? 'Several quality electronics and furniture items just became available in your area.'
+        : 'Local shelter urgently needs winter clothing and bedding for families.',
+      urgency: 'high',
+      createdAt: new Date().toISOString(),
+      read: false,
+      actionUrl: newUserType === 'collector' ? '/browse' : '/profile'
+    }
+    
+    // Dispatch custom event for demo notification
+    window.dispatchEvent(new CustomEvent('add-demo-notification', {
+      detail: { notification: demoNotification }
+    }))
+    
+    // Show immediate toast
+    toast(demoNotification.title, {
+      description: demoNotification.message,
+      action: {
+        label: newUserType === 'collector' ? 'View Items' : 'See Needs',
+        onClick: () => {
+          if (newUserType === 'collector') {
+            setCurrentTab('browse')
+          } else {
+            setCurrentTab('profile')
+          }
+        }
+      }
+    })
   }
 
   const handleSearch = (e: React.FormEvent) => {
@@ -126,6 +173,21 @@ function App() {
                       </Badge>
                     </Button>
                   )}
+                  
+                  {/* Trigger Urgent Notifications */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (triggerUrgentNotifications) {
+                        triggerUrgentNotifications()
+                      }
+                    }}
+                    className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                    title="Demo: Experience urgent alerts"
+                  >
+                    <Bell size={16} className="animate-pulse" />
+                  </Button>
                   
                   <Button 
                     variant="outline" 
@@ -309,6 +371,9 @@ function App() {
         open={showMessageCenter}
         onOpenChange={setShowMessageCenter}
       />
+
+      {/* Toast Notifications */}
+      <Toaster />
     </div>
   )
 }

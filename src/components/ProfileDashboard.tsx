@@ -89,7 +89,7 @@ export function ProfileDashboard() {
   
   const { chats, getTotalUnreadCount } = useMessaging()
   const { initializeSampleChats } = useInitializeSampleData()
-  const { notifications: recomNotifications, unreadCount: recomUnreadCount, markAsRead } = useRecommendationNotifications(user)
+  const { notifications: recomNotifications, unreadCount: recomUnreadCount, markAsRead, triggerUrgentNotifications } = useRecommendationNotifications(user)
 
   // Initialize sample data when user is signed in
   useEffect(() => {
@@ -600,6 +600,55 @@ export function ProfileDashboard() {
               notifications={recomNotifications}
               onMarkAsRead={markAsRead}
             />
+            
+            {/* Urgent Notification Demo */}
+            <Card className="mt-6 bg-gradient-to-br from-orange-50 to-red-50 border-orange-200">
+              <CardHeader>
+                <CardTitle className="text-h3 flex items-center space-x-2">
+                  <Bell size={20} className="text-orange-600" />
+                  <span>Experience Urgent Alerts</span>
+                  <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                    Demo
+                  </Badge>
+                </CardTitle>
+                <CardDescription>
+                  See how TruCycle's AI instantly alerts you about time-sensitive opportunities
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-orange-900">
+                      {user.userType === 'collector' ? '🔥 High-Value Items' : '❤️ Urgent Community Needs'}
+                    </h4>
+                    <p className="text-sm text-orange-700">
+                      {user.userType === 'collector' 
+                        ? 'Get instant notifications when valuable electronics, appliances, or furniture become available for immediate pickup.'
+                        : 'Receive alerts when local organizations, schools, or families have urgent needs where your donations can make immediate impact.'
+                      }
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <Button 
+                      onClick={() => {
+                        triggerUrgentNotifications()
+                      }}
+                      className="bg-orange-600 hover:bg-orange-700 text-white"
+                    >
+                      <Bell size={16} className="mr-2" />
+                      Generate Urgent Alert
+                    </Button>
+                  </div>
+                </div>
+                <div className="bg-orange-100 rounded-lg p-3">
+                  <p className="text-xs text-orange-700">
+                    <strong>💡 Pro Tip:</strong> Real urgent alerts appear as browser notifications, in-app toasts, 
+                    and are highlighted in red in your notifications panel. The AI learns your response patterns 
+                    to better prioritize future urgent opportunities.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="messages">
