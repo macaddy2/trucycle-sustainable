@@ -114,7 +114,7 @@ function App() {
                       size="sm"
                       onClick={() => setCurrentTab('profile')}
                       className="relative"
-                      title={`${unreadCount} new recommendation${unreadCount !== 1 ? 's' : ''}`}
+                      title={`${unreadCount} new ${user?.userType === 'collector' ? 'item recommendation' : 'community need'}${unreadCount !== 1 ? 's' : ''}`}
                     >
                       <Bell size={16} />
                       <Badge 

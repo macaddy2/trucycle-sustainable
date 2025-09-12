@@ -36,19 +36,21 @@ export function useRecommendationNotifications(user: UserProfile | null) {
 
       if (user.userType === 'collector') {
         // Check for new items that match collector preferences
-        const prompt = spark.llmPrompt`Check if there are any new high-priority or urgent items available for collection that would match a collector user in ${user.postcode}, London. 
+        const prompt = spark.llmPrompt`Check for urgent item opportunities for a collector user in ${user.postcode}, London. 
 
-        Consider items that would be:
-        - Urgent (donor needs to get rid of quickly)
-        - High-value or popular items
-        - In their local area
-        - Recently listed since ${lastCheck}
+        Generate 1-2 realistic urgent alerts for high-value or time-sensitive items that just became available. Consider:
+        - Someone moving house urgently (appliances, furniture)
+        - High-value electronics being offered
+        - Quality furniture or household items in excellent condition
+        - Items from verified donors with good ratings
 
-        Generate 0-2 realistic notification alerts if there are any urgent matches. For each notification:
-        - title: Short alert title
-        - message: Brief description of the opportunity
+        Focus on items that would be genuinely urgent/valuable for collectors. Make alerts specific and actionable.
+
+        For each notification:
+        - title: Urgent alert title (e.g., "High-Value TV Available - Urgent Pickup Needed")
+        - message: Brief description of opportunity and why it's urgent
         - urgency: high, medium, or low
-        - itemId: fake item ID like "item-123"
+        - itemId: fake item ID like "item-urgent-123"
 
         Return as JSON with a "notifications" array (can be empty if no urgent matches).`
 
@@ -89,17 +91,20 @@ export function useRecommendationNotifications(user: UserProfile | null) {
         }
       } else {
         // Check for community needs for donors
-        const prompt = spark.llmPrompt`Check if there are any urgent community needs or donation requests in ${user.postcode}, London that would benefit from donations.
+        const prompt = spark.llmPrompt`Check for urgent community needs for a donor user in ${user.postcode}, London.
 
-        Consider:
-        - Emergency donation requests
-        - Community organizations with urgent needs
-        - High-impact donation opportunities
-        - Time-sensitive charitable needs
+        Generate 1-2 realistic urgent alerts for community organizations or people in genuine need. Consider:
+        - Emergency shelter needs (winter clothing, blankets)
+        - School urgent requests (supplies before term starts)
+        - Community center equipment needs
+        - Family emergency situations (household essentials)
+        - Environmental group urgent equipment needs
 
-        Generate 0-2 realistic notification alerts for urgent community needs. For each notification:
-        - title: Short alert title
-        - message: Brief description of the need and impact
+        Focus on genuine community impact where donations would make a real difference.
+
+        For each notification:
+        - title: Urgent alert title (e.g., "Emergency: Shelter Needs Winter Clothing")
+        - message: Brief description of the need, who benefits, and impact
         - urgency: high, medium, or low
 
         Return as JSON with a "notifications" array (can be empty if no urgent needs).`
@@ -155,7 +160,20 @@ export function useRecommendationNotifications(user: UserProfile | null) {
     // Set up periodic checks
     const interval = setInterval(checkForNewRecommendations, 10 * 60 * 1000) // 10 minutes
 
-    return () => clearInterval(interval)
+    // Listen for demo notifications when profile switches
+    const handleDemoNotification = (event: CustomEvent) => {
+      const { notification } = event.detail
+      if (notification && notification.userId === user.id) {
+        setNotifications(prev => [notification, ...prev])
+      }
+    }
+
+    window.addEventListener('add-demo-notification', handleDemoNotification as EventListener)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('add-demo-notification', handleDemoNotification as EventListener)
+    }
   }, [user])
 
   // Mark notification as read

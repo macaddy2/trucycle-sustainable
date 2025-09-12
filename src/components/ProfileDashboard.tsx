@@ -129,6 +129,68 @@ export function ProfileDashboard() {
     toast.success('Welcome to TruCycle! You can now start listing and browsing items.')
   }
 
+  const handleToggleUserType = async () => {
+    if (!user) return
+
+    const newUserType = user.userType === 'collector' ? 'donor' : 'collector'
+    const updatedUser = {
+      ...user,
+      userType: newUserType
+    }
+
+    setUser(updatedUser)
+    
+    // Show confirmation message
+    toast.success(
+      `Profile switched to ${newUserType.charAt(0).toUpperCase() + newUserType.slice(1)}`,
+      {
+        description: `You'll now see ${newUserType === 'collector' ? 'item recommendations' : 'community needs'} tailored for your new profile type.`
+      }
+    )
+
+    // Switch to recommendations tab to show the difference
+    setCurrentTab('recommendations')
+
+    // Generate sample demonstration notification for the new profile type
+    const demoNotification = {
+      id: `demo-${Date.now()}`,
+      userId: user.id,
+      type: newUserType === 'collector' ? 'item_match' : 'community_need',
+      title: newUserType === 'collector' 
+        ? '🔥 High-Value Item Alert: Samsung Smart TV Available'
+        : '❤️ Community Need: Local School Needs Supplies',
+      message: newUserType === 'collector'
+        ? 'A verified donor is offering a 55" Samsung Smart TV in excellent condition. Urgent pickup needed due to house move.'
+        : 'St. Mary\'s Primary School urgently needs art supplies and books for their new term. Your donations could help 150+ children.',
+      urgency: 'high' as const,
+      createdAt: new Date().toISOString(),
+      read: false,
+      actionUrl: newUserType === 'collector' ? '/browse' : '/profile?tab=recommendations'
+    }
+
+    // Add the demo notification to show immediate difference
+    setTimeout(() => {
+      // Trigger the notification update via custom event
+      window.dispatchEvent(new CustomEvent('add-demo-notification', { 
+        detail: { notification: demoNotification } 
+      }))
+      
+      // Show a toast notification too
+      toast(demoNotification.title, {
+        description: demoNotification.message,
+        action: {
+          label: newUserType === 'collector' ? 'View Item' : 'See Needs',
+          onClick: () => setCurrentTab('recommendations')
+        }
+      })
+    }, 500)
+
+    // Trigger new recommendations check after a brief delay
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('profile-changed', { detail: { userType: newUserType } }))
+    }, 1000)
+  }
+
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'listed': return <Package size={16} />
@@ -340,8 +402,15 @@ export function ProfileDashboard() {
                           variant="compact"
                         />
                       </div>
-                      <p className="text-small text-muted-foreground capitalize mt-1">
-                        {user.userType} • {user.postcode || 'Location not set'}
+                      <p className="text-small text-muted-foreground capitalize mt-1 flex items-center space-x-2">
+                        <Badge 
+                          variant={user.userType === 'collector' ? 'default' : 'secondary'}
+                          className={user.userType === 'collector' ? 'bg-primary' : 'bg-accent'}
+                        >
+                          {user.userType}
+                        </Badge>
+                        <span>•</span>
+                        <span>{user.postcode || 'Location not set'}</span>
                       </p>
                       
                       {/* Rating Display */}
@@ -369,6 +438,16 @@ export function ProfileDashboard() {
                       <Button variant="outline" className="w-full">
                         <Settings size={16} className="mr-2" />
                         Edit Profile
+                      </Button>
+                      
+                      {/* Profile Type Switcher */}
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={handleToggleUserType}
+                      >
+                        <ArrowsClockwise size={16} className="mr-2" />
+                        Switch to {user.userType === 'collector' ? 'Donor' : 'Collector'}
                       </Button>
                       
                       {/* Quick action to view recommendations */}
@@ -465,6 +544,42 @@ export function ProfileDashboard() {
           </TabsContent>
 
           <TabsContent value="recommendations">
+            {/* Profile Type Explanation */}
+            <Card className="mb-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+              <CardContent className="p-4">
+                <div className="flex items-start space-x-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Sparkles size={20} className="text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-medium text-blue-900">
+                      {user.userType === 'collector' ? 'Collector Mode Active' : 'Donor Mode Active'}
+                    </h4>
+                    <p className="text-sm text-blue-700 mt-1">
+                      {user.userType === 'collector' 
+                        ? 'You\'ll see personalized item recommendations based on availability, value, and proximity to your location. Perfect for finding great items to collect!'
+                        : 'You\'ll see community needs and organizations that would benefit from your donations. Make a real impact in your local community!'
+                      }
+                    </p>
+                    <div className="flex items-center space-x-2 mt-3">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleToggleUserType}
+                        className="bg-white hover:bg-blue-50"
+                      >
+                        <ArrowsClockwise size={16} className="mr-2" />
+                        Switch to {user.userType === 'collector' ? 'Donor' : 'Collector'} Mode
+                      </Button>
+                      <span className="text-xs text-blue-600">
+                        See different recommendation types
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
             <IntelligentRecommendations 
               user={user} 
               notifications={recomNotifications}

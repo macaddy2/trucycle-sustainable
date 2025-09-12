@@ -79,23 +79,29 @@ export function IntelligentRecommendations({ user, notifications = [], onMarkAsR
     try {
       if (user.userType === 'collector') {
         // Generate recommendations for collectors (items to collect)
-        const prompt = spark.llmPrompt`Generate 3-5 personalized item recommendations for a collector user living in ${user.postcode}, London. Based on common household items that are frequently available for exchange, donation, or pickup in London communities. 
+        const prompt = spark.llmPrompt`Generate 4-6 personalized item recommendations for a collector user living in ${user.postcode}, London. 
 
-        Create realistic items that would be useful for someone looking to collect household items, furniture, electronics, or other useful goods. Consider sustainability impact and local availability.
+        Create realistic items that would commonly be available for collection in London neighborhoods. Focus on:
+        - High-value items (electronics, furniture, appliances)
+        - Urgent listings (people moving, decluttering)
+        - Quality items in good condition
+        - Items that are environmentally beneficial to reuse
 
         For each item, include:
-        - title: realistic item name
-        - description: detailed description of the item
+        - title: realistic item name (be specific: "Samsung 55" Smart TV", "IKEA Kallax Bookshelf", "Nespresso Coffee Machine")
+        - description: detailed description including brand, condition, why it's available
         - category: one of [furniture, electronics, kitchenware, clothing, books, tools, garden, baby-items, sports, home-decor]
         - condition: excellent, good, or fair
-        - location: realistic London area/neighborhood (different from user's ${user.postcode} but nearby)
-        - distance: realistic distance like "0.8 miles", "1.2 miles" etc
-        - co2Impact: estimated CO2 savings in kg (2-15 range)
+        - location: realistic London area/neighborhood (different from ${user.postcode} but within 5 miles)
+        - distance: realistic distance like "0.8 miles", "1.2 miles" (under 3 miles)
+        - co2Impact: estimated CO2 savings in kg (electronics: 8-25kg, furniture: 15-40kg, appliances: 10-30kg)
         - donorName: realistic first name
         - donorRating: rating between 4.2-5.0
-        - urgency: high, medium, or low
-        - matchReason: why this item matches their profile
-        - tags: 2-3 relevant tags like ["energy-efficient", "urgent", "verified-donor"]
+        - urgency: high (moving/urgent), medium (decluttering), low (casual exchange)
+        - matchReason: specific reason why this item matches their location and collector needs
+        - tags: 2-3 relevant tags like ["urgent-pickup", "verified-donor", "high-value", "energy-efficient"]
+
+        Make at least 1-2 items high urgency (people moving, clearing house, etc.)
 
         Return as JSON with a "recommendations" array.`
 
@@ -112,21 +118,29 @@ export function IntelligentRecommendations({ user, notifications = [], onMarkAsR
         setRecommendations(enhancedRecommendations)
       } else {
         // Generate community needs for donors (where to donate)
-        const prompt = spark.llmPrompt`Generate 3-5 personalized community needs for a donor user living in ${user.postcode}, London. These should be real community organizations, charities, or individuals in need that would benefit from household item donations.
+        const prompt = spark.llmPrompt`Generate 4-6 personalized community needs for a donor user living in ${user.postcode}, London. Focus on real community organizations, schools, charities, and families in need.
 
-        Focus on legitimate community needs in London - schools, community centers, charities, families in need, etc.
+        Create realistic donation opportunities that would have genuine community impact:
+        - Local schools needing supplies
+        - Community centers needing furniture/equipment
+        - Families in temporary housing needing household items
+        - Environmental groups needing tools/equipment
+        - Senior centers needing recreational items
+        - Youth organizations needing sports equipment
 
         For each need, include:
-        - title: what they need (e.g., "School Needs Art Supplies", "Family Seeking Kitchen Items")
-        - description: detailed description of the need and impact
+        - title: specific need (e.g., "Homeless Shelter Needs Kitchen Equipment", "Primary School Seeks Art Supplies")
+        - description: detailed description of need, who benefits, and impact of donation
         - category: one of [furniture, electronics, kitchenware, clothing, books, tools, garden, baby-items, sports, home-decor]
-        - urgency: high, medium, or low
-        - requestedBy: organization or person name
+        - urgency: high (emergency need), medium (ongoing need), low (general support)
+        - requestedBy: realistic organization/person name (London Community Center, St. Mary's School, etc.)
         - location: realistic London area/neighborhood
-        - distance: realistic distance from ${user.postcode}
-        - peopleHelped: number of people who would benefit (1-50)
-        - co2ImpactPotential: potential CO2 savings in kg
-        - matchReason: why this matches what they could donate
+        - distance: realistic distance from ${user.postcode} (under 5 miles)
+        - peopleHelped: number of people who would benefit (5-100 for organizations, 1-6 for families)
+        - co2ImpactPotential: potential CO2 savings in kg from donation vs. disposal
+        - matchReason: specific reason why this need matches what they could donate
+
+        Include mix of urgent needs (high priority) and ongoing community support needs.
 
         Return as JSON with a "needs" array.`
 
@@ -151,11 +165,24 @@ export function IntelligentRecommendations({ user, notifications = [], onMarkAsR
     }
   }
 
-  // Auto-generate recommendations on component mount
+  // Auto-generate recommendations on component mount and when user type changes
   useEffect(() => {
     if (user && user.onboardingCompleted) {
       generateRecommendations()
     }
+  }, [user?.userType, user?.id]) // React to userType changes
+
+  // Listen for profile changes and generate immediate recommendations
+  useEffect(() => {
+    const handleProfileChange = (event: CustomEvent) => {
+      if (user && user.onboardingCompleted) {
+        toast.info('Generating new recommendations for your profile type...')
+        generateRecommendations()
+      }
+    }
+
+    window.addEventListener('profile-changed', handleProfileChange as EventListener)
+    return () => window.removeEventListener('profile-changed', handleProfileChange as EventListener)
   }, [user])
 
   const getUrgencyColor = (urgency: string) => {
@@ -268,8 +295,8 @@ export function IntelligentRecommendations({ user, notifications = [], onMarkAsR
                 </CardTitle>
                 <CardDescription>
                   {user.userType === 'collector' 
-                    ? 'Items matched to your interests and location'
-                    : 'Local organizations and people who need your donations'
+                    ? 'Items matched to your interests and location - perfect for collectors'
+                    : 'Local organizations and people who need your donations - make a difference'
                   }
                 </CardDescription>
               </div>
