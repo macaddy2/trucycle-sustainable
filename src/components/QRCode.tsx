@@ -118,7 +118,8 @@ export function QRCodeDisplay({ qrData, onClose }: QRCodeDisplayProps) {
   }
 
   const isExpired = new Date() > new Date(qrData.metadata.expiresAt)
-  const timeUntilExpiry = new Date(qrData.metadata.expiresAt).getTime() - Date.now()
+  const expiryDate = new Date(qrData.metadata.expiresAt)
+  const timeUntilExpiry = expiryDate.getTime() - Date.now()
   const hoursUntilExpiry = Math.floor(timeUntilExpiry / (1000 * 60 * 60))
 
   return (

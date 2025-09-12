@@ -29,7 +29,7 @@ interface Message {
   senderName: string
   senderAvatar?: string
   content: string
-  timestamp: Date
+  timestamp: Date | string
   type: 'text' | 'system' | 'location' | 'image'
   metadata?: {
     location?: { lat: number; lng: number; address: string }
@@ -52,7 +52,7 @@ interface Chat {
   status: 'active' | 'collection_arranged' | 'completed' | 'cancelled'
   lastMessage?: Message
   unreadCount: number
-  createdAt: Date
+  createdAt: Date | string
 }
 
 interface MessageCenterProps {
@@ -72,8 +72,26 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
   const [selectedDropOffLocation, setSelectedDropOffLocation] = useState<string>('')
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const selectedChat = chats.find(chat => chat.id === selectedChatId)
-  const currentMessages = selectedChatId ? messages[selectedChatId] || [] : []
+  
+  // Helper function to normalize dates from KV storage
+  const normalizeChat = (chat: Chat): Chat => ({
+    ...chat,
+    createdAt: chat.createdAt instanceof Date ? chat.createdAt : new Date(chat.createdAt),
+    lastMessage: chat.lastMessage ? {
+      ...chat.lastMessage,
+      timestamp: chat.lastMessage.timestamp instanceof Date ? chat.lastMessage.timestamp : new Date(chat.lastMessage.timestamp)
+    } : undefined
+  })
+
+  const normalizeMessage = (message: Message): Message => ({
+    ...message,
+    timestamp: message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp)
+  })
+
+  // Get normalized data
+  const normalizedChats = chats.map(normalizeChat)
+  const selectedChat = normalizedChats.find(chat => chat.id === selectedChatId)
+  const currentMessages = selectedChatId ? (messages[selectedChatId] || []).map(normalizeMessage) : []
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -82,13 +100,13 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
 
   // Select chat if itemId is provided
   useEffect(() => {
-    if (itemId && chats.length > 0) {
-      const itemChat = chats.find(chat => chat.itemId === itemId)
+    if (itemId && normalizedChats.length > 0) {
+      const itemChat = normalizedChats.find(chat => chat.itemId === itemId)
       if (itemChat) {
         setSelectedChatId(itemChat.id)
       }
     }
-  }, [itemId, chats])
+  }, [itemId, normalizedChats])
 
   // Mock real-time message simulation
   useEffect(() => {
@@ -306,9 +324,10 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
     }
   ]
 
-  const formatTime = (date: Date) => {
+  const formatTime = (date: Date | string) => {
     const now = new Date()
-    const diff = now.getTime() - date.getTime()
+    const dateObj = date instanceof Date ? date : new Date(date)
+    const diff = now.getTime() - dateObj.getTime()
     const minutes = Math.floor(diff / 60000)
     const hours = Math.floor(diff / 3600000)
     const days = Math.floor(diff / 86400000)
@@ -317,7 +336,7 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
     if (minutes < 60) return `${minutes}m ago`
     if (hours < 24) return `${hours}h ago`
     if (days < 7) return `${days}d ago`
-    return date.toLocaleDateString()
+    return dateObj.toLocaleDateString()
   }
 
   if (!currentUser) {
@@ -349,12 +368,12 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
             <div className="p-4 border-b border-border">
               <h2 className="text-h3 font-medium">Messages</h2>
               <p className="text-small text-muted-foreground">
-                {chats.length} active conversations
+                {normalizedChats.length} active conversations
               </p>
             </div>
             
             <ScrollArea className="flex-1">
-              {chats.length === 0 ? (
+              {normalizedChats.length === 0 ? (
                 <div className="p-4 text-center">
                   <Package size={32} className="mx-auto text-muted-foreground mb-2" />
                   <p className="text-small text-muted-foreground">
@@ -363,7 +382,7 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
                 </div>
               ) : (
                 <div className="space-y-1 p-2">
-                  {chats.map(chat => (
+                  {normalizedChats.map(chat => (
                     <Card 
                       key={chat.id}
                       className={`cursor-pointer transition-colors hover:bg-muted/50 ${

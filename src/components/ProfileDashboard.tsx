@@ -640,8 +640,9 @@ export function ProfileDashboard() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {userQRCodes.map((qrCode) => {
-                        const isExpired = new Date() > new Date(qrCode.metadata.expiresAt)
-                        const timeUntilExpiry = new Date(qrCode.metadata.expiresAt).getTime() - Date.now()
+                        const expiryDate = new Date(qrCode.metadata.expiresAt)
+                        const isExpired = new Date() > expiryDate
+                        const timeUntilExpiry = expiryDate.getTime() - Date.now()
                         const hoursUntilExpiry = Math.floor(timeUntilExpiry / (1000 * 60 * 60))
 
                         return (
