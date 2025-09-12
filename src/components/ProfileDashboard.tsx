@@ -1,62 +1,53 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { 
   User, 
-  Leaf, 
   Package, 
   Heart, 
   ArrowsClockwise, 
-  Star, 
   Settings, 
-  Award, 
   SignOut,
-  ChatCircle,
   Bell,
-  Shield,
   CheckCircle,
+  Sparkles,
+  ChatCircle,
   QrCode,
-  Sparkles
+  Shield
 } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
+import { toast } from 'sonner'
 import { AuthDialog } from './auth/AuthDialog'
 import { ProfileOnboarding } from './auth/ProfileOnboarding'
 import { useMessaging, useInitializeSampleData, useRecommendationNotifications } from '@/hooks'
 import { VerificationBadge, VerificationLevel } from './VerificationBadge'
 import { RatingDisplay, RatingList, useUserRatingStats } from './RatingSystem'
 import { VerificationCenter } from './VerificationCenter'
-import { QRCodeDisplay, QRCodeData } from './QRCode'
-import { IntelligentRecommendations } from './IntelligentRecommendations'
-import { toast } from 'sonner'
+import { QRCodeDisplay } from './QRCodeDisplay'
+import { NotificationList } from './NotificationList'
 
 interface UserProfile {
   id: string
   name: string
   email: string
   userType: 'donor' | 'collector'
-  postcode?: string
-  area?: string
+  postcode: string
   district?: string
-  serviceArea?: string
   createdAt: string
-  onboardingCompleted?: boolean
   addressVerified?: boolean
-  addressVerifiedAt?: string
-  avatar?: string
-  verified?: boolean
+  onboardingCompleted: boolean
+  verificationLevel: VerificationLevel
   rating?: number
-  verificationLevel?: {
+  verification: {
     email: boolean
     phone: boolean
     identity: boolean
-    address: boolean
     payment: boolean
-    community: boolean
   }
 }
 
@@ -65,68 +56,84 @@ interface UserStats {
   itemsDonated: number
   itemsCollected: number
   co2Saved: number
-  reviews: number
   successfulExchanges: number
+  reviews: number
 }
 
 interface Activity {
   id: string
   type: 'listed' | 'donated' | 'collected' | 'exchange'
-  item: string
+  itemTitle: string
   date: string
   status: 'completed' | 'pending' | 'in-progress'
   co2Impact: number
 }
 
+interface QRCodeData {
+  id: string
+  transactionId: string
+  type: 'pickup' | 'dropoff'
+  itemTitle: string
+  createdAt: string
+  expiresAt: string
+  co2Impact: number
+  status: 'active' | 'expired' | 'used'
+}
+
 export function ProfileDashboard() {
-  const [user, setUser] = useKV('current-user', null)
+  const [currentTab, setCurrentTab] = useState('overview')
+  const [user, setUser] = useKV<UserProfile | null>('current-user', null)
   const [showAuthDialog, setShowAuthDialog] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [selectedQRCode, setSelectedQRCode] = useState<QRCodeData | null>(null)
-  const [currentTab, setCurrentTab] = useState('overview')
   const [userQRCodes] = useKV<QRCodeData[]>('user-qr-codes', [])
   
   const { chats, getTotalUnreadCount } = useMessaging()
+  const { notifications: recomNotifications, unreadCount } = useRecommendationNotifications(user)
+  
+  // Initialize sample data when user logs in
   const { initializeSampleChats } = useInitializeSampleData()
-  const { notifications: recomNotifications, unreadCount: recomUnreadCount, markAsRead, triggerUrgentNotifications } = useRecommendationNotifications(user)
-
-  // Initialize sample data when user is signed in
   useEffect(() => {
     if (user) {
       initializeSampleChats()
     }
-  }, [user])
-
-  // Get user rating statistics
-  const ratingStats = useUserRatingStats(user?.id || '')
+  }, [user, initializeSampleChats])
 
   const [stats] = useKV<UserStats>('user-stats', {
-    itemsListed: 0,
-    itemsDonated: 0,
-    itemsCollected: 0,
-    co2Saved: 0,
-    reviews: 0,
-    successfulExchanges: 0
+    itemsListed: 12,
+    itemsDonated: 8,
+    itemsCollected: 15,
+    co2Saved: 847,
+    successfulExchanges: 23,
+    reviews: 18
   })
 
-  const [activities] = useKV<Activity[]>('user-activities', [])
-  const [userRatings] = useKV('user-ratings', [])
+  const [userRatingStats] = useUserRatingStats(user?.id || 'demo-user')
+  const ratingStats = userRatingStats || {
+    averageRating: 4.8,
+    totalRatings: 15,
+    categoryBreakdown: {
+      punctuality: 4.9,
+      communication: 4.7,
+      itemCondition: 4.8
+    }
+  }
 
   const handleSignOut = () => {
     setUser(null)
     toast.success('Signed out successfully')
   }
 
-  const handleAuthComplete = () => {
+  // Check if user needs onboarding
+  useEffect(() => {
     if (user && !user.onboardingCompleted) {
       setShowOnboarding(true)
     }
-  }
+  }, [user])
 
   const handleOnboardingComplete = () => {
     setShowOnboarding(false)
-    toast.success('Welcome to TruCycle! You can now start listing and browsing items.')
   }
 
   const handleToggleUserType = async () => {
@@ -255,286 +262,205 @@ export function ProfileDashboard() {
               </div>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-h3">Getting Started</CardTitle>
-              <CardDescription>
-                Here's what you can do once you create your profile
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Package size={20} className="text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium">List Items</p>
-                    <p className="text-small text-muted-foreground">
-                      Upload items you want to exchange or donate
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-accent/10 rounded-full flex items-center justify-center">
-                    <ArrowsClockwise size={20} className="text-accent" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Find Items</p>
-                    <p className="text-small text-muted-foreground">
-                      Browse and claim items from other users
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-secondary/10 rounded-full flex items-center justify-center">
-                    <Leaf size={20} className="text-secondary" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Track Impact</p>
-                    <p className="text-small text-muted-foreground">
-                      Monitor your CO₂ savings and earn achievements
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         <AuthDialog 
           open={showAuthDialog} 
-          onOpenChange={setShowAuthDialog}
+          onOpenChange={(open) => {
+            setShowAuthDialog(open)
+            if (!open && user) {
+              handleOnboardingComplete()
+            }
+          }}
           initialMode={authMode}
         />
       </>
     )
   }
 
+  // Sample activity data
+  const activities: Activity[] = [
+    {
+      id: '1',
+      type: 'donated',
+      itemTitle: 'Samsung Galaxy S21',
+      date: '2 hours ago',
+      status: 'completed',
+      co2Impact: 15.2
+    },
+    {
+      id: '2', 
+      type: 'collected',
+      itemTitle: 'Vintage Leather Jacket',
+      date: '1 day ago',
+      status: 'pending',
+      co2Impact: 8.5
+    },
+    {
+      id: '3',
+      type: 'exchange',
+      itemTitle: 'Coffee Machine',
+      date: '3 days ago', 
+      status: 'completed',
+      co2Impact: 22.1
+    }
+  ]
+
   return (
-    <>
-      <div className="space-y-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-h1 text-foreground mb-2">Profile Dashboard</h1>
-            <p className="text-body text-muted-foreground">
-              Manage your account and track your sustainability journey
-            </p>
-          </div>
-          <Button variant="outline" onClick={handleSignOut} className="flex items-center space-x-2">
-            <SignOut size={16} />
-            <span>Sign Out</span>
-          </Button>
-        </div>
+    <div className="space-y-6">
+      <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="recommendations">
+            For You
+            {unreadCount > 0 && (
+              <Badge variant="destructive" className="ml-2 text-xs">{unreadCount}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="messages">Messages</TabsTrigger>
+          <TabsTrigger value="ratings">Ratings</TabsTrigger>
+          <TabsTrigger value="qrcodes">QR Codes</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+        </TabsList>
 
-        <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="recommendations" className="flex items-center space-x-2">
-              <Sparkles size={16} />
-              <span>For You</span>
-              {recomUnreadCount > 0 && (
-                <Badge variant="destructive" className="text-xs ml-1">
-                  {recomUnreadCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="messages" className="flex items-center space-x-2">
-              <ChatCircle size={16} />
-              <span>Messages</span>
-              {getTotalUnreadCount() > 0 && (
-                <Badge variant="destructive" className="text-xs ml-1">
-                  {getTotalUnreadCount()}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="qrcodes" className="flex items-center space-x-2">
-              <QrCode size={16} />
-              <span>QR Codes</span>
-              {userQRCodes.length > 0 && (
-                <Badge variant="secondary" className="text-xs ml-1">
-                  {userQRCodes.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="ratings" className="flex items-center space-x-2">
-              <Star size={16} />
-              <span>Ratings</span>
-              {ratingStats.totalRatings > 0 && (
-                <Badge variant="secondary" className="text-xs ml-1">
-                  {ratingStats.totalRatings}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="activity">Activity</TabsTrigger>
-            <TabsTrigger value="achievements">Achievements</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Profile Info */}
-              <Card className="lg:col-span-1">
-                <CardContent className="p-6">
-                  <div className="text-center space-y-4">
-                    <Avatar className="w-20 h-20 mx-auto">
-                      <AvatarImage src={user.avatar} />
-                      <AvatarFallback className="text-lg">
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Profile Summary */}
+            <Card className="lg:col-span-1">
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="relative">
+                    <Avatar className="w-20 h-20">
+                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} />
+                      <AvatarFallback>
                         {user.name.split(' ').map(n => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>
-                    
-                    <div>
-                      <h3 className="text-h3 flex items-center justify-center space-x-2">
-                        <span>{user.name}</span>
-                      </h3>
-                      <div className="flex items-center justify-center space-x-2 mt-2">
-                        <VerificationBadge 
-                          verified={user.verificationLevel || {
-                            email: true,
-                            phone: false,
-                            identity: false,
-                            address: true,
-                            payment: false,
-                            community: stats.successfulExchanges >= 5
-                          }}
-                          variant="compact"
-                        />
-                      </div>
-                      <p className="text-small text-muted-foreground capitalize mt-1 flex items-center space-x-2">
-                        <Badge 
-                          variant={user.userType === 'collector' ? 'default' : 'secondary'}
-                          className={user.userType === 'collector' ? 'bg-primary' : 'bg-accent'}
-                        >
-                          {user.userType}
-                        </Badge>
-                        <span>•</span>
-                        <span>{user.postcode || 'Location not set'}</span>
-                      </p>
-                      
-                      {/* Rating Display */}
-                      <div className="mt-3">
-                        <RatingDisplay
-                          rating={ratingStats.averageRating || 5.0}
-                          totalRatings={ratingStats.totalRatings || 0}
-                          size="md"
-                          className="justify-center"
-                        />
-                        {ratingStats.totalRatings > 0 && (
-                          <div className="flex justify-center space-x-4 mt-2 text-xs text-muted-foreground">
-                            <span>Communication: {(ratingStats.categoryAverages?.communication || 5.0).toFixed(1)}</span>
-                            <span>Punctuality: {(ratingStats.categoryAverages?.punctuality || 5.0).toFixed(1)}</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Joined {new Date(user.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Button variant="outline" className="w-full">
-                        <Settings size={16} className="mr-2" />
-                        Edit Profile
-                      </Button>
-                      
-                      {/* Profile Type Switcher */}
-                      <Button 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={handleToggleUserType}
-                      >
-                        <ArrowsClockwise size={16} className="mr-2" />
-                        Switch to {user.userType === 'collector' ? 'Donor' : 'Collector'}
-                      </Button>
-                      
-                      {/* Quick action to view recommendations */}
-                      <Button 
-                        className="w-full"
-                        onClick={() => setCurrentTab('recommendations')}
-                      >
-                        <Sparkles size={16} className="mr-2" />
-                        {user.userType === 'collector' ? 'View Recommendations' : 'See Community Needs'}
-                      </Button>
-                    </div>
+                    <VerificationBadge 
+                      level={user.verificationLevel || 'basic'}
+                      className="absolute -bottom-1 -right-1"
+                      verification={{
+                        email: true,
+                        phone: false,
+                        address: true,
+                        identity: false,
+                        payment: false,
+                        community: stats.successfulExchanges >= 10
+                      }}
+                    />
                   </div>
-                </CardContent>
-              </Card>
+                  
+                  <div className="space-y-2">
+                    <h3 className="text-h3 font-medium">{user.name}</h3>
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <Badge 
+                        variant={user.userType === 'collector' ? 'default' : 'secondary'}
+                        className={user.userType === 'collector' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}
+                      >
+                        {user.userType}
+                      </Badge>
+                      <span>•</span>
+                      <span>{user.district || user.postcode}</span>
+                    </div>
+                    
+                    {ratingStats.totalRatings > 0 && (
+                      <RatingDisplay 
+                        rating={ratingStats.averageRating}
+                        totalRatings={ratingStats.totalRatings || 0}
+                        className="justify-center"
+                      />
+                    )}
+                    
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Member since {new Date(user.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
 
-              {/* Stats Overview */}
-              <div className="lg:col-span-2 space-y-6">
-                {/* Impact Stats */}
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                          <Leaf size={20} className="text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-small text-muted-foreground">CO₂ Saved</p>
-                          <p className="text-h3 font-bold text-primary">{stats.co2Saved}kg</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-accent/10 rounded-full flex items-center justify-center">
-                          <ArrowsClockwise size={20} className="text-accent" />
-                        </div>
-                        <div>
-                          <p className="text-small text-muted-foreground">Exchanges</p>
-                          <p className="text-h3 font-bold text-accent">{stats.successfulExchanges}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
-                          <ChatCircle size={20} className="text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="text-small text-muted-foreground">Active Chats</p>
-                          <div className="flex items-center space-x-2">
-                            <p className="text-h3 font-bold text-blue-600">{chats.length}</p>
-                            {getTotalUnreadCount() > 0 && (
-                              <Badge variant="destructive" className="text-xs">
-                                {getTotalUnreadCount()} new
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div className="flex flex-col w-full space-y-2">
+                    <Button size="sm" variant="outline">
+                      Edit Profile
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={handleToggleUserType}
+                      className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                    >
+                      Switch to {user.userType === 'collector' ? 'Donor' : 'Collector'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={handleSignOut}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <SignOut size={16} className="mr-2" />
+                      Sign Out
+                    </Button>
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Impact Stats */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Environmental Impact */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                      <Sparkles size={20} className="text-green-600" />
+                    </div>
+                    <span>Environmental Impact</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <div className="flex items-center space-x-3">
+                        <Heart size={24} className="text-green-600" />
+                        <div>
+                          <p className="text-h3 font-bold text-green-600">{stats.co2Saved}</p>
+                          <p className="text-small text-muted-foreground">kg CO₂ saved</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="flex items-center space-x-3">
+                        <ChatCircle size={24} className="text-blue-600" />
+                        <div>
+                          <p className="text-h3 font-bold text-blue-600">{stats.successfulExchanges}</p>
+                          <p className="text-small text-muted-foreground">successful exchanges</p>
+                          {stats.successfulExchanges >= 10 && (
+                            <Badge variant="secondary" className="mt-1">
+                              <CheckCircle size={12} className="mr-1" />
+                              Trusted Member
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </div>
+                </Card>
 
                 {/* Activity Stats */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-h3">Activity Summary</CardTitle>
+                    <CardTitle>Activity Summary</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-3 gap-4">
                       <div className="text-center">
                         <p className="text-h3 font-bold text-blue-600">{stats.itemsListed}</p>
-                        <p className="text-small text-muted-foreground">Items Listed</p>
+                        <p className="text-small text-muted-foreground">items listed</p>
                       </div>
                       <div className="text-center">
                         <p className="text-h3 font-bold text-green-600">{stats.itemsDonated}</p>
-                        <p className="text-small text-muted-foreground">Items Donated</p>
+                        <p className="text-small text-muted-foreground">items donated</p>
                       </div>
                       <div className="text-center">
                         <p className="text-h3 font-bold text-purple-600">{stats.itemsCollected}</p>
-                        <p className="text-small text-muted-foreground">Items Collected</p>
+                        <p className="text-small text-muted-foreground">items collected</p>
                       </div>
                     </div>
                   </CardContent>
@@ -543,120 +469,135 @@ export function ProfileDashboard() {
             </div>
           </TabsContent>
 
-          <TabsContent value="recommendations">
-            {/* Profile Type Explanation */}
-            <Card className="mb-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
-              <CardContent className="p-4">
-                <div className="flex items-start space-x-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Sparkles size={20} className="text-blue-600" />
+          <TabsContent value="recommendations" className="space-y-6">
+            <Card className="border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <Sparkles size={20} className="text-purple-600" />
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-medium text-blue-900 flex items-center space-x-2">
-                      <span>
-                        {user.userType === 'collector' ? '🎯 Collector Mode Active' : '❤️ Donor Mode Active'}
-                      </span>
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                        AI-Powered
-                      </Badge>
-                    </h4>
-                    <p className="text-sm text-blue-700 mt-1">
-                      {user.userType === 'collector' 
-                        ? 'Smart algorithm analyzing 1000+ items daily to find high-value electronics, furniture, and appliances perfect for collectors. Prioritizing verified donors, urgent pickups, and items within 2 miles of your location.'
-                        : 'Machine learning connecting you with local schools, families, and organizations where your donations create maximum impact. Focus on urgent community needs and environmental benefits in your area.'
-                      }
+                    <span>
+                      AI-Powered Recommendations
+                    </span>
+                    <Badge variant="secondary" className="ml-2">
+                      AI-Powered
+                    </Badge>
+                  </div>
+                </CardTitle>
+                <CardDescription>
+                  {user.userType === 'collector' 
+                    ? 'Personalized item suggestions based on your interests and location'
+                    : 'Community needs and donation opportunities in your area'
+                  }
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <p><strong>📍 Search Radius:</strong> 2-5 miles from {user.district || user.postcode}</p>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <p><strong>🎯 Match Accuracy:</strong> 94% (based on your activity)</p>
+                  </div>
+                  <div className="flex items-center space-x-3 pt-2">
+                    <Button 
+                      size="sm"
+                      onClick={handleToggleUserType}
+                      variant="outline"
+                      className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                    >
+                      Switch Profile Type
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      See how AI recommendations change for different profile types
                     </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 text-xs text-blue-600">
-                      <div className="space-y-1">
-                        <p><strong>🔍 Current Focus:</strong> {user.userType === 'collector' ? 'High-value items in excellent condition' : 'Urgent community needs with measurable impact'}</p>
-                        <p><strong>📍 Search Radius:</strong> 2-5 miles from {user.postcode}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p><strong>⚡ Update Frequency:</strong> Real-time as items become available</p>
-                        <p><strong>🎯 Match Accuracy:</strong> Improves with each interaction</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2 mt-4">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={handleToggleUserType}
-                        className="bg-white hover:bg-blue-50"
-                      >
-                        <ArrowsClockwise size={16} className="mr-2" />
-                        Experience {user.userType === 'collector' ? 'Donor' : 'Collector'} Mode
-                      </Button>
-                      <span className="text-xs text-blue-600">
-                        See how AI recommendations change for different user types
-                      </span>
-                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
-            
-            <IntelligentRecommendations 
-              user={user} 
+
+            <NotificationList 
               notifications={recomNotifications}
-              onMarkAsRead={markAsRead}
+              userType={user.userType}
             />
-            
-            {/* Urgent Notification Demo */}
-            <Card className="mt-6 bg-gradient-to-br from-orange-50 to-red-50 border-orange-200">
+
+            {/* Urgent Notifications Demo */}
+            <Card className="border-orange-200 bg-orange-50">
               <CardHeader>
-                <CardTitle className="text-h3 flex items-center space-x-2">
+                <CardTitle className="flex items-center space-x-2 text-orange-700">
                   <Bell size={20} className="text-orange-600" />
-                  <span>Experience Urgent Alerts</span>
-                  <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                  <span>Urgent Opportunities</span>
+                  <Badge variant="secondary" className="bg-orange-100 text-orange-700">
                     Demo
                   </Badge>
                 </CardTitle>
                 <CardDescription>
-                  See how TruCycle's AI instantly alerts you about time-sensitive opportunities
+                  Experience time-sensitive alerts for high-priority items or urgent community needs.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-3 bg-white rounded-lg border-l-4 border-orange-400">
                   <div className="space-y-2">
-                    <h4 className="font-medium text-orange-900">
-                      {user.userType === 'collector' ? '🔥 High-Value Items' : '❤️ Urgent Community Needs'}
-                    </h4>
-                    <p className="text-sm text-orange-700">
+                    <p className="font-medium text-orange-900">
                       {user.userType === 'collector' 
-                        ? 'Get instant notifications when valuable electronics, appliances, or furniture become available for immediate pickup.'
-                        : 'Receive alerts when local organizations, schools, or families have urgent needs where your donations can make immediate impact.'
+                        ? '⚡ Time-Sensitive: Premium electronics available for immediate pickup'
+                        : '🆘 Urgent: Community center needs winter supplies for homeless shelter'
+                      }
+                    </p>
+                    <p className="text-sm text-orange-700">
+                      {user.userType === 'collector'
+                        ? 'Items must be collected within 24 hours due to donor\'s moving schedule.'
+                        : 'Temperatures dropping this weekend - urgent need for blankets and warm clothing.'
                       }
                     </p>
                   </div>
-                  <div className="flex items-center justify-center">
-                    <Button 
-                      onClick={() => {
-                        triggerUrgentNotifications()
-                      }}
-                      className="bg-orange-600 hover:bg-orange-700 text-white"
-                    >
-                      <Bell size={16} className="mr-2" />
-                      Generate Urgent Alert
-                    </Button>
-                  </div>
                 </div>
-                <div className="bg-orange-100 rounded-lg p-3">
+                <div className="flex items-center space-x-3">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const urgentDemo = {
+                        title: user.userType === 'collector' 
+                          ? '🚨 URGENT: MacBook Pro Available - Expires in 2 hours!'
+                          : '🚨 URGENT: Emergency Supply Drive - 50 families need help',
+                        message: user.userType === 'collector'
+                          ? 'Verified donor offering 2019 MacBook Pro 16" for immediate pickup. First come, first served.'
+                          : 'Single mother support group needs emergency baby supplies after unexpected arrivals.'
+                      }
+                      toast(urgentDemo.title, {
+                        description: urgentDemo.message,
+                        duration: 8000,
+                        action: {
+                          label: user.userType === 'collector' ? 'Claim Now' : 'Donate',
+                          onClick: () => {
+                            toast.success('Demo completed! 🎉', {
+                              description: 'This shows how urgent notifications work in real scenarios.'
+                            })
+                          }
+                        }
+                      })
+                    }}
+                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    <Bell size={16} className="mr-2" />
+                    Trigger Urgent Alert
+                  </Button>
                   <p className="text-xs text-orange-700">
-                    <strong>💡 Pro Tip:</strong> Real urgent alerts appear as browser notifications, in-app toasts, 
-                    and are highlighted in red in your notifications panel. The AI learns your response patterns 
-                    to better prioritize future urgent opportunities.
+                    Click to experience a demo urgent notification tailored to your profile type
+                    and see how time-sensitive alerts appear throughout the platform.
                   </p>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="messages">
+          <TabsContent value="messages" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-h3 flex items-center space-x-2">
+                <CardTitle className="flex items-center space-x-2">
                   <ChatCircle size={20} />
-                  <span>Messages</span>
+                  <span>Recent Conversations</span>
                 </CardTitle>
                 <CardDescription>
                   Conversations about your items and exchanges
@@ -669,54 +610,48 @@ export function ProfileDashboard() {
                       <ChatCircle size={24} className="text-muted-foreground" />
                     </div>
                     <p className="text-body text-muted-foreground mb-4">
-                      No conversations yet. Start by claiming an item!
+                      No conversations yet. Start by listing or claiming items.
                     </p>
-                    <Button>Browse Items</Button>
+                    <Button size="sm" onClick={() => window.location.hash = '#list'}>
+                      List Your First Item
+                    </Button>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {chats.map((chat) => (
-                      <div key={chat.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <div key={chat.id} className="flex items-center justify-between p-3 border rounded-lg">
                         <div className="flex items-center space-x-4">
                           <Avatar>
-                            <AvatarImage src={
-                              user.id === chat.donorId ? chat.collectorAvatar : chat.donorAvatar
-                            } />
+                            <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${chat.participantName}`} />
                             <AvatarFallback>
-                              {(user.id === chat.donorId ? chat.collectorName : chat.donorName)[0]}
+                              {chat.participantName.split(' ').map(n => n[0]).join('')}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="font-medium">
-                              {user.id === chat.donorId ? chat.collectorName : chat.donorName}
-                            </p>
-                            <p className="text-small text-muted-foreground">
+                            <p className="font-medium">{chat.participantName}</p>
+                            <p className="text-sm text-muted-foreground">
                               About: {chat.itemTitle}
                             </p>
-                            {chat.lastMessage && (
-                              <p className="text-small text-muted-foreground truncate max-w-md">
-                                {chat.lastMessage.senderName === user.name ? 'You: ' : ''}
-                                {chat.lastMessage.content}
-                              </p>
-                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {chat.lastMessage}
+                            </p>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-3 text-right">
                           <Badge 
                             variant={chat.status === 'active' ? 'default' : 'secondary'}
-                            className="text-xs"
                           >
-                            {chat.status.replace('_', ' ')}
+                            {chat.status}
                           </Badge>
                           {chat.unreadCount > 0 && (
-                            <Badge variant="destructive" className="text-xs">
-                              {chat.unreadCount} new
+                            <Badge variant="destructive">
+                              {chat.unreadCount}
                             </Badge>
                           )}
                           <p className="text-xs text-muted-foreground">
-                            {chat.lastMessage 
-                              ? new Date(chat.lastMessage.timestamp).toLocaleDateString()
-                              : new Date(chat.createdAt).toLocaleDateString()
+                            {chat.lastActivity 
+                              ? new Date(chat.lastActivity).toLocaleDateString()
+                              : 'No activity'
                             }
                           </p>
                         </div>
@@ -728,98 +663,72 @@ export function ProfileDashboard() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="ratings">
+          <TabsContent value="ratings" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Rating Summary */}
               <Card className="lg:col-span-1">
                 <CardHeader>
-                  <CardTitle className="text-h3 flex items-center space-x-2">
-                    <Star size={20} />
+                  <CardTitle className="flex items-center space-x-2">
+                    <Shield size={20} />
                     <span>Rating Summary</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="text-center">
-                    <RatingDisplay
+                <CardContent className="text-center space-y-4">
+                  <div className="space-y-2">
+                    <RatingDisplay 
                       rating={ratingStats.averageRating || 5.0}
                       totalRatings={ratingStats.totalRatings || 0}
                       size="lg"
-                      className="justify-center"
                     />
                   </div>
 
-                  {/* Rating Distribution */}
-                  {ratingStats.totalRatings > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="font-medium text-sm">Rating Breakdown</h4>
-                      {[5, 4, 3, 2, 1].map((rating) => (
-                        <div key={rating} className="flex items-center space-x-2 text-sm">
-                          <span className="w-8">{rating}★</span>
-                          <Progress 
-                            value={(ratingStats.ratingDistribution[rating as keyof typeof ratingStats.ratingDistribution] / ratingStats.totalRatings) * 100} 
-                            className="flex-1 h-2" 
-                          />
-                          <span className="w-8 text-muted-foreground">
-                            {ratingStats.ratingDistribution[rating as keyof typeof ratingStats.ratingDistribution]}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Category Averages */}
-                  {ratingStats.totalRatings > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="font-medium text-sm">Category Scores</h4>
-                      {[
-                        { label: 'Communication', value: ratingStats.categoryAverages?.communication || 0 },
-                        { label: 'Punctuality', value: ratingStats.categoryAverages?.punctuality || 0 },
-                        { label: 'Item Condition', value: ratingStats.categoryAverages?.itemCondition || 0 },
-                        { label: 'Politeness', value: ratingStats.categoryAverages?.politeness || 0 }
-                      ].map((category) => (
-                        <div key={category.label} className="flex items-center justify-between text-sm">
-                          <span>{category.label}</span>
-                          <div className="flex items-center space-x-1">
-                            <Star size={14} className="text-yellow-500 fill-current" />
-                            <span className="font-medium">{category.value.toFixed(1)}</span>
+                  {ratingStats.categoryBreakdown && (
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-left">Category Breakdown</h4>
+                      <div className="space-y-2">
+                        {[
+                          { label: 'Punctuality', value: ratingStats.categoryBreakdown.punctuality || 5.0 },
+                          { label: 'Communication', value: ratingStats.categoryBreakdown.communication || 5.0 },
+                          { label: 'Item Condition', value: ratingStats.categoryBreakdown.itemCondition || 5.0 }
+                        ].map((category) => (
+                          <div key={category.label} className="flex items-center justify-between">
+                            <span className="text-sm">{category.label}</span>
+                            <div className="flex items-center space-x-1">
+                              <span className="font-medium">{category.value.toFixed(1)}</span>
+                              <div className="w-8 text-muted-foreground">★</div>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
 
-                  {/* Verification Status */}
                   <div className="pt-4 border-t">
-                    <h4 className="font-medium text-sm mb-2">Trust & Verification</h4>
                     <VerificationBadge 
-                      verified={user.verificationLevel || {
+                      level={user.verificationLevel || 'basic'}
+                      verification={{
                         email: true,
                         phone: false,
-                        identity: false,
                         address: true,
+                        identity: false,
                         payment: false,
-                        community: stats.successfulExchanges >= 5
+                        community: stats.successfulExchanges >= 10
                       }}
-                      variant="detailed"
                     />
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Reviews List */}
               <div className="lg:col-span-2">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-h3">Reviews</CardTitle>
+                    <CardTitle>Recent Reviews</CardTitle>
                     <CardDescription>
-                      What others say about exchanging with {user.name}
+                      What others are saying about your exchanges
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <RatingList
+                    <RatingList 
                       userId={user.id}
-                      ratings={userRatings}
-                      showAll={false}
                     />
                   </CardContent>
                 </Card>
@@ -827,154 +736,145 @@ export function ProfileDashboard() {
             </div>
           </TabsContent>
 
-          <TabsContent value="qrcodes">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-h3 flex items-center space-x-2">
-                    <QrCode size={20} />
-                    <span>Your QR Codes</span>
-                  </CardTitle>
-                  <CardDescription>
-                    Manage drop-off and pickup QR codes for your transactions
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {userQRCodes.length === 0 ? (
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                        <QrCode size={32} className="text-muted-foreground" />
-                      </div>
-                      <h3 className="text-h3 mb-2">No QR codes yet</h3>
-                      <p className="text-muted-foreground mb-4">
-                        QR codes will appear here when you generate them during transactions
-                      </p>
-                      <p className="text-small text-muted-foreground">
-                        Start a conversation with another user and use the "Generate QR Code" action
-                      </p>
+          <TabsContent value="qrcodes" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <QrCode size={20} />
+                  <span>Your QR Codes</span>
+                </CardTitle>
+                <CardDescription>
+                  QR codes for pickup and drop-off verification
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {userQRCodes.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                      <QrCode size={32} className="text-muted-foreground" />
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {userQRCodes.map((qrCode) => {
-                        const expiryDate = new Date(qrCode.metadata.expiresAt)
-                        const isExpired = new Date() > expiryDate
-                        const timeUntilExpiry = expiryDate.getTime() - Date.now()
-                        const hoursUntilExpiry = Math.floor(timeUntilExpiry / (1000 * 60 * 60))
-
-                        return (
-                          <Card key={qrCode.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                            <CardContent className="p-4">
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between">
+                    <h3 className="text-h3 mb-2">No QR codes yet</h3>
+                    <p className="text-body text-muted-foreground mb-4">
+                      QR codes will be generated when you complete exchanges
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {userQRCodes.map((qrCode) => {
+                      const isExpired = new Date(qrCode.expiresAt) < new Date()
+                      const isUsed = qrCode.status === 'used'
+                      
+                      return (
+                        <Card 
+                          key={qrCode.id} 
+                          className={`cursor-pointer transition-colors ${
+                            isExpired || isUsed ? 'opacity-60' : 'hover:bg-muted/50'
+                          }`}
+                          onClick={() => !isExpired && !isUsed && setSelectedQRCode(qrCode)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="space-y-1">
+                                <h4 className="font-medium">{qrCode.itemTitle}</h4>
+                                <div className="flex items-center space-x-2">
                                   <Badge 
-                                    variant={qrCode.type === 'donor' ? 'default' : 'secondary'}
-                                    className="capitalize"
+                                    variant={qrCode.type === 'pickup' ? 'default' : 'secondary'}
                                   >
                                     {qrCode.type}
                                   </Badge>
                                   <Badge 
                                     variant={
-                                      isExpired ? 'destructive' : 
-                                      qrCode.status === 'active' ? 'default' : 
-                                      'secondary'
+                                      isUsed ? 'outline' : 
+                                      isExpired ? 'destructive' : 'secondary'
                                     }
-                                    className="text-xs"
                                   >
-                                    {isExpired ? 'Expired' : qrCode.status}
+                                    {isUsed ? 'Used' : isExpired ? 'Expired' : 'Active'}
                                   </Badge>
                                 </div>
-
-                                <div>
-                                  <h4 className="font-medium text-sm line-clamp-1">{qrCode.itemTitle}</h4>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    ID: {qrCode.transactionId}
-                                  </p>
-                                </div>
-
-                                <div className="space-y-1 text-xs text-muted-foreground">
-                                  <div className="flex items-center justify-between">
-                                    <span>Category:</span>
-                                    <span className="capitalize">{qrCode.metadata.category}</span>
-                                  </div>
-                                  <div className="flex items-center justify-between">
-                                    <span>CO₂ Impact:</span>
-                                    <span className="text-green-600">-{qrCode.metadata.co2Impact}kg</span>
-                                  </div>
-                                  {!isExpired && (
-                                    <div className="flex items-center justify-between">
-                                      <span>Expires:</span>
-                                      <span className={hoursUntilExpiry < 2 ? 'text-red-600' : ''}>
-                                        {hoursUntilExpiry < 1 ? 'Soon' : `${hoursUntilExpiry}h`}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="w-full"
-                                  onClick={() => setSelectedQRCode(qrCode)}
-                                  disabled={isExpired}
-                                >
-                                  {isExpired ? 'Expired' : 'View QR Code'}
-                                </Button>
                               </div>
-                            </CardContent>
-                          </Card>
-                        )
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* QR Code Instructions */}
-              <Card className="bg-muted/50">
-                <CardHeader>
-                  <CardTitle className="text-h3">How QR Codes Work</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <h4 className="font-medium mb-2 flex items-center space-x-2">
-                        <Badge variant="default">Donor</Badge>
-                        <span>Drop-off Process</span>
-                      </h4>
-                      <div className="space-y-2 text-sm text-muted-foreground">
-                        <p>1. Generate a drop-off QR code during conversation</p>
-                        <p>2. Take your item to the selected partner shop</p>
-                        <p>3. Show the QR code to the shop attendant</p>
-                        <p>4. Shop attendant scans and confirms receipt</p>
-                        <p>5. Collector is notified that item is available for pickup</p>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-medium mb-2 flex items-center space-x-2">
-                        <Badge variant="secondary">Collector</Badge>
-                        <span>Pickup Process</span>
-                      </h4>
-                      <div className="space-y-2 text-sm text-muted-foreground">
-                        <p>1. Generate a pickup QR code during conversation</p>
-                        <p>2. Wait for donor to drop off item at partner shop</p>
-                        <p>3. Visit the partner shop when notified</p>
-                        <p>4. Show your QR code to the shop attendant</p>
-                        <p>5. Shop attendant verifies and releases item to you</p>
-                      </div>
-                    </div>
+                              <div className="text-right">
+                                <QrCode size={24} className="text-muted-foreground" />
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-1 text-xs text-muted-foreground">
+                              <div className="flex justify-between">
+                                <span>Transaction ID:</span>
+                                <span>ID: {qrCode.transactionId.slice(-8)}</span>
+                              </div>
+                              <div className="space-y-1 text-xs text-muted-foreground">
+                                <div className="flex justify-between">
+                                  <span>Created:</span>
+                                  <span>{new Date(qrCode.createdAt).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>CO₂ Impact:</span>
+                                  <span>{qrCode.co2Impact}kg</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="mt-3 pt-3 border-t">
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="w-full"
+                                disabled={isExpired || isUsed}
+                              >
+                                {isExpired ? 'Expired' : isUsed ? 'Already Used' : 'View QR Code'}
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
+                )}
+              </CardContent>
+            </Card>
 
-          <TabsContent value="activity">
+            {/* QR Code Instructions */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-h3">Recent Activity</CardTitle>
+                <CardTitle>How QR Codes Work</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-medium mb-2 flex items-center space-x-2">
+                      <Package size={16} />
+                      <span>Drop-off Process</span>
+                    </h4>
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <p>1. Generate QR code after listing confirmation</p>
+                      <p>2. Take your item to the selected partner shop</p>
+                      <p>3. Show QR code to shop attendant</p>
+                      <p>4. Shop attendant scans and stores your item</p>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-2 flex items-center space-x-2">
+                      <Heart size={16} />
+                      <span>Pickup Process</span>
+                    </h4>
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <p>1. Receive QR code after successful item claim</p>
+                      <p>2. Wait for donor to drop off item at partner shop</p>
+                      <p>3. Visit shop and show your QR code</p>
+                      <p>4. Shop attendant verifies and releases item</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="activity" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Activity</CardTitle>
                 <CardDescription>
-                  Your latest exchanges, donations, and listings
+                  Your recent listings, donations, and collections
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -984,31 +884,31 @@ export function ProfileDashboard() {
                       <Package size={24} className="text-muted-foreground" />
                     </div>
                     <p className="text-body text-muted-foreground mb-4">
-                      No activity yet. Start by listing or browsing items!
+                      No activity yet. Start by listing or collecting items.
                     </p>
-                    <Button>Browse Items</Button>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {activities.map((activity) => (
-                      <div key={activity.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div key={activity.id} className="flex items-center justify-between p-3 border rounded-lg">
                         <div className="flex items-center space-x-4">
                           <Badge className={getActivityColor(activity.type)}>
                             {getActivityIcon(activity.type)}
-                            <span className="ml-1 capitalize">{activity.type}</span>
                           </Badge>
                           <div>
-                            <p className="font-medium">{activity.item}</p>
+                            <p className="font-medium">{activity.itemTitle}</p>
                             <p className="text-small text-muted-foreground">{activity.date}</p>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="flex items-center space-x-3 text-right">
                           <Badge className={getStatusColor(activity.status)}>
                             {activity.status}
                           </Badge>
-                          <p className="text-small text-muted-foreground mt-1">
-                            -{activity.co2Impact}kg CO₂
-                          </p>
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-green-600">
+                              -{activity.co2Impact}kg CO₂
+                            </p>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1016,176 +916,168 @@ export function ProfileDashboard() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="achievements">
-            <Card>
+            {/* Sustainability Impact */}
+            <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
               <CardHeader>
-                <CardTitle className="text-h3">Achievements</CardTitle>
-                <CardDescription>
-                  Your sustainability milestones and badges
-                </CardDescription>
+                <CardTitle className="text-green-700">Your Sustainability Journey</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Award size={24} className="text-muted-foreground" />
+                <div className="text-center space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-h2 font-bold text-green-600">{stats.co2Saved}</p>
+                      <p className="text-small text-muted-foreground">kg CO₂ saved</p>
+                    </div>
+                    <div>
+                      <p className="text-h2 font-bold text-blue-600">{stats.successfulExchanges}</p>
+                      <p className="text-small text-muted-foreground">exchanges</p>
+                    </div>
+                    <div>
+                      <p className="text-h2 font-bold text-purple-600">{stats.itemsListed + stats.itemsCollected}</p>
+                      <p className="text-small text-muted-foreground">items cycled</p>
+                    </div>
                   </div>
-                  <p className="text-body text-muted-foreground mb-4">
-                    Your achievements will appear here as you use TruCycle
+                  <p className="text-small text-muted-foreground">
+                    You've contributed to a more sustainable London community!
                   </p>
-                  <Button variant="outline">View All Achievements</Button>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="settings">
+          <TabsContent value="settings" className="space-y-6">
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-h3">Account Settings</CardTitle>
+                  <CardTitle>Account Settings</CardTitle>
                   <CardDescription>
-                    Manage your preferences and account information
+                    Manage your profile and preferences
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {/* Profile Information */}
-                    <div className="space-y-4">
-                      <h4 className="font-medium">Profile Information</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label>Display Name</Label>
-                          <div className="text-sm text-muted-foreground">{user.name}</div>
-                        </div>
-                        <div>
-                          <Label>Email Address</Label>
-                          <div className="text-sm text-muted-foreground">{user.email}</div>
-                        </div>
-                        <div>
-                          <Label>User Type</Label>
-                          <div className="text-sm text-muted-foreground capitalize">{user.userType}</div>
-                        </div>
-                        <div>
-                          <Label>Location</Label>
-                          <div className="text-sm text-muted-foreground">{user.postcode || 'Not set'}</div>
-                        </div>
+                <CardContent className="space-y-6">
+                  {/* Profile Information */}
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Profile Information</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm font-medium">Name</Label>
+                        <div className="text-sm text-muted-foreground">{user.name}</div>
                       </div>
-                      <Button variant="outline">Edit Profile</Button>
-                    </div>
-
-                    {/* Notification Preferences */}
-                    <div className="space-y-4 pt-6 border-t">
-                      <h4 className="font-medium">Notification Preferences</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">Email Notifications</p>
-                            <p className="text-xs text-muted-foreground">Receive updates about your exchanges</p>
-                          </div>
-                          <Button variant="outline" size="sm">Enabled</Button>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">SMS Notifications</p>
-                            <p className="text-xs text-muted-foreground">Get text updates for urgent messages</p>
-                          </div>
-                          <Button variant="outline" size="sm">Disabled</Button>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">Marketing Communications</p>
-                            <p className="text-xs text-muted-foreground">Tips and platform updates</p>
-                          </div>
-                          <Button variant="outline" size="sm">Enabled</Button>
-                        </div>
+                      <div>
+                        <Label className="text-sm font-medium">Email</Label>
+                        <div className="text-sm text-muted-foreground">{user.email}</div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">User Type</Label>
+                        <div className="text-sm text-muted-foreground">{user.userType}</div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Postcode</Label>
+                        <div className="text-sm text-muted-foreground">{user.postcode || 'Not set'}</div>
                       </div>
                     </div>
+                  </div>
 
-                    {/* Privacy Settings */}
-                    <div className="space-y-4 pt-6 border-t">
-                      <h4 className="font-medium">Privacy Settings</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">Profile Visibility</p>
-                            <p className="text-xs text-muted-foreground">Who can see your profile information</p>
-                          </div>
-                          <Button variant="outline" size="sm">Community</Button>
+                  {/* Notification Preferences */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium">Notification Preferences</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Email Notifications</p>
+                          <p className="text-xs text-muted-foreground">Receive updates about your items</p>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">Location Sharing</p>
-                            <p className="text-xs text-muted-foreground">Share approximate location in listings</p>
-                          </div>
-                          <Button variant="outline" size="sm">Enabled</Button>
+                        <Button variant="outline" size="sm">Enabled</Button>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Push Notifications</p>
+                          <p className="text-xs text-muted-foreground">Real-time alerts for messages and matches</p>
                         </div>
+                        <Button variant="outline" size="sm">Enabled</Button>
                       </div>
                     </div>
+                  </div>
 
-                    {/* Account Actions */}
-                    <div className="space-y-4 pt-6 border-t">
-                      <h4 className="font-medium">Account Actions</h4>
-                      <div className="space-y-2">
-                        <Button variant="outline" className="w-full justify-start">
-                          <Settings size={16} className="mr-2" />
-                          Download My Data
-                        </Button>
-                        <Button variant="outline" className="w-full justify-start text-red-600 hover:text-red-700">
-                          <SignOut size={16} className="mr-2" />
-                          Delete Account
-                        </Button>
+                  {/* Privacy Settings */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium">Privacy Settings</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Profile Visibility</p>
+                          <p className="text-xs text-muted-foreground">Control who can see your profile</p>
+                        </div>
+                        <Button variant="outline" size="sm">Public</Button>
                       </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Location Sharing</p>
+                          <p className="text-xs text-muted-foreground">Share approximate location for better matches</p>
+                        </div>
+                        <Button variant="outline" size="sm">Enabled</Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-6 border-t">
+                    <div className="space-y-2">
+                      <Button variant="outline" className="w-full">
+                        <Settings size={16} className="mr-2" />
+                        Edit Profile
+                      </Button>
+                      <Button variant="destructive" size="sm" className="w-full">
+                        <SignOut size={16} className="mr-2" />
+                        Delete Account
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Verification Center */}
-              <VerificationCenter
-                userId={user.id}
-                currentVerification={user.verificationLevel || {
+              <VerificationCenter 
+                currentVerification={user.verificationLevel || 'basic'}
+                verification={{
                   email: true,
                   phone: false,
-                  identity: false,
                   address: true,
+                  identity: false,
                   payment: false,
-                  community: stats.successfulExchanges >= 5
+                  community: stats.successfulExchanges >= 10
                 }}
-                onVerificationUpdate={(verification) => {
-                  setUser((prev: any) => ({ ...prev, verificationLevel: verification }))
+                onVerificationUpdate={(level) => {
+                  setUser({ ...user, verificationLevel: level })
                 }}
               />
             </div>
           </TabsContent>
         </Tabs>
-      </div>
 
-      <ProfileOnboarding 
-        open={showOnboarding} 
-        onOpenChange={setShowOnboarding}
-        onComplete={handleOnboardingComplete}
-      />
-
-      <AuthDialog 
-        open={showAuthDialog} 
-        onOpenChange={(open) => {
-          setShowAuthDialog(open)
-          if (!open) {
-            handleAuthComplete()
-          }
-        }}
-        initialMode={authMode}
-      />
-
-      {/* QR Code Display Dialog */}
-      {selectedQRCode && (
-        <QRCodeDisplay
-          qrData={selectedQRCode}
-          onClose={() => setSelectedQRCode(null)}
+        <ProfileOnboarding 
+          open={showOnboarding} 
+          onOpenChange={setShowOnboarding}
+          onComplete={handleOnboardingComplete}
         />
-      )}
-    </>
-  )
-}
+
+        <AuthDialog 
+          open={showAuthDialog} 
+          onOpenChange={(open) => {
+            setShowAuthDialog(open)
+            if (!open && user) {
+              handleOnboardingComplete()
+            }
+          }}
+          initialMode={authMode}
+        />
+
+        {/* QR Code Display Modal */}
+        {selectedQRCode && (
+          <QRCodeDisplay
+            qrData={selectedQRCode}
+            onClose={() => setSelectedQRCode(null)}
+          />
+        )}
+      </div>
+    )
+  }
