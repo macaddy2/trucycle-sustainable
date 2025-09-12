@@ -26,7 +26,7 @@ import { useMessaging, useInitializeSampleData, useRecommendationNotifications }
 import { VerificationBadge, VerificationLevel } from './VerificationBadge'
 import { RatingDisplay, RatingList, useUserRatingStats } from './RatingSystem'
 import { VerificationCenter } from './VerificationCenter'
-import { QRCodeDisplay } from './QRCodeDisplay'
+import { QRCodeDisplay } from './QRCode'
 import { NotificationList } from './NotificationList'
 
 interface UserProfile {

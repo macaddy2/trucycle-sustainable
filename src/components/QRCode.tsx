@@ -27,6 +27,8 @@ interface QRCodeData {
   status: 'active' | 'scanned' | 'expired' | 'completed'
 }
 
+export type { QRCodeData }
+
 interface QRCodeDisplayProps {
   qrData: QRCodeData
   onClose: () => void
