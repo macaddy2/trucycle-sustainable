@@ -101,8 +101,16 @@ export function ProfileDashboard() {
     reviews: 18
   })
 
-  const [userRatingStats] = useUserRatingStats(user?.id || 'demo-user')
-  const ratingStats = userRatingStats || {
+  const userRatingStats = useUserRatingStats(user?.id || 'demo-user')
+  const ratingStats = userRatingStats.totalRatings > 0 ? {
+    averageRating: userRatingStats.averageRating,
+    totalRatings: userRatingStats.totalRatings,
+    categoryBreakdown: {
+      punctuality: userRatingStats.categoryAverages.punctuality,
+      communication: userRatingStats.categoryAverages.communication,
+      itemCondition: userRatingStats.categoryAverages.itemCondition
+    }
+  } : {
     averageRating: 4.8,
     totalRatings: 15,
     categoryBreakdown: {
