@@ -1,24 +1,22 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
-  Package
-  Arrows
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { 
+  Package,
+  ArrowsClockwise,
   SignOut,
-  CheckCi
-  ChatCircle,
-  Shield
-import { u
-import 
   CheckCircle,
-  Sparkles,
   ChatCircle,
+  Shield,
   QrCode,
-  Shield
+  Sparkles,
+  Heart,
+  User
 } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
@@ -31,39 +29,33 @@ import { VerificationCenter } from './VerificationCenter'
 import { QRCodeDisplay } from './QRCodeDisplay'
 import { NotificationList } from './NotificationList'
 
-  rating?: number
-    email: b
-    identity: 
-  }
-
-  itemsListed: num
-  itemsCollected: n
-  successfulExchang
-}
-interface Activity {
-  type: 'listed' | 'donated' | 'collec
-  date: string
-  co2Impact: numb
-
+interface UserProfile {
   id: string
-  type: 'pickup' | 'd
-  createdAt: string
-  c
+  name: string
+  email: string
+  userType: 'donor' | 'collector'
+  verificationLevel: VerificationLevel
+  onboardingCompleted: boolean
+  rating?: number
+  completedVerifications: {
+    email: boolean
+    phone: boolean
+    identity: boolean
+  }
 }
 
-  const [user, setUse
-  const [showOnboardi
-  const [selectedQRCod
-  
-  const { notifica
-  // Initialize sample data w
-  useEffect(() =>
- 
+interface UserStats {
+  itemsListed: number
+  itemsDonated: number
+  itemsCollected: number
+  successfulExchanges: number
+  co2Saved: number
+  reviews: number
+}
 
-  const [stats] = us
-    itemsDon
-    co2Saved: 847,
-    reviews: 18
+interface Activity {
+  type: 'listed' | 'donated' | 'collected' | 'exchange'
+  title: string
   date: string
   status: 'completed' | 'pending' | 'in-progress'
   co2Impact: number
@@ -227,6 +219,31 @@ export function ProfileDashboard() {
     }
   }
 
+  // Sample activities
+  const activities: Activity[] = [
+    {
+      type: 'donated',
+      title: 'Kitchen Blender to Sarah M.',
+      date: '2 hours ago',
+      status: 'completed',
+      co2Impact: 15
+    },
+    {
+      type: 'collected',
+      title: 'Laptop from James K.',
+      date: '1 day ago',
+      status: 'completed',
+      co2Impact: 45
+    },
+    {
+      type: 'listed',
+      title: 'Winter Coat',
+      date: '3 days ago',
+      status: 'pending',
+      co2Impact: 0
+    }
+  ]
+
   // If no user is signed in, show welcome/setup screen
   if (!user) {
     return (
@@ -261,822 +278,536 @@ export function ProfileDashboard() {
                 </Button>
               </div>
             </CardContent>
-        </TabsLis
-        <TabsC
+          </Card>
+        </div>
 
-              <CardC
-                  <div className
-                      <AvatarImage 
-                        {user.name.
-                    </Avatar>
-                      level={user.verifi
-             
-            
-                        identity
-          
-         
-     
-   
-
-                        c
-                        {user.user
-     
-              
-                    {r
-                        rating={rating
-                        cl
-                    )}
-                    <
-      
-
-               
-                    </Bu
-                      size="sm" 
-                      on
-                    >
-                    
-      
-     
-              
-                      S
-                  </div>
-              </CardConten
-
-            <div clas
-     
-   
-
-          
-                </CardHeader>
-                  <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-cente
-                        <div>
-                          <p className="text-sm
-                   
-                    <div classNam
-                        <ChatCircle size={24} className="text-blue-600" />
-              
-                        
-                              <CheckCircle size={12} className
-                            </Badge>
-                        </div>
-                    </CardContent>
-                </C
-
-                  <CardHeader>
-                  </CardHeader>
-                    <div className=
-                        <p className="text-h
-                      </div>
-                        <p className="text-h3 font-bold text-green-600">{stats.ite
-                      </div>
-                        <p className="text-h3 font
-                      </div>
-                  </CardContent>
-              </div>
-          </TabsContent>
-                    </Avatar>
-              <CardHeader>
-                  <div className="w-8 h-8 bg-purple-100 rounded
-                  </div>
-                    <span>
-                    </span>
-                      AI-Powered
-                  </div>
-                <CardDescription>
-                    ? 'Personalized ite
-                  }
-              </CardHead
-                <div c
-                    <p><
-                  
-                  </div>
-                    <Button 
-                      onClick={handleToggleUserType}
-                      classNa
-                      Switch Profile Type
-                    <p className="text-xs text-muted-foreground">
-                      >
-                </div>
-            </Card>
-            <NotificationList 
-              userType={user.userType}
-
-                    
-                <CardTitle className="flex items-cente
-                  <span>Urgent Opport
-                    Demo
-                </CardTitle>
-                  Experience time-sensitive alerts
-              </CardHead
-                <div c
-                    
-                        ? '⚡ Time-Sensitive: Premium electronics avail
-                      }
-                    <p c
-                        
-
-                  </div>
-                <div className="flex items-center space-
-                    size="sm"
-                      const u
-                          ? 
-                        message:
-                          : 'Single mot
-                      toast(urgentDemo.title, {
-                        duration: 8000,
-                     
-                            toast.success('Demo completed! 🎉', {
-                            }
-                        }
-                    }}
-                  >
-                    Trigger Urgent Alert
-                  <p className="text-xs text-orange-700">
-                    a
-                </div>
-            </Card>
-
-            <Card>
-                <CardT
-                  <span>Rece
-                <Ca
-
-              <CardContent>
-                  <div className="text-center py-8">
-                      <ChatCircle size={24
-                    
-                    </p>
-                      List Your First Item
-                  </div>
-                  <div className="space-y-3">
-                      <div
-                          <Avatar>
-                            <A
-                            <
-                          <di
-                            <p className="text-sm text-mut
-                            </p>
-                              {chat.lastMessage}
-                          </div>
-                        <div>
-                            variant={chat.status === 'active' ? 'default' : 'secondary'}
-                            {chat.status}
-                          {cha
-                      </div>
-                          
-                            {chat.lastActivity 
-                      <div className="flex items-center space-x-3">
-                          </p>
-                        <div>
-                  </div>
-              </CardContent>
-          </TabsContent>
-          <TabsContent value="ratings" className="space-y-6">
-              <Card className="lg:col-span-1">
-                  <CardTitle className="flex
-                    <span>Rating Sum
-                </CardHeader
-                        </div>
-                      rating
-                    </CardContent>
-                  </div>
-                  {rati
-
-                        {[
-                      
-                  <CardHeader>
-                            <span className="text-sm">{cate
-                  </CardHeader>
-                            </d
-                    <div className="grid grid-cols-3 gap-4">
-                    </div>
-
-                    <VerificationBadge 
-                      </div>
-                        phone: false,
-                        identity: false,
-                        community: stats.successfulExchanges >= 10
-                    />
-                </CardContent>
-
-                <Card>
-                    <CardTit
-                      What
-                  </CardContent>
-                    <Ra
-              </div>
-                </
-          </TabsContent>
-
-            <Card>
-                <CardTitle className="flex items-center space-x-2">
-                  <span>Yo
-                <CardDescription>
-                </CardDescription>
-              <CardContent>
-                  <div c
-                  <div className="flex-1">
-                    <h3 cl
-                      QR codes will be generated
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-
-                      const isEx
-                      
-                        
-                          cl
-                          }`}
-                        >
-                            <div className="flex items-start justify-between mb-3">
-                                <h4 className="font-medium">{qrCode.itemTitle}<
-                   
-                                  
-                           
-                           
-                                      isExp
-                                  >
-                                  </Badge>
-                        
-                                <QrCode size={24} className="text-muted-foreg
-                            </div>
-                        
-                                <span>Transaction ID:</span>
-                            
-                               
-                                  <span>{new Date(qr
-                                <div cl
-                                  <span>{qrCode.co2Impact}kg</span>
-                     
-                            
-                             
-                                variant="outline" 
-                                disabled={isExpired || isUsed}
-                        
-                        
-                </div>
-                    })}
-            </Card>
-
-            {/* QR Code Instru
-              <CardHeader>
-              </CardHeader>
-            />
-
-                      <span>Drop-off Process<
-                    <div className="space-y-2 text-sm text-mu
-              <CardHeader>
-                      <p>4. Shop attendant scans and stores your item</p>
-                  </div>
-                    <h4 className="font-medium mb-2
-                      <span>Pickup Process</span>
-                    <div
-                  </Badge>
-                      <p>4. 
-                <CardDescription>
-              </CardContent>
-                </CardDescription>
-          <TabsContent valu
-              <CardContent className="space-y-4">
-                <CardDescription>
-                </CardDescription>
-              <CardContent>
-                  <div className="text-center py-8">
-                      <Package size={24} className="text-muted-foreground" />
-                    <p className="text-body text-muted-foreground mb-4">
-                      }
-                ) : (
-                    {activities.map((activity) => (
-                        <div className="flex items-c
-                            {getActivityIcon(activity.type)}
-                          <div>
-                       
-                        
-                  </div>
-                </div>
-                            <p className="text-sm font-medium
-                         
-                        </div
-                    ))}
-                )}
-            </Card>
-            {/* Sustainability Impact */}
-              <CardHeader>
-              </CardHeader>
-                <div className="text-center space-y-4">
-                    <div>
-                      <
-                    <div>
-                      <p className="text-small text-mute
-                    <div>
-                      <p classNam
-                  </div>
-                    You've contributed to 
-                </div>
-            </Card>
-
-            <div className=
-                <CardHead
-                  <CardD
-                  </Ca
-                <CardContent className="space-y-6">
-                  <
-                    <div className="grid grid-cols-2 ga
-                        <Label className
-                      </div
-                  <p className="text-xs text-orange-700">
-                      </div>
-                        <Label className="text-sm font-medium">User Type</Label>
-                  </p>
-                      
-              </CardContent>
-                  <
-          </TabsContent>
-
-                      <div className="flex items-center justif
-                  
-              <CardHeader>
-                      </div>
-                        <div>
-                          <p className="text-xs tex
-                </CardTitle>
-                    </div>
-
-                  <div className="
-              </CardHeader>
-                        <di
-                {chats.length === 0 ? (
-                        <Button variant="outline" si
-                      <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium">Location Sharing</p
-                    </div>
-                      </div>
-                  </div>
-                  <div c
-                      <Button variant="outline" className="w-full">
-                        Edit Profile
-                      <Button
-                        
-                ) : (
-                </CardContent>
-                    {chats.map((chat) => (
-                currentVerification={user.verificationLevel || 'basic'}
-                        <div className="flex items-center space-x-4">
-                  address: true,
-                  payment: false,
-                }}
-                  setUser({ ...user, verificationLevel: level })
-              />
-          </TabsContent>
-
-          open={showOnboarding} 
-          onComplete={handleOnboardingComplete}
-                              About: {chat.itemTitle}
+        {/* Authentication Dialog */}
+        <AuthDialog 
           open={showAuthDialog} 
+          onOpenChange={(open) => {
             setShowAuthDialog(open)
-              handleOnboardingComplete()
+            if (!open && user && !user.onboardingCompleted) {
+              setShowOnboarding(true)
+            }
           }}
-                          </div>
-        {/* QR Code Display Mo
-          <QRCodeDisplay
-            onClose={() => setSel
-        )}
-                          >
+          initialMode={authMode}
+        />
+      </>
+    )
+  }
 
+  return (
+    <div className="space-y-6">
+      <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
+        <TabsList className="grid grid-cols-6 w-full">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="recommendations">For You</TabsTrigger>
+          <TabsTrigger value="messages">Messages</TabsTrigger>
+          <TabsTrigger value="qr-codes">QR Codes</TabsTrigger>
+          <TabsTrigger value="ratings">Ratings</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+        </TabsList>
 
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Profile Card */}
+            <Card className="lg:col-span-1">
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <Avatar className="w-20 h-20">
+                    <AvatarImage src={`https://avatar.vercel.sh/${user.email}`} alt={user.name} />
+                    <AvatarFallback>
+                      {user.name.split(' ').map(n => n[0]).join('')}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="space-y-2">
+                    <h2 className="text-h2">{user.name}</h2>
+                    <VerificationBadge 
+                      level={user.verificationLevel || 'basic'}
+                      className="mx-auto"
+                    />
+                    <Badge variant="secondary" className="capitalize">
+                      {user.userType}
+                    </Badge>
+                  </div>
 
+                  {ratingStats && (
+                    <RatingDisplay 
+                      rating={ratingStats.averageRating}
+                      totalRatings={ratingStats.totalRatings}
+                      className="justify-center"
+                    />
+                  )}
 
-
-                            </Badge>
-
-
-
-
-
-                            }
-
-                        </div>
-
-                    ))}
-
-                )}
-
+                  <div className="flex space-x-2 w-full">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleToggleUserType}
+                      className="flex-1"
+                    >
+                      Switch to {user.userType === 'donor' ? 'Collector' : 'Donor'}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleSignOut}
+                    >
+                      <SignOut size={16} />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
             </Card>
 
+            {/* Stats Grid */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Your Impact</CardTitle>
+                <CardDescription>Track your sustainability contributions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-lg mb-2 mx-auto">
+                      <Package size={24} className="text-blue-600" />
+                    </div>
+                    <p className="text-h3 font-bold">{stats.itemsListed}</p>
+                    <p className="text-small text-muted-foreground">Items Listed</p>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-lg mb-2 mx-auto">
+                      <Heart size={24} className="text-green-600" />
+                    </div>
+                    <p className="text-h3 font-bold">{stats.itemsDonated}</p>
+                    <p className="text-small text-muted-foreground">Items Donated</p>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-lg mb-2 mx-auto">
+                      <ArrowsClockwise size={24} className="text-purple-600" />
+                    </div>
+                    <p className="text-h3 font-bold">{stats.itemsCollected}</p>
+                    <p className="text-small text-muted-foreground">Items Collected</p>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-lg mb-2 mx-auto">
+                      <CheckCircle size={24} className="text-green-600" />
+                    </div>
+                    <p className="text-h3 font-bold">{stats.co2Saved}kg</p>
+                    <p className="text-small text-muted-foreground">CO₂ Saved</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
+          {/* Recent Activity */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Package size={20} />
+                <span>Recent Activity</span>
+              </CardTitle>
+              <CardDescription>Your latest exchanges and donations</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {activities.length === 0 ? (
+                <div className="text-center py-8">
+                  <Package size={24} className="text-muted-foreground mx-auto mb-2" />
+                  <p className="text-body text-muted-foreground mb-4">
+                    No activity yet. Start by listing your first item!
+                  </p>
+                  <Button variant="outline">List Your First Item</Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {activities.map((activity, index) => (
+                    <div key={index} className="flex items-center space-x-4 p-3 bg-muted/30 rounded-lg">
+                      <div className={`p-2 rounded-full ${getActivityColor(activity.type)}`}>
+                        {getActivityIcon(activity.type)}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{activity.title}</p>
+                        <p className="text-small text-muted-foreground">{activity.date}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="secondary" className={getStatusColor(activity.status)}>
+                          {activity.status}
+                        </Badge>
+                        {activity.co2Impact > 0 && (
+                          <p className="text-small text-green-600 mt-1">
+                            +{activity.co2Impact}kg CO₂ saved
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
+        <TabsContent value="recommendations" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Sparkles size={20} className="text-purple-600" />
+                <span>AI-Powered {user.userType === 'collector' ? 'Item Recommendations' : 'Community Needs'}</span>
+              </CardTitle>
+              <CardDescription>
+                {user.userType === 'collector' 
+                  ? 'Personalized item suggestions based on your preferences and location'
+                  : 'Local communities and organizations that could benefit from your donations'
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Switch between Donor and Collector profiles to see different recommendation types.
+                </p>
+                <Button 
+                  onClick={handleToggleUserType}
+                  className="w-full"
+                  variant="outline"
+                >
+                  Switch Profile Type
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  This demo shows how the AI system adapts recommendations based on your profile type.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
-              <Card className="lg:col-span-1">
+          <NotificationList 
+            userType={user.userType}
+            notifications={recomNotifications}
+            onMarkAsRead={() => {}}
+          />
+        </TabsContent>
 
+        <TabsContent value="messages" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <ChatCircle size={20} />
+                <span>Messages</span>
+                {getTotalUnreadCount() > 0 && (
+                  <Badge variant="destructive" className="ml-2">
+                    {getTotalUnreadCount()}
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>Conversations with other TruCycle users</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {chats.length === 0 ? (
+                <div className="text-center py-8">
+                  <ChatCircle size={24} className="text-muted-foreground mx-auto mb-2" />
+                  <p className="text-body text-muted-foreground mb-4">
+                    No conversations yet. Start exchanging items to connect with other users!
+                  </p>
+                  <Button variant="outline">List Your First Item</Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {chats.map((chat) => (
+                    <div key={chat.id} className="flex items-center space-x-3 p-3 hover:bg-muted/50 rounded-lg cursor-pointer">
+                      <Avatar>
+                        <AvatarImage src={`https://avatar.vercel.sh/${chat.recipientEmail}`} />
+                        <AvatarFallback>{chat.recipientName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">{chat.recipientName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {chat.lastActivity ? new Date(chat.lastActivity).toLocaleDateString() : ''}
+                          </p>
+                        </div>
+                        <p className="text-small text-muted-foreground">
+                          About: {chat.itemTitle}
+                        </p>
+                        <p className="text-small text-muted-foreground truncate">
+                          {chat.lastMessage}
+                        </p>
+                      </div>
+                      <div>
+                        <Badge 
+                          variant={chat.status === 'active' ? 'default' : 'secondary'}
+                        >
+                          {chat.status}
+                        </Badge>
+                        {chat.unreadCount > 0 && (
+                          <Badge variant="destructive" className="ml-2">
+                            {chat.unreadCount}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
+        <TabsContent value="qr-codes" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <QrCode size={20} />
+                <span>Your QR Codes</span>
+              </CardTitle>
+              <CardDescription>
+                QR codes for item pickups and drop-offs
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {userQRCodes.length === 0 ? (
+                <div className="text-center py-8">
+                  <QrCode size={24} className="text-muted-foreground mx-auto mb-2" />
+                  <div className="flex-1">
+                    <h3 className="font-medium mb-2">No QR Codes Yet</h3>
+                    <p className="text-small text-muted-foreground">
+                      QR codes will be generated when you complete item exchanges
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {userQRCodes.map((qrCode) => {
+                    const isExpired = new Date(qrCode.expiresAt) < new Date()
+                    const isUsed = qrCode.status === 'used'
+                    
+                    return (
+                      <Card 
+                        key={qrCode.id}
+                        className={`cursor-pointer transition-colors ${
+                          isExpired || isUsed ? 'opacity-60' : 'hover:bg-muted/50'
+                        }`}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <h4 className="font-medium">{qrCode.itemTitle}</h4>
+                            <Badge 
+                              variant={
+                                isUsed ? 'secondary' : 
+                                isExpired ? 'destructive' : 'default'
+                              }
+                            >
+                              {isUsed ? 'Used' : isExpired ? 'Expired' : 'Active'}
+                            </Badge>
+                          </div>
+                          
+                          <div className="space-y-2 text-sm text-muted-foreground">
+                            <div className="flex justify-between">
+                              <span>Transaction ID:</span>
+                              <span className="font-mono text-xs">{qrCode.transactionId.slice(0, 8)}...</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Created:</span>
+                              <span>{new Date(qrCode.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>CO₂ Impact:</span>
+                              <span>{qrCode.co2Impact}kg</span>
+                            </div>
+                          </div>
+                          
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full mt-3"
+                            disabled={isExpired || isUsed}
+                            onClick={() => setSelectedQRCode(qrCode)}
+                          >
+                            <QrCode size={16} className="mr-2" />
+                            View QR Code
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-
-
-                </CardHeader>
-
-
-
+        <TabsContent value="ratings" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="lg:col-span-1">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield size={20} />
+                  <span>Rating Summary</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center space-y-4">
+                  <div>
+                    <RatingDisplay 
                       rating={ratingStats.averageRating || 5.0}
-
+                      totalRatings={ratingStats.totalRatings}
                       size="lg"
                     />
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                    </div>
-
-
-
-
-
-
-
-
-
-                        identity: false,
-                        payment: false,
-
-                      }}
-                    />
-
-                </CardContent>
-
-
-              <div className="lg:col-span-2">
-
-                  <CardHeader>
-
-
-
-
-
-                  <CardContent>
-
-
-
-
-
-              </div>
-
-          </TabsContent>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                      
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                                  </Badge>
-
-
-
-
-                                    }
-                                  >
-
-                                  </Badge>
-                                </div>
-
-
-
-
-
-                            
-
-
-
-
-                              </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
                   </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          </TabsContent>
-
-
-
-              <CardHeader>
-
-                <CardDescription>
-
-                </CardDescription>
-
-              <CardContent>
-
-
-
-
-
-
-
-                    </p>
-                  </div>
-
-
-
-
-
-
-
-
-                          <div>
-
-                            <p className="text-small text-muted-foreground">{activity.date}</p>
-
+                  
+                  {ratingStats.categoryBreakdown && (
+                    <div className="space-y-3">
+                      {Object.entries(ratingStats.categoryBreakdown).map(([category, rating]) => (
+                        <div key={category}>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm capitalize">{category}</span>
+                            <span className="text-sm font-medium">{rating.toFixed(1)}</span>
+                          </div>
+                          <Progress value={(rating / 5) * 100} className="h-2" />
                         </div>
-
-
-
-                          </Badge>
-
-
-
-
-
-
-
-                    ))}
-
-                )}
-
-            </Card>
-
-
-
-
-
-              </CardHeader>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  </p>
+                      ))}
+                    </div>
+                  )}
                 </div>
-
+              </CardContent>
             </Card>
 
+            <Card className="lg:col-span-1">
+              <CardHeader>
+                <CardTitle>Verification Status</CardTitle>
+                <CardDescription>Build trust with verified credentials</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <VerificationBadge 
+                  level={user.verificationLevel || 'basic'}
+                  completedVerifications={{
+                    email: true,
+                    phone: false,
+                    address: true,
+                    payment: false,
+                    identity: false,
+                    community: stats.successfulExchanges >= 10
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </div>
 
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Reviews</CardTitle>
+                <CardDescription>What other users are saying about you</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RatingList ratings={[]} />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-            <div className="space-y-6">
-
-                <CardHeader>
-
-                  <CardDescription>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                        <div>
-
-
-
-
-
-
-                        <div>
-
-
-                        </div>
-
-
+        <TabsContent value="settings" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Profile Settings</CardTitle>
+                <CardDescription>Manage your account preferences</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium">Name</Label>
+                      <p className="text-sm text-muted-foreground">{user.name}</p>
                     </div>
-
-
-
-
-
-
-
-
-
-
-                        </div>
-
-                      </div>
-
-
-
-
-
-
-
+                    <div>
+                      <Label className="text-sm font-medium">User Type</Label>
+                      <p className="text-sm text-muted-foreground capitalize">{user.userType}</p>
                     </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Email Notifications</p>
+                      <p className="text-xs text-muted-foreground">Get notified about new matches</p>
+                    </div>
+                    <Button variant="outline" size="sm">Enable</Button>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Location Sharing</p>
+                      <p className="text-xs text-muted-foreground">Help others find nearby items</p>
+                    </div>
+                    <Button variant="outline" size="sm">Configure</Button>
+                  </div>
+                </div>
+                
+                <div className="pt-4 border-t">
+                  <Button variant="outline" className="w-full">
+                    Edit Profile
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    className="w-full mt-2"
+                    onClick={handleSignOut}
+                  >
+                    Sign Out
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
+            <VerificationCenter 
+              currentVerification={user.verificationLevel || 'basic'}
+              completedVerifications={{
+                email: true,
+                phone: false,
+                address: true,
+                payment: false,
+                identity: false,
+                community: stats.successfulExchanges >= 10
+              }}
+              onVerificationComplete={(level) => 
+                setUser({ ...user, verificationLevel: level })
+              }
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
 
+      {/* Profile Onboarding */}
+      <ProfileOnboarding 
+        open={showOnboarding} 
+        onOpenChange={setShowOnboarding}
+        onComplete={handleOnboardingComplete}
+      />
 
+      {/* Authentication Dialog */}
+      <AuthDialog 
+        open={showAuthDialog} 
+        onOpenChange={(open) => {
+          setShowAuthDialog(open)
+          if (!open && user && !user.onboardingCompleted) {
+            handleOnboardingComplete()
+          }
+        }}
+        initialMode={authMode}
+      />
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                  phone: false,
-
-
-
-
-                }}
-
-
-
-
-            </div>
-
-        </Tabs>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      {/* QR Code Display Modal */}
+      {selectedQRCode && (
+        <QRCodeDisplay
+          qrCodeData={selectedQRCode}
+          onClose={() => setSelectedQRCode(null)}
+        />
+      )}
+    </div>
+  )
+}
