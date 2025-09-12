@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, Plus, User, QrCode, Bell } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
-import { ItemListing, ItemListingForm, ProfileDashboard, DropOffMap, CarbonTracker, ShopScanner } from './components'
+import { ItemListing, ItemListingForm, ProfileDashboard, DropOffMap, CarbonTracker, ShopScanner, DemoGuide } from './components'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
 import { useInitializeSampleData, useRecommendationNotifications } from '@/hooks'
@@ -14,12 +14,13 @@ import { useInitializeSampleData, useRecommendationNotifications } from '@/hooks
 function App() {
   const [currentTab, setCurrentTab] = useState('browse')
   const [searchQuery, setSearchQuery] = useState('')
-  const [user] = useKV('current-user', null)
+  const [user, setUser] = useKV('current-user', null)
   const [showAuthDialog, setShowAuthDialog] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showMessageCenter, setShowMessageCenter] = useState(false)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [showShopScanner, setShowShopScanner] = useState(false)
+  const [showDemoGuide, setShowDemoGuide] = useKV('show-demo-guide', true)
   
   const { initializeSampleChats } = useInitializeSampleData()
   const { notifications, unreadCount } = useRecommendationNotifications(user)
@@ -216,6 +217,13 @@ function App() {
           </TabsContent>
 
           <TabsContent value="profile">
+            {user && showDemoGuide && currentTab === 'profile' && (
+              <DemoGuide
+                onSwitchProfile={handleToggleUserType}
+                currentUserType={user.userType}
+                userName={user.name.split(' ')[0]}
+              />
+            )}
             <ProfileDashboard />
           </TabsContent>
         </Tabs>

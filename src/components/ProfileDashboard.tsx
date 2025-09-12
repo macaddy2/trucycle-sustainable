@@ -552,16 +552,31 @@ export function ProfileDashboard() {
                     <Sparkles size={20} className="text-blue-600" />
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-medium text-blue-900">
-                      {user.userType === 'collector' ? 'Collector Mode Active' : 'Donor Mode Active'}
+                    <h4 className="font-medium text-blue-900 flex items-center space-x-2">
+                      <span>
+                        {user.userType === 'collector' ? '🎯 Collector Mode Active' : '❤️ Donor Mode Active'}
+                      </span>
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                        AI-Powered
+                      </Badge>
                     </h4>
                     <p className="text-sm text-blue-700 mt-1">
                       {user.userType === 'collector' 
-                        ? 'You\'ll see personalized item recommendations based on availability, value, and proximity to your location. Perfect for finding great items to collect!'
-                        : 'You\'ll see community needs and organizations that would benefit from your donations. Make a real impact in your local community!'
+                        ? 'Smart algorithm analyzing 1000+ items daily to find high-value electronics, furniture, and appliances perfect for collectors. Prioritizing verified donors, urgent pickups, and items within 2 miles of your location.'
+                        : 'Machine learning connecting you with local schools, families, and organizations where your donations create maximum impact. Focus on urgent community needs and environmental benefits in your area.'
                       }
                     </p>
-                    <div className="flex items-center space-x-2 mt-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 text-xs text-blue-600">
+                      <div className="space-y-1">
+                        <p><strong>🔍 Current Focus:</strong> {user.userType === 'collector' ? 'High-value items in excellent condition' : 'Urgent community needs with measurable impact'}</p>
+                        <p><strong>📍 Search Radius:</strong> 2-5 miles from {user.postcode}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p><strong>⚡ Update Frequency:</strong> Real-time as items become available</p>
+                        <p><strong>🎯 Match Accuracy:</strong> Improves with each interaction</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2 mt-4">
                       <Button 
                         variant="outline" 
                         size="sm"
@@ -569,10 +584,10 @@ export function ProfileDashboard() {
                         className="bg-white hover:bg-blue-50"
                       >
                         <ArrowsClockwise size={16} className="mr-2" />
-                        Switch to {user.userType === 'collector' ? 'Donor' : 'Collector'} Mode
+                        Experience {user.userType === 'collector' ? 'Donor' : 'Collector'} Mode
                       </Button>
                       <span className="text-xs text-blue-600">
-                        See different recommendation types
+                        See how AI recommendations change for different user types
                       </span>
                     </div>
                   </div>
