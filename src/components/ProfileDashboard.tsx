@@ -15,7 +15,7 @@ import {
   SignOut,
   Bell,
   CheckCircle,
-  Sparkles,
+  Sparkle,
   ChatCircle,
   QrCode,
   Shield
@@ -409,7 +409,7 @@ export function ProfileDashboard() {
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                      <Sparkles size={20} className="text-green-600" />
+                      <Sparkle size={20} className="text-green-600" />
                     </div>
                     <span>Environmental Impact</span>
                   </CardTitle>
@@ -439,8 +439,9 @@ export function ProfileDashboard() {
                           )}
                         </div>
                       </div>
-                    </CardContent>
+                    </div>
                   </div>
+                </CardContent>
                 </Card>
 
                 {/* Activity Stats */}
@@ -474,7 +475,7 @@ export function ProfileDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <Sparkles size={20} className="text-purple-600" />
+                    <Sparkle size={20} className="text-purple-600" />
                   </div>
                   <div className="flex-1">
                     <span>

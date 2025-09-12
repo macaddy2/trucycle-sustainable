@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Leaf, Award, Recycle, ArrowsClockwise, TrendUp } from '@phosphor-icons/react'
+import { Leaf, Trophy, Recycle, ArrowsClockwise, TrendUp } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 
 interface CarbonData {
@@ -46,7 +46,7 @@ export function CarbonTracker() {
     {
       title: 'Carbon Saver',
       description: 'Save 25kg of CO₂',
-      icon: <Award size={24} />,
+      icon: <Trophy size={24} />,
       earned: carbonData.totalCO2Saved >= 25,
       color: 'bg-secondary text-secondary-foreground'
     },

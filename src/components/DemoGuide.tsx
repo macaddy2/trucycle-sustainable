@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
-  Sparkles, 
+  Sparkle, 
   ArrowsClockwise, 
   User,
   Eye,
@@ -49,7 +49,7 @@ export function DemoGuide({ onSwitchProfile, currentUserType, userName }: DemoGu
       description: 'Browse AI-curated recommendations tailored to your profile',
       action: 'Already Here!',
       onAction: () => markStepComplete('explore-foryou'),
-      icon: <Sparkles size={20} />,
+      icon: <Sparkle size={20} />,
       benefit: 'Discover personalized matches based on location and preferences'
     },
     {

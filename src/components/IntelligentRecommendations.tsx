@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { 
-  Sparkles, 
+  Sparkle, 
   Heart, 
   Package, 
   ArrowRight, 
-  RefreshCw,
+  ArrowsClockwise,
   MapPin,
   Leaf,
   Clock,
@@ -208,7 +208,7 @@ export function IntelligentRecommendations({ user, notifications = [], onMarkAsR
       <Card>
         <CardContent className="text-center py-8">
           <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-            <Sparkles size={24} className="text-muted-foreground" />
+            <Sparkle size={24} className="text-muted-foreground" />
           </div>
           <h3 className="text-h3 mb-2">Complete Your Profile Setup</h3>
           <p className="text-muted-foreground mb-4">
@@ -228,7 +228,7 @@ export function IntelligentRecommendations({ user, notifications = [], onMarkAsR
           <CardContent className="p-6">
             <div className="flex items-start space-x-4">
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <Sparkles size={24} className="text-blue-600" />
+                <Sparkle size={24} className="text-blue-600" />
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-blue-900 mb-2">
@@ -253,7 +253,7 @@ export function IntelligentRecommendations({ user, notifications = [], onMarkAsR
                     onClick={generateRecommendations}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
-                    <Sparkles size={16} className="mr-2" />
+                    <Sparkle size={16} className="mr-2" />
                     Generate My First Recommendations
                   </Button>
                 </div>
@@ -328,7 +328,7 @@ export function IntelligentRecommendations({ user, notifications = [], onMarkAsR
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
-                <Sparkles size={20} className="text-primary" />
+                <Sparkle size={20} className="text-primary" />
               </div>
               <div>
                 <CardTitle className="text-h3 flex items-center space-x-2">
@@ -357,7 +357,7 @@ export function IntelligentRecommendations({ user, notifications = [], onMarkAsR
                 disabled={isLoading}
                 className="flex items-center space-x-2"
               >
-                <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
+                <ArrowsClockwise size={16} className={isLoading ? 'animate-spin' : ''} />
                 <span>{isLoading ? 'Finding...' : 'Refresh'}</span>
               </Button>
             </div>
@@ -398,7 +398,7 @@ export function IntelligentRecommendations({ user, notifications = [], onMarkAsR
                   <p>⭐ Focusing on verified donors with excellent ratings</p>
                 </div>
                 <Button onClick={generateRecommendations} disabled={isLoading}>
-                  <Sparkles size={16} className="mr-2" />
+                  <Sparkle size={16} className="mr-2" />
                   Generate Recommendations
                 </Button>
               </CardContent>
@@ -456,7 +456,7 @@ export function IntelligentRecommendations({ user, notifications = [], onMarkAsR
 
                       <div className="p-3 bg-accent/10 rounded-lg border border-accent/20">
                         <div className="flex items-start space-x-2">
-                          <Sparkles size={14} className="text-accent mt-0.5 flex-shrink-0" />
+                          <Sparkle size={14} className="text-accent mt-0.5 flex-shrink-0" />
                           <div>
                             <p className="text-sm font-medium text-accent-foreground">
                               AI Match Confidence: {Math.floor(Math.random() * 20) + 80}%
@@ -608,7 +608,7 @@ export function IntelligentRecommendations({ user, notifications = [], onMarkAsR
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="font-medium text-sm flex items-center space-x-2">
-                  <Sparkles size={16} className="text-primary" />
+                  <Sparkle size={16} className="text-primary" />
                   <span>Personalization Tips</span>
                 </h4>
                 <p className="text-xs text-muted-foreground mt-1">

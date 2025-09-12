@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { MapPin, Clock, Phone, Navigation } from '@phosphor-icons/react'
+import { MapPin, Clock, Phone, NavigationArrow } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 
 interface DropOffLocation {
@@ -157,7 +157,7 @@ export function DropOffMap() {
                 {/* Actions */}
                 <div className="flex space-x-2 pt-2">
                   <Button variant="outline" className="flex-1">
-                    <Navigation size={16} className="mr-2" />
+                    <NavigationArrow size={16} className="mr-2" />
                     Directions
                   </Button>
                   <Button className="flex-1">
