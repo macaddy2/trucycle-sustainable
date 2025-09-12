@@ -203,7 +203,7 @@ function App() {
                     onClick={() => setCurrentTab('profile')}
                   >
                     <User size={16} className="mr-2" />
-                    {user.name.split(' ')[0]}
+                    {user.name ? user.name.split(' ')[0] : 'User'}
                   </Button>
                 </div>
               ) : (
@@ -283,7 +283,7 @@ function App() {
               <DemoGuide
                 onSwitchProfile={handleToggleUserType}
                 currentUserType={user.userType}
-                userName={user.name.split(' ')[0]}
+                userName={user.name ? user.name.split(' ')[0] : 'User'}
               />
             )}
             <ProfileDashboard />

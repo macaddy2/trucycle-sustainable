@@ -323,14 +323,14 @@ export function ProfileDashboard() {
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center text-center space-y-4">
                   <Avatar className="w-20 h-20">
-                    <AvatarImage src={`https://avatar.vercel.sh/${user.email}`} alt={user.name} />
+                    <AvatarImage src={`https://avatar.vercel.sh/${user.email}`} alt={user.name || 'User'} />
                     <AvatarFallback>
-                      {user.name.split(' ').map(n => n[0]).join('')}
+                      {user.name ? user.name.split(' ').map(n => n[0]).join('') : 'U'}
                     </AvatarFallback>
                   </Avatar>
                   
                   <div className="space-y-2">
-                    <h2 className="text-h2">{user.name}</h2>
+                    <h2 className="text-h2">{user.name || 'User'}</h2>
                     <VerificationBadge 
                       level={user.verificationLevel || 'basic'}
                       className="mx-auto"
@@ -730,7 +730,7 @@ export function ProfileDashboard() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-sm font-medium">Name</Label>
-                      <p className="text-sm text-muted-foreground">{user.name}</p>
+                      <p className="text-sm text-muted-foreground">{user.name || 'User'}</p>
                     </div>
                     <div>
                       <Label className="text-sm font-medium">User Type</Label>

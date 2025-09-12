@@ -141,7 +141,7 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
         id: `listing-${Date.now()}`,
         ...formData,
         userId: user.id,
-        userName: user.name,
+        userName: user.name || 'Anonymous User',
         status: 'active',
         createdAt: new Date().toISOString(),
         views: 0,
