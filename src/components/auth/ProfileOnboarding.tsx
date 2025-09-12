@@ -32,8 +32,13 @@ interface UserProfile {
   name: string
   userType: 'donor' | 'collector'
   postcode?: string
+  area?: string
+  district?: string
+  serviceArea?: string
   createdAt: string
   onboardingCompleted?: boolean
+  addressVerified?: boolean
+  addressVerifiedAt?: string
 }
 
 export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnboardingProps) {
@@ -101,12 +106,35 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
     setIsLoading(true)
 
     try {
-      // Update user profile
+      // Simulate address authentication
+      const addressPrompt = spark.llmPrompt`Verify that postcode ${profileData.postcode} is a valid London postcode and provide area information. Return a JSON response with:
+      {
+        "isValid": true/false,
+        "area": "area name",
+        "district": "district name", 
+        "coordinates": {"lat": number, "lng": number},
+        "serviceArea": "zone name"
+      }`
+
+      const addressVerification = await spark.llm(addressPrompt, 'gpt-4o-mini', true)
+      const verificationData = JSON.parse(addressVerification)
+
+      if (!verificationData.isValid) {
+        toast.error('Invalid postcode. Please check and try again.')
+        return
+      }
+
+      // Update user profile with verified address data
       const updatedUser: UserProfile = {
         ...user,
         userType: profileData.userType as 'donor' | 'collector',
         postcode: profileData.postcode.toUpperCase(),
-        onboardingCompleted: true
+        area: verificationData.area,
+        district: verificationData.district,
+        serviceArea: verificationData.serviceArea,
+        onboardingCompleted: true,
+        addressVerified: true,
+        addressVerifiedAt: new Date().toISOString()
       }
 
       // Save to user profiles
@@ -116,12 +144,45 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
         [updatedUser.id]: updatedUser
       })
 
+      // Initialize user preferences based on profile type
+      const initialPreferences = {
+        userId: updatedUser.id,
+        userType: updatedUser.userType,
+        location: {
+          postcode: updatedUser.postcode,
+          area: updatedUser.area,
+          district: updatedUser.district
+        },
+        notifications: {
+          newMatches: true,
+          messages: true,
+          recommendations: true,
+          communityNeeds: updatedUser.userType === 'donor'
+        },
+        preferences: {
+          maxDistance: updatedUser.userType === 'collector' ? 5 : 10, // km
+          categories: [], // Will be learned from user behavior
+          urgencyLevels: ['high', 'medium', 'low'],
+          autoNotifications: true
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+
+      await spark.kv.set(`user-preferences-${updatedUser.id}`, initialPreferences)
+
       setUser(updatedUser)
       
-      toast.success('Profile setup completed successfully!')
+      // Success message with next steps
+      const nextSteps = updatedUser.userType === 'donor' 
+        ? 'You can now list items for donation and see community needs in your area!'
+        : 'You can now browse available items and receive personalized recommendations!'
+      
+      toast.success(`Welcome to TruCycle! ${nextSteps}`)
       onOpenChange(false)
       onComplete()
     } catch (error) {
+      console.error('Profile setup error:', error)
       toast.error('Failed to complete profile setup. Please try again.')
     } finally {
       setIsLoading(false)

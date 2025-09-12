@@ -20,16 +20,18 @@ import {
   Bell,
   Shield,
   CheckCircle,
-  QrCode
+  QrCode,
+  Sparkles
 } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { AuthDialog } from './auth/AuthDialog'
 import { ProfileOnboarding } from './auth/ProfileOnboarding'
-import { useMessaging, useInitializeSampleData } from '@/hooks'
+import { useMessaging, useInitializeSampleData, useRecommendationNotifications } from '@/hooks'
 import { VerificationBadge, VerificationLevel } from './VerificationBadge'
 import { RatingDisplay, RatingList, useUserRatingStats } from './RatingSystem'
 import { VerificationCenter } from './VerificationCenter'
 import { QRCodeDisplay, QRCodeData } from './QRCode'
+import { IntelligentRecommendations } from './IntelligentRecommendations'
 import { toast } from 'sonner'
 
 interface UserProfile {
@@ -38,8 +40,13 @@ interface UserProfile {
   email: string
   userType: 'donor' | 'collector'
   postcode?: string
+  area?: string
+  district?: string
+  serviceArea?: string
   createdAt: string
   onboardingCompleted?: boolean
+  addressVerified?: boolean
+  addressVerifiedAt?: string
   avatar?: string
   verified?: boolean
   rating?: number
@@ -77,10 +84,12 @@ export function ProfileDashboard() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [selectedQRCode, setSelectedQRCode] = useState<QRCodeData | null>(null)
+  const [currentTab, setCurrentTab] = useState('overview')
   const [userQRCodes] = useKV<QRCodeData[]>('user-qr-codes', [])
   
   const { chats, getTotalUnreadCount } = useMessaging()
   const { initializeSampleChats } = useInitializeSampleData()
+  const { notifications: recomNotifications, unreadCount: recomUnreadCount, markAsRead } = useRecommendationNotifications(user)
 
   // Initialize sample data when user is signed in
   useEffect(() => {
@@ -257,9 +266,18 @@ export function ProfileDashboard() {
           </Button>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+        <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="recommendations" className="flex items-center space-x-2">
+              <Sparkles size={16} />
+              <span>For You</span>
+              {recomUnreadCount > 0 && (
+                <Badge variant="destructive" className="text-xs ml-1">
+                  {recomUnreadCount}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="messages" className="flex items-center space-x-2">
               <ChatCircle size={16} />
               <span>Messages</span>
@@ -347,10 +365,21 @@ export function ProfileDashboard() {
                       </p>
                     </div>
 
-                    <Button variant="outline" className="w-full">
-                      <Settings size={16} className="mr-2" />
-                      Edit Profile
-                    </Button>
+                    <div className="space-y-2">
+                      <Button variant="outline" className="w-full">
+                        <Settings size={16} className="mr-2" />
+                        Edit Profile
+                      </Button>
+                      
+                      {/* Quick action to view recommendations */}
+                      <Button 
+                        className="w-full"
+                        onClick={() => setCurrentTab('recommendations')}
+                      >
+                        <Sparkles size={16} className="mr-2" />
+                        {user.userType === 'collector' ? 'View Recommendations' : 'See Community Needs'}
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -433,6 +462,14 @@ export function ProfileDashboard() {
                 </Card>
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="recommendations">
+            <IntelligentRecommendations 
+              user={user} 
+              notifications={recomNotifications}
+              onMarkAsRead={markAsRead}
+            />
           </TabsContent>
 
           <TabsContent value="messages">

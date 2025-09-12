@@ -4,12 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, Plus, User, QrCode } from '@phosphor-icons/react'
+import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, Plus, User, QrCode, Bell } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { ItemListing, ItemListingForm, ProfileDashboard, DropOffMap, CarbonTracker, ShopScanner } from './components'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
-import { useInitializeSampleData } from '@/hooks'
+import { useInitializeSampleData, useRecommendationNotifications } from '@/hooks'
 
 function App() {
   const [currentTab, setCurrentTab] = useState('browse')
@@ -22,6 +22,7 @@ function App() {
   const [showShopScanner, setShowShopScanner] = useState(false)
   
   const { initializeSampleChats } = useInitializeSampleData()
+  const { notifications, unreadCount } = useRecommendationNotifications(user)
 
   // Check for shop scanner mode in URL
   useEffect(() => {
@@ -105,6 +106,26 @@ function App() {
               {user ? (
                 <div className="flex items-center space-x-2">
                   <MessageNotification onOpenMessages={() => setShowMessageCenter(true)} />
+                  
+                  {/* Recommendation Notifications */}
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentTab('profile')}
+                      className="relative"
+                      title={`${unreadCount} new recommendation${unreadCount !== 1 ? 's' : ''}`}
+                    >
+                      <Bell size={16} />
+                      <Badge 
+                        variant="destructive" 
+                        className="absolute -top-2 -right-2 text-xs w-5 h-5 p-0 flex items-center justify-center"
+                      >
+                        {unreadCount}
+                      </Badge>
+                    </Button>
+                  )}
+                  
                   <Button 
                     variant="outline" 
                     size="sm"

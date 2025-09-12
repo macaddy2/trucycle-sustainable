@@ -8,4 +8,5 @@ export { RatingDisplay, RatingStars, RatingForm, RatingList, useUserRatingStats 
 export { VerificationCenter } from './VerificationCenter'
 export { QRCodeGenerator, QRCodeDisplay, QRCodeScanner } from './QRCode'
 export { ShopScanner } from './ShopScanner'
+export { IntelligentRecommendations } from './IntelligentRecommendations'
 export * from './messaging'
