@@ -164,15 +164,6 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
           payment: false,
           community: false
         },
-        ownerRating: 4.2,
-        ownerVerificationLevel: {
-          email: true,
-          phone: false,
-          identity: false,
-          address: true,
-          payment: false,
-          community: false
-        },
         status: 'active',
         views: 3,
         interested: []
