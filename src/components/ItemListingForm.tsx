@@ -6,9 +6,10 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Plus, Camera, MapPin, Recycle, Heart, ArrowsClockwise } from '@phosphor-icons/react'
+import { Plus, Camera, MapPin, Recycle, Heart, ArrowsClockwise, Truck, Storefront } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
+import { DropOffLocationSelector, DropOffLocation } from './DropOffLocationSelector'
 
 const CATEGORIES = [
   'Electronics',
@@ -67,12 +68,15 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
     actionType: '',
     photos: [] as string[],
     location: '',
-    contactMethod: 'platform'
+    contactMethod: 'platform',
+    fulfillmentMethod: '' as 'pickup' | 'dropoff' | '',
+    dropOffLocation: null as DropOffLocation | null
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showDropOffSelector, setShowDropOffSelector] = useState(false)
 
-  const totalSteps = 4
+  const totalSteps = 5
   const progress = (currentStep / totalSteps) * 100
 
   const handleInputChange = (field: string, value: string) => {
@@ -105,10 +109,40 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
       case 3:
         return formData.actionType !== ''
       case 4:
+        return formData.fulfillmentMethod !== ''
+      case 5:
         return formData.location.trim() !== ''
       default:
         return false
     }
+  }
+
+  const handleFulfillmentSelect = (method: 'pickup' | 'dropoff') => {
+    setFormData(prev => ({
+      ...prev,
+      fulfillmentMethod: method,
+      // Reset location details if the method changes
+      location:
+        method === 'pickup'
+          ? (prev.fulfillmentMethod === 'pickup' ? prev.location : '')
+          : '',
+      dropOffLocation: method === 'pickup' ? null : prev.dropOffLocation
+    }))
+
+    if (method === 'dropoff') {
+      setShowDropOffSelector(true)
+    }
+  }
+
+  const handleDropOffSelection = (location: DropOffLocation) => {
+    setFormData(prev => ({
+      ...prev,
+      dropOffLocation: location,
+      location: location.address,
+      fulfillmentMethod: 'dropoff'
+    }))
+    setShowDropOffSelector(false)
+    toast.success(`Selected ${location.name} for drop-off`)
   }
 
   const nextStep = () => {
@@ -129,7 +163,7 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
       return
     }
 
-    if (!validateStep(4)) {
+    if (!validateStep(totalSteps)) {
       toast.error('Please complete all required fields')
       return
     }
@@ -182,10 +216,12 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
         actionType: '',
         photos: [],
         location: '',
-        contactMethod: 'platform'
+        contactMethod: 'platform',
+        fulfillmentMethod: '',
+        dropOffLocation: null
       })
       setCurrentStep(1)
-      
+
       if (onComplete) {
         onComplete()
       }
@@ -223,7 +259,15 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
   }
 
   return (
-    <Card>
+    <>
+      {showDropOffSelector && (
+        <DropOffLocationSelector
+          selectedLocation={formData.dropOffLocation}
+          onSelect={handleDropOffSelection}
+          onClose={() => setShowDropOffSelector(false)}
+        />
+      )}
+      <Card>
       <CardHeader>
         <CardTitle className="text-h2 flex items-center space-x-2">
           <Plus size={24} className="text-primary" />
@@ -386,22 +430,120 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
           </div>
         )}
 
-        {/* Step 4: Location & Review */}
+        {/* Step 4: Fulfilment Method */}
         {currentStep === 4 && (
           <div className="space-y-4">
             <div>
-              <Label htmlFor="location">Pickup Location *</Label>
-              <div className="flex items-center space-x-2 mt-1">
-                <MapPin size={16} className="text-muted-foreground" />
-                <Input
-                  id="location"
-                  placeholder="e.g., Camden, London NW1"
-                  value={formData.location}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                />
+              <Label>How will the item be handed over? *</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                <Card
+                  className={`cursor-pointer transition-colors ${
+                    formData.fulfillmentMethod === 'pickup'
+                      ? 'border-primary bg-primary/5'
+                      : 'hover:border-primary/50'
+                  }`}
+                  onClick={() => handleFulfillmentSelect('pickup')}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Truck
+                          size={28}
+                          className={formData.fulfillmentMethod === 'pickup' ? 'text-primary' : 'text-muted-foreground'}
+                        />
+                      </div>
+                      <div>
+                        <div className="font-medium text-lg">Pick up from me</div>
+                        <p className="text-sm text-muted-foreground">
+                          Share a safe meet-up location for collectors or shop partners to collect your item.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card
+                  className={`cursor-pointer transition-colors ${
+                    formData.fulfillmentMethod === 'dropoff'
+                      ? 'border-primary bg-primary/5'
+                      : 'hover:border-primary/50'
+                  }`}
+                  onClick={() => handleFulfillmentSelect('dropoff')}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Storefront
+                          size={28}
+                          className={formData.fulfillmentMethod === 'dropoff' ? 'text-primary' : 'text-muted-foreground'}
+                        />
+                      </div>
+                      <div>
+                        <div className="font-medium text-lg">Drop off at a partner shop</div>
+                        <p className="text-sm text-muted-foreground">
+                          Choose a TruCycle partner location with convenient hours and services for your donation.
+                        </p>
+                        {formData.fulfillmentMethod === 'dropoff' && formData.dropOffLocation && (
+                          <Badge variant="secondary" className="mt-3">
+                            Selected: {formData.dropOffLocation.name}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Location & Review */}
+        {currentStep === 5 && (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="location">
+                {formData.fulfillmentMethod === 'dropoff' ? 'Preferred Drop-off Location *' : 'Pickup Location *'}
+              </Label>
+              {formData.fulfillmentMethod === 'dropoff' ? (
+                <div className="space-y-2 mt-2">
+                  {formData.dropOffLocation ? (
+                    <div className="rounded-lg border border-primary/40 bg-primary/5 p-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium text-lg">{formData.dropOffLocation.name}</p>
+                          <p className="text-sm text-muted-foreground">{formData.dropOffLocation.address}</p>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => setShowDropOffSelector(true)}>
+                          Change
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-3 text-xs text-muted-foreground">
+                        <span>Postcode: {formData.dropOffLocation.postcode}</span>
+                        <span>Open: {formData.dropOffLocation.openHours}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button type="button" variant="outline" onClick={() => setShowDropOffSelector(true)}>
+                      <Storefront size={18} className="mr-2" />
+                      Browse partner drop-off locations
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2 mt-1">
+                  <MapPin size={16} className="text-muted-foreground" />
+                  <Input
+                    id="location"
+                    placeholder="e.g., Camden, London NW1"
+                    value={formData.location}
+                    onChange={(e) => handleInputChange('location', e.target.value)}
+                  />
+                </div>
+              )}
               <p className="text-sm text-muted-foreground mt-1">
-                Enter your general area (borough/postcode area only for privacy)
+                {formData.fulfillmentMethod === 'dropoff'
+                  ? 'Select a partner location that suits your schedule and item type.'
+                  : 'Enter your general area (borough/postcode area only for privacy).'}
               </p>
             </div>
 
@@ -412,7 +554,13 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
                 <div><span className="font-medium">Category:</span> {formData.category}</div>
                 <div><span className="font-medium">Condition:</span> {formData.condition}</div>
                 <div><span className="font-medium">Action:</span> {formData.actionType}</div>
-                <div><span className="font-medium">Location:</span> {formData.location}</div>
+                <div><span className="font-medium">Hand-off:</span> {formData.fulfillmentMethod === 'dropoff' ? 'Drop off' : 'Pick up'}</div>
+                <div>
+                  <span className="font-medium">Location:</span>{' '}
+                  {formData.fulfillmentMethod === 'dropoff' && formData.dropOffLocation
+                    ? `${formData.dropOffLocation.name}, ${formData.dropOffLocation.postcode}`
+                    : formData.location}
+                </div>
                 {formData.photos.length > 0 && (
                   <div><span className="font-medium">Photos:</span> {formData.photos.length} uploaded</div>
                 )}
@@ -443,6 +591,7 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
           )}
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </>
   )
 }
