@@ -83,6 +83,7 @@ export function ShopScanner() {
       setScannedData(foundQR)
       toast.success('QR code scanned successfully')
     } catch (error) {
+      console.error('Failed to parse QR code', error)
       toast.error('Invalid QR code format')
     } finally {
       setIsProcessing(false)
@@ -131,6 +132,7 @@ export function ShopScanner() {
       setShopNotes('')
       setAttendantName('')
     } catch (error) {
+      console.error('Failed to process transaction', error)
       toast.error('Failed to process transaction')
     }
   }

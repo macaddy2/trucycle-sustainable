@@ -7,7 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Heart, MapPin, ArrowsClockwise, Clock, Package, ChatCircle, Recycle } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { useMessaging } from '@/hooks'
-import { VerificationBadge, type VerificationLevel } from './VerificationBadge'
+import { VerificationBadge } from './VerificationBadge'
+import type { VerificationLevel } from './verificationBadgeUtils'
 import { RatingDisplay } from './RatingSystem'
 import { toast } from 'sonner'
 
@@ -209,6 +210,7 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
       toast.success(`Connected you with ${item.ownerName}`)
       setActiveItem(null)
     } catch (error) {
+      console.error('Failed to start conversation', error)
       toast.error('Unable to start conversation right now')
     }
   }

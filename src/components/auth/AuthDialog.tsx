@@ -48,7 +48,6 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
   })
 
   const [, setUser] = useKV('current-user', null)
-  const [, setUserProfiles] = useKV('user-profiles', {})
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -154,6 +153,7 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
       // Reset form
       setFormData({ email: '', password: '', name: '', confirmPassword: '' })
     } catch (error) {
+      console.error('Authentication flow failed', error)
       toast.error('Authentication failed. Please try again.')
     } finally {
       setIsLoading(false)

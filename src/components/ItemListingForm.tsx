@@ -224,7 +224,8 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
       if (onComplete) {
         onComplete()
       }
-    } catch (_error) {
+    } catch (error) {
+      console.error('Failed to create listing', error)
       toast.error('Failed to create listing. Please try again.')
     } finally {
       setIsSubmitting(false)

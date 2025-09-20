@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { QrCode, Download, Share, Clock, MapPin, Package, User } from '@phosphor-icons/react'
+import { QrCode, Download, Share, Clock, MapPin, Package } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
 
@@ -57,7 +57,6 @@ const generateTransactionId = (): string => {
 }
 
 export function QRCodeDisplay({ qrData, onClose }: QRCodeDisplayProps) {
-  const [currentUser] = useKV('current-user', null)
   const [qrImageUrl, setQrImageUrl] = useState<string>('')
 
   useEffect(() => {
@@ -91,6 +90,7 @@ export function QRCodeDisplay({ qrData, onClose }: QRCodeDisplayProps) {
       window.URL.revokeObjectURL(url)
       toast.success('QR code downloaded successfully')
     } catch (error) {
+      console.error('Failed to download QR code', error)
       toast.error('Failed to download QR code')
     }
   }
@@ -108,6 +108,7 @@ export function QRCodeDisplay({ qrData, onClose }: QRCodeDisplayProps) {
           files: [file]
         })
       } catch (error) {
+        console.error('Failed to share QR code via Web Share API', error)
         // Fallback to clipboard
         await navigator.clipboard.writeText(qrImageUrl)
         toast.success('QR code URL copied to clipboard')
@@ -312,6 +313,7 @@ export function QRCodeGenerator({
       onGenerated?.(qrData)
       toast.success(`${type === 'donor' ? 'Drop-off' : 'Pickup'} QR code generated successfully`)
     } catch (error) {
+      console.error('Failed to generate QR code', error)
       toast.error('Failed to generate QR code')
     } finally {
       setIsGenerating(false)
@@ -376,6 +378,7 @@ export function QRCodeScanner() {
       setScannedData(foundQR)
       toast.success('QR code scanned successfully')
     } catch (error) {
+      console.error('Failed to process manual QR code input', error)
       toast.error('Invalid QR code format')
     } finally {
       setIsProcessing(false)

@@ -15,7 +15,7 @@
  * - 0-39: New/Basic User
  */
 
-import { VerificationLevel } from './VerificationBadge'
+import type { VerificationLevel } from './verificationBadgeUtils'
 import { UserRatingStats } from './RatingSystem'
 
 export interface TrustFactors {
@@ -69,8 +69,8 @@ export function calculateTrustScore(factors: TrustFactors): TrustScore {
       reliability: reliabilityScore
     },
     tier: getTrustTier(overall),
-    factors: getTrustFactors(factors, overall),
-    improvements: getImprovementSuggestions(factors, overall)
+    factors: getTrustFactors(factors),
+    improvements: getImprovementSuggestions(factors)
   }
 }
 
@@ -150,7 +150,7 @@ function getTrustTier(score: number): TrustScore['tier'] {
   return 'basic'
 }
 
-function getTrustFactors(factors: TrustFactors, overallScore: number): string[] {
+function getTrustFactors(factors: TrustFactors): string[] {
   const positiveFactors: string[] = []
   
   // Verification factors
@@ -178,7 +178,7 @@ function getTrustFactors(factors: TrustFactors, overallScore: number): string[] 
   return positiveFactors
 }
 
-function getImprovementSuggestions(factors: TrustFactors, currentScore: number): string[] {
+function getImprovementSuggestions(factors: TrustFactors): string[] {
   const suggestions: string[] = []
   
   // Verification improvements

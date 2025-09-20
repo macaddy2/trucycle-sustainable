@@ -67,7 +67,7 @@ export function QRFlowGuide({ onNavigateToTab }: QRFlowGuideProps) {
           </p>
 
           <div className="space-y-4">
-            {steps.map((step, index) => (
+            {steps.map((step) => (
               <div 
                 key={step.id}
                 className="flex items-start space-x-4 p-4 rounded-lg border bg-card"
