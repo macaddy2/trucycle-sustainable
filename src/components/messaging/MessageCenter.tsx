@@ -123,38 +123,7 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
     return responses[Math.floor(Math.random() * responses.length)]
   }
 
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedChatId || !currentUser) return
-
-    const message: Message = {
-      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      chatId: selectedChatId,
-      senderId: currentUser.id,
-      senderName: currentUser.name,
-      senderAvatar: currentUser.avatar,
-      content: newMessage.trim(),
-      timestamp: new Date(),
-      type: 'text'
-    }
-
-    // Add message
-    setMessages(prev => ({
-      ...prev,
-      [selectedChatId]: [...(prev[selectedChatId] || []), message]
-    }))
-
-    // Update chat's last message
-    setChats(prev => prev.map(chat => 
-      chat.id === selectedChatId 
-        ? { ...chat, lastMessage: message }
-        : chat
-    ))
-
-    setNewMessage('')
-    toast.success('Message sent')
-  }
-
-  const receiveMessage = useCallback(
+  const handleIncomingMessage = useCallback(
     (messageData: Omit<Message, 'id' | 'timestamp'>) => {
       const message: Message = {
         ...messageData,
@@ -186,6 +155,37 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
     [selectedChatId, setMessages, setChats],
   )
 
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !selectedChatId || !currentUser) return
+
+    const message: Message = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      chatId: selectedChatId,
+      senderId: currentUser.id,
+      senderName: currentUser.name,
+      senderAvatar: currentUser.avatar,
+      content: newMessage.trim(),
+      timestamp: new Date(),
+      type: 'text'
+    }
+
+    // Add message
+    setMessages(prev => ({
+      ...prev,
+      [selectedChatId]: [...(prev[selectedChatId] || []), message]
+    }))
+
+    // Update chat's last message
+    setChats(prev => prev.map(chat =>
+      chat.id === selectedChatId
+        ? { ...chat, lastMessage: message }
+        : chat
+    ))
+
+    setNewMessage('')
+    toast.success('Message sent')
+  }
+
   // Mock real-time message simulation
   useEffect(() => {
     if (!selectedChatId || !currentUser || !selectedChat) {
@@ -202,7 +202,7 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
           : selectedChat.donorName
 
         if (otherUserId && otherUserName) {
-          receiveMessage({
+          handleIncomingMessage({
             chatId: selectedChatId,
             senderId: otherUserId,
             senderName: otherUserName,
@@ -214,7 +214,7 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [selectedChatId, currentUser, selectedChat, receiveMessage])
+  }, [selectedChatId, currentUser, selectedChat, handleIncomingMessage])
 
   const markChatAsRead = (chatId: string) => {
     setChats(prev => prev.map(chat => 
