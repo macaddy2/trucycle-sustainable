@@ -109,36 +109,6 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
     }
   }, [itemId, normalizedChats])
 
-  // Mock real-time message simulation
-  useEffect(() => {
-    if (!selectedChatId || !currentUser || !selectedChat) {
-      return undefined
-    }
-
-    const interval = setInterval(() => {
-      if (Math.random() > 0.98) {
-        const otherUserId = selectedChat.donorId === currentUser.id
-          ? selectedChat.collectorId
-          : selectedChat.donorId
-        const otherUserName = selectedChat.donorId === currentUser.id
-          ? selectedChat.collectorName
-          : selectedChat.donorName
-
-        if (otherUserId && otherUserName) {
-          receiveMessage({
-            chatId: selectedChatId,
-            senderId: otherUserId,
-            senderName: otherUserName,
-            content: getRandomResponse(),
-            type: 'text',
-          })
-        }
-      }
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [selectedChatId, currentUser, selectedChat, receiveMessage])
-
   const getRandomResponse = () => {
     const responses = [
       "Thanks for the quick response!",
@@ -215,6 +185,36 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
     },
     [selectedChatId, setMessages, setChats],
   )
+
+  // Mock real-time message simulation
+  useEffect(() => {
+    if (!selectedChatId || !currentUser || !selectedChat) {
+      return undefined
+    }
+
+    const interval = setInterval(() => {
+      if (Math.random() > 0.98) {
+        const otherUserId = selectedChat.donorId === currentUser.id
+          ? selectedChat.collectorId
+          : selectedChat.donorId
+        const otherUserName = selectedChat.donorId === currentUser.id
+          ? selectedChat.collectorName
+          : selectedChat.donorName
+
+        if (otherUserId && otherUserName) {
+          receiveMessage({
+            chatId: selectedChatId,
+            senderId: otherUserId,
+            senderName: otherUserName,
+            content: getRandomResponse(),
+            type: 'text',
+          })
+        }
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [selectedChatId, currentUser, selectedChat, receiveMessage])
 
   const markChatAsRead = (chatId: string) => {
     setChats(prev => prev.map(chat => 
