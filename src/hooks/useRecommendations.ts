@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 interface UserProfile {
   id: string
   userType: 'donor' | 'collector'
-  postcode: string
+  postcode?: string
   onboardingCompleted: boolean
 }
 

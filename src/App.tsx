@@ -19,6 +19,7 @@ interface UserProfile {
   email: string
   userType: 'donor' | 'collector'
   onboardingCompleted: boolean
+  postcode?: string
   rating?: number
   verificationLevel: {
     email: boolean
@@ -42,7 +43,7 @@ function App() {
   const [showDemoGuide, setShowDemoGuide] = useKV<boolean>('show-demo-guide', true)
   
   const { initializeSampleChats } = useInitializeSampleData()
-  const { notifications, unreadCount, triggerUrgentNotifications } = useRecommendationNotifications(user)
+  const { notifications, unreadCount, triggerUrgentNotifications } = useRecommendationNotifications(user ?? null)
 
   // Check for shop scanner mode in URL
   useEffect(() => {
@@ -89,8 +90,8 @@ function App() {
   const handleToggleUserType = () => {
     if (!user) return
     
-    const newUserType = user.userType === 'donor' ? 'collector' : 'donor'
-    const updatedUser = { ...user, userType: newUserType }
+    const newUserType: 'donor' | 'collector' = user.userType === 'donor' ? 'collector' : 'donor'
+    const updatedUser: UserProfile = { ...user, userType: newUserType }
     setUser(updatedUser)
     
     // Trigger demo notification for the switched profile
