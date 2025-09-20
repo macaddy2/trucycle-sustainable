@@ -2,15 +2,9 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { 
-  ChatCircle, 
-  Bell, 
-  CheckCircle, 
-  Clock,
-  Package
-} from '@phosphor-icons/react'
+import { ChatCircle, CheckCircle, Clock } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 
 interface MessageNotificationProps {
@@ -116,17 +110,11 @@ export function MessageNotification({ onOpenMessages }: MessageNotificationProps
 
 interface InlineMessageProps {
   itemId: string
-  itemTitle: string
   isOwner: boolean
   onStartChat: (recipientId: string, recipientName: string) => void
 }
 
-export function InlineMessage({ 
-  itemId, 
-  itemTitle, 
-  isOwner, 
-  onStartChat 
-}: InlineMessageProps) {
+export function InlineMessage({ itemId, isOwner, onStartChat }: InlineMessageProps) {
   const [currentUser] = useKV('current-user', null)
   const [chats] = useKV('user-chats', [] as Chat[])
   

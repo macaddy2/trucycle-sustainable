@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -13,7 +12,6 @@ import {
   Clock,
   X
 } from '@phosphor-icons/react'
-import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
 
 export interface Notification {
@@ -36,7 +34,6 @@ export interface Notification {
 
 interface NotificationListProps {
   notifications?: Notification[]
-  userType?: 'donor' | 'collector'
   onMarkAsRead?: (notificationId: string) => void
   onMarkAllAsRead?: () => void
   onDeleteNotification?: (notificationId: string) => void
@@ -45,7 +42,6 @@ interface NotificationListProps {
 
 export function NotificationList({ 
   notifications = [], 
-  userType,
   onMarkAsRead,
   onMarkAllAsRead,
   onDeleteNotification,

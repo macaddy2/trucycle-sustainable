@@ -7,7 +7,6 @@ import {
   Sparkle, 
   ArrowsClockwise, 
   User,
-  Eye,
   Gift,
   TrendUp,
   CheckCircle

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
 
@@ -25,14 +25,18 @@ interface RecommendationNotification {
 export function useRecommendationNotifications(user: UserProfile | null) {
   const [notifications, setNotifications] = useKV<RecommendationNotification[]>('recommendation-notifications', [])
   const [lastCheckTime, setLastCheckTime] = useKV<string | null>('last-notification-check', null)
-  
-  // Check for new recommendations periodically
-  const checkForNewRecommendations = async () => {
+
+  const checkForNewRecommendations = useCallback(async () => {
     if (!user || !user.onboardingCompleted) return
 
     try {
       const now = new Date().toISOString()
-      const lastCheck = lastCheckTime || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      if (lastCheckTime) {
+        const minutesSinceLastCheck = (Date.now() - new Date(lastCheckTime).getTime()) / (1000 * 60)
+        if (minutesSinceLastCheck < 1) {
+          return
+        }
+      }
 
       if (user?.userType === 'collector') {
         // Mock urgent notifications for collectors
@@ -74,29 +78,30 @@ export function useRecommendationNotifications(user: UserProfile | null) {
     } catch (error) {
       console.error('Failed to check recommendations:', error)
     }
-  }
+  }, [lastCheckTime, setLastCheckTime, setNotifications, user])
 
   // Check for recommendations every 10 minutes when user is active
   useEffect(() => {
     if (!user || !user.onboardingCompleted) return
 
     // Initial check
-    checkForNewRecommendations()
+    void checkForNewRecommendations()
 
     // Set up periodic checks
-    const interval = setInterval(checkForNewRecommendations, 10 * 60 * 1000) // 10 minutes
+    const interval = setInterval(() => {
+      void checkForNewRecommendations()
+    }, 10 * 60 * 1000)
 
-    // Listen for demo notifications when profile switches
-    const handleDemoNotification = (event: CustomEvent) => {
-      const { notification } = event.detail
-      if (notification && notification.userId === (user?.id || "")) {
-        setNotifications(prev => [notification, ...(prev || [])])
+    const handleDemoNotification = (event: Event) => {
+      const detail = (event as CustomEvent<{ notification?: RecommendationNotification }>).detail
+      if (detail?.notification && detail.notification.userId === (user?.id || '')) {
+        setNotifications(prev => [detail.notification!, ...(prev || [])])
       }
     }
 
     // Listen for urgent notification requests
     const handleUrgentRequest = () => {
-      checkForNewRecommendations()
+      void checkForNewRecommendations()
     }
 
     window.addEventListener('add-demo-notification', handleDemoNotification as EventListener)
@@ -107,7 +112,7 @@ export function useRecommendationNotifications(user: UserProfile | null) {
       window.removeEventListener('add-demo-notification', handleDemoNotification as EventListener)
       window.removeEventListener('request-urgent-notifications', handleUrgentRequest as EventListener)
     }
-  }, [user])
+  }, [checkForNewRecommendations, setNotifications, user])
 
   // Function to trigger urgent notifications manually
   const triggerUrgentNotifications = async () => {

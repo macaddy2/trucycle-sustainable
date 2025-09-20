@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Plus, Camera, MapPin, Recycle, Heart, ArrowsClockwise } from '@phosphor-icons/react'
@@ -55,7 +54,7 @@ interface ItemListingFormProps {
 
 export function ItemListingForm({ onComplete }: ItemListingFormProps) {
   const [user] = useKV('current-user', null)
-  const [listings, setListings] = useKV('user-listings', [])
+  const [, setListings] = useKV('user-listings', [])
   const [currentStep, setCurrentStep] = useState(1)
   
   // Form state
@@ -189,7 +188,7 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
       if (onComplete) {
         onComplete()
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to create listing. Please try again.')
     } finally {
       setIsSubmitting(false)

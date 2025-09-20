@@ -37,6 +37,7 @@ interface UserProfile {
     phone: boolean
     identity: boolean
   }
+  avatar?: string
 }
 
 interface Message {
@@ -76,7 +77,7 @@ interface Rating {
 export function useInitializeSampleData() {
   const [currentUser] = useKV<UserProfile | null>('current-user', null)
   const [chats, setChats] = useKV<Chat[]>('user-chats', [])
-  const [messages, setMessages] = useKV<Record<string, Message[]>>('chat-messages', {})
+  const [, setMessages] = useKV<Record<string, Message[]>>('chat-messages', {})
   const [ratings, setRatings] = useKV<Rating[]>('user-ratings', [])
 
   const initializeSampleChats = () => {

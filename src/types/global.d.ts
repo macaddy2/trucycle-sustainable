@@ -1,7 +1,7 @@
 declare global {
   interface Window {
     spark: {
-      llmPrompt: (strings: TemplateStringsArray, ...values: any[]) => string
+      llmPrompt: (strings: TemplateStringsArray, ...values: unknown[]) => string
       llm: (prompt: string, modelName?: string, jsonMode?: boolean) => Promise<string>
       user: () => Promise<{
         avatarUrl: string

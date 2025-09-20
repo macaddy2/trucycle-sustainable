@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -40,10 +39,10 @@ function App() {
   const [showMessageCenter, setShowMessageCenter] = useState(false)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [showShopScanner, setShowShopScanner] = useState(false)
-  const [showDemoGuide, setShowDemoGuide] = useKV<boolean>('show-demo-guide', true)
+  const [showDemoGuide] = useKV<boolean>('show-demo-guide', true)
   
   const { initializeSampleChats } = useInitializeSampleData()
-  const { notifications, unreadCount, triggerUrgentNotifications } = useRecommendationNotifications(user ?? null)
+  const { unreadCount, triggerUrgentNotifications } = useRecommendationNotifications(user ?? null)
 
   // Check for shop scanner mode in URL
   useEffect(() => {
@@ -65,7 +64,7 @@ function App() {
     if (user) {
       initializeSampleChats()
     }
-  }, [user])
+  }, [initializeSampleChats, user])
 
   const handleSignIn = () => {
     setAuthMode('signin')

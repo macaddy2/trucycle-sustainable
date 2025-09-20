@@ -1,31 +1,16 @@
-import { useState, useEffect } from 'react'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Progress } from '@/components/ui/progress'
-import { Label } from '@/components/ui/label'
+import { useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-  ArrowsClockwise,
-  Shield,
-  User,
-  QrCode,
-  Leaf,
-  Package,
-  Star,
-  Heart,
-  MapPin,
-  Bell,
-  CheckCircle
-} from '@phosphor-icons/react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Progress } from '@/components/ui/progress'
+import { CheckCircle, MapPin, Bell, Heart, Shield, Package, Star } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
 import { AuthDialog } from './auth'
-import { MessageCenter } from './messaging'
-import { RatingDisplay } from './RatingSystem'
 import { VerificationBadge } from './VerificationBadge'
-import { QRCodeDisplay } from './QRCode'
+import { RatingDisplay } from './RatingSystem'
 import { IntelligentRecommendations } from './IntelligentRecommendations'
 
 interface UserProfile {
@@ -49,247 +34,215 @@ interface UserProfile {
 interface ListedItem {
   id: string
   title: string
-  description: string
-  category: string
-  condition: string
-  photos: string[]
   status: 'active' | 'claimed' | 'collected' | 'expired'
+  category: string
   createdAt: string
-  views: number
-  carbonImpact: number
+  actionType: 'exchange' | 'donate' | 'recycle'
+  co2Impact?: number
 }
 
 export function ProfileDashboard() {
   const [user, setUser] = useKV<UserProfile | null>('current-user', null)
+  const [listings] = useKV<ListedItem[]>('user-listings', [])
   const [showAuthDialog, setShowAuthDialog] = useState(false)
-  const [showMessageCenter, setShowMessageCenter] = useState(false)
-  const [activeTab, setActiveTab] = useState('overview')
-  const [listedItems] = useKV<ListedItem[]>('user-items', [])
-  const [showCompleteSetup, setShowCompleteSetup] = useState(false)
+  const [activeTab, setActiveTab] = useState<'overview' | 'listings' | 'recommendations' | 'impact'>('overview')
 
-  // Check if profile setup is incomplete
-  useEffect(() => {
-    if (user && user.onboardingCompleted) {
-      const verificationCount = Object.values(user.verificationLevel).filter(Boolean).length
-      const isIncomplete = verificationCount < 3 || !user.verificationLevel.address
-      setShowCompleteSetup(isIncomplete)
+  const verificationStats = useMemo(() => {
+    if (!user) {
+      return { completed: 0, total: 0 }
+    }
+    const values = Object.values(user.verificationLevel)
+    return {
+      completed: values.filter(Boolean).length,
+      total: values.length,
     }
   }, [user])
 
-  const handleCompleteSetup = () => {
+  const recentListings = useMemo(() => {
+    return listings.slice(0, 5)
+  }, [listings])
+
+  const handleToggleUserType = () => {
     if (!user) return
-    
-    // Simulate address verification completion
+
+    const nextType = user.userType === 'donor' ? 'collector' : 'donor'
     const updatedUser: UserProfile = {
       ...user,
-      postcode: 'SW1A 1AA', // Default London postcode for demo
-      verificationLevel: {
-        ...user.verificationLevel,
-        address: true,
-        identity: true,
-        phone: true
-      }
+      userType: nextType,
     }
     setUser(updatedUser)
-    
-    // Trigger smart notification system
-    toast.success('Profile Setup Complete!', {
-      description: `Smart recommendations are now active for ${user.userType}s in your area.`,
-      action: {
-        label: 'View Recommendations',
-        onClick: () => setActiveTab('recommendations')
-      }
+
+    toast.success(`Switched to ${nextType} view`, {
+      description: nextType === 'collector'
+        ? 'We will highlight nearby high-value items for you to claim.'
+        : 'We will surface urgent community needs that match your donations.'
     })
-    
-    // Auto-switch to recommendations tab
-    setTimeout(() => setActiveTab('recommendations'), 1000)
   }
 
-  const toggleUserType = () => {
-    if (!user) return
-    
-    const newUserType: 'donor' | 'collector' = user.userType === 'donor' ? 'collector' : 'donor'
-    const updatedUser: UserProfile = { ...user, userType: newUserType }
-    setUser(updatedUser)
-    
-    toast.success(`Switched to ${newUserType} mode`, {
-      description: `You'll now see recommendations tailored for ${newUserType}s.`
-    })
+  const handleCompleteSetup = () => {
+    toast.info('Opening setup checklist...')
+    setActiveTab('overview')
   }
 
   if (!user) {
     return (
-      <div className="max-w-4xl mx-auto">
+      <>
         <Card>
-          <CardContent className="p-8 text-center">
-            <User size={48} className="mx-auto mb-4 text-muted-foreground" />
-            <h2 className="text-h2 mb-2">Sign in to view your profile</h2>
-            <p className="text-muted-foreground mb-6">
-              Track your environmental impact, manage listings, and connect with your community.
-            </p>
-            <Button onClick={() => setShowAuthDialog(true)}>
-              Sign In / Sign Up
-            </Button>
+          <CardHeader>
+            <CardTitle className="text-h2 flex items-center gap-2">
+              <Shield size={20} />
+              Sign in to see your profile
+            </CardTitle>
+            <CardDescription>
+              Create an account to track verification, manage listings, and receive recommendations.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => setShowAuthDialog(true)}>Sign in or create account</Button>
           </CardContent>
         </Card>
 
-        <AuthDialog 
-          open={showAuthDialog} 
-          onOpenChange={setShowAuthDialog}
-          initialMode="signin"
-        />
-      </div>
+        <AuthDialog open={showAuthDialog} onOpenChange={setShowAuthDialog} />
+      </>
     )
   }
 
-  const verificationProgress = Object.values(user.verificationLevel).filter(Boolean).length
-  const totalVerifications = Object.keys(user.verificationLevel).length
+  const allVerified = verificationStats.completed === verificationStats.total
+  const profileInitials = user.name
+    ? user.name.split(' ').map((segment) => segment[0]).join('').toUpperCase()
+    : 'U'
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Profile Header */}
+    <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center space-x-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
               <Avatar className="w-16 h-16">
-                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} />
-                <AvatarFallback>
-                  {user.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
-                </AvatarFallback>
+                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} alt={user.name} />
+                <AvatarFallback>{profileInitials}</AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="text-h2 flex items-center gap-2">
-                  {user.name}
-                  <VerificationBadge verified={user.verificationLevel} />
-                </h1>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-h2">{user.name}</h2>
+                  <VerificationBadge userType={user.userType} verificationLevel={user.verificationLevel} />
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground mt-1">
                   <Badge variant={user.userType === 'donor' ? 'default' : 'secondary'}>
-                    {user.userType === 'donor' ? 'Donor' : 'Collector'}
+                    {user.userType === 'donor' ? 'Donor' : 'Collector'} mode
                   </Badge>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={toggleUserType}
-                    className="text-xs"
-                  >
-                    Switch to {user.userType === 'donor' ? 'Collector' : 'Donor'}
-                  </Button>
-                  {user.rating && (
-                    <div className="flex items-center gap-1">
-                      <Star size={16} className="text-yellow-500 fill-current" />
-                      <span className="text-sm">{user.rating.toFixed(1)}</span>
-                    </div>
+                  {user.postcode && (
+                    <span className="flex items-center gap-1">
+                      <MapPin size={14} />
+                      {user.postcode}
+                    </span>
+                  )}
+                  {typeof user.rating === 'number' && (
+                    <span className="flex items-center gap-1">
+                      <Star size={14} className="text-yellow-500" />
+                      {user.rating.toFixed(1)}
+                    </span>
                   )}
                 </div>
               </div>
             </div>
-            
-            {showCompleteSetup && (
-              <Button 
-                onClick={handleCompleteSetup}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                <CheckCircle size={16} className="mr-2" />
-                Complete Setup
+
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={handleToggleUserType}>
+                Switch to {user.userType === 'donor' ? 'collector' : 'donor'} mode
               </Button>
-            )}
+              {!allVerified && (
+                <Button onClick={handleCompleteSetup}>
+                  <CheckCircle size={16} className="mr-2" />
+                  Complete setup
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
       </Card>
 
-      {/* Profile Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
+        <TabsList className="grid grid-cols-4 md:w-auto md:inline-flex">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="listings">My Items</TabsTrigger>
-          <TabsTrigger value="recommendations">For You</TabsTrigger>
-          <TabsTrigger value="verification">Trust</TabsTrigger>
+          <TabsTrigger value="listings">My listings</TabsTrigger>
+          <TabsTrigger value="recommendations">For you</TabsTrigger>
           <TabsTrigger value="impact">Impact</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Profile Completion */}
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield size={20} />
-                  Profile Verification
+                <CardTitle className="text-h4 flex items-center gap-2">
+                  <Shield size={18} />
+                  Verification progress
                 </CardTitle>
                 <CardDescription>
-                  {verificationProgress}/{totalVerifications} verifications complete
+                  {verificationStats.completed} of {verificationStats.total} checks complete
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Progress value={(verificationProgress / totalVerifications) * 100} className="mb-4" />
-                <div className="space-y-2">
-                  {Object.entries(user.verificationLevel).map(([key, verified]) => (
+                <Progress value={verificationStats.total === 0 ? 0 : (verificationStats.completed / verificationStats.total) * 100} className="mb-4" />
+                <div className="space-y-2 text-sm">
+                  {Object.entries(user.verificationLevel).map(([key, value]) => (
                     <div key={key} className="flex items-center justify-between">
-                      <span className="text-sm capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
-                      {verified ? (
-                        <CheckCircle size={16} className="text-green-600" />
-                      ) : (
-                        <div className="w-4 h-4 border border-muted-foreground rounded-full" />
-                      )}
+                      <span className="capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
+                      {value ? <CheckCircle size={16} className="text-green-600" /> : <Badge variant="outline">Pending</Badge>}
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Activity Stats */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package size={20} />
-                  Activity Stats
+                <CardTitle className="text-h4 flex items-center gap-2">
+                  <Package size={18} />
+                  Recent listings
                 </CardTitle>
+                <CardDescription>Latest items you have listed on TruCycle</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Items Listed</span>
-                    <Badge variant="secondary">{listedItems?.length || 0}</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Successful Exchanges</span>
-                    <Badge variant="secondary">
-                      {listedItems?.filter(item => item.status === 'collected').length || 0}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Community Rating</span>
-                    <div className="flex items-center gap-1">
-                      <Star size={14} className="text-yellow-500 fill-current" />
-                      <span className="text-sm">{user.rating?.toFixed(1) || 'N/A'}</span>
-                    </div>
-                  </div>
-                </div>
+                {recentListings.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">You have not listed any items yet.</p>
+                ) : (
+                  <ul className="space-y-3 text-sm">
+                    {recentListings.map((item) => (
+                      <li key={item.id} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{item.title}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{item.status} • {item.category}</p>
+                        </div>
+                        <Badge variant="outline" className="capitalize">{item.actionType}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </CardContent>
             </Card>
 
-            {/* Environmental Impact */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Leaf size={20} />
-                  Environmental Impact
+                <CardTitle className="text-h4 flex items-center gap-2">
+                  <Bell size={18} />
+                  Activity snapshot
                 </CardTitle>
+                <CardDescription>Highlights from the last 30 days</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {listedItems?.reduce((sum, item) => sum + (item.carbonImpact || 0), 0).toFixed(1) || '0.0'} kg
-                    </div>
-                    <p className="text-sm text-muted-foreground">CO2 saved</p>
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span>Items listed</span>
+                    <strong>{listings.length}</strong>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">Items rescued</span>
-                    <Badge variant="outline" className="text-green-600">
-                      {listedItems?.filter(item => item.status === 'collected').length || 0}
-                    </Badge>
+                    <span>Verified checks passed</span>
+                    <strong>{verificationStats.completed}</strong>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Recommendations saved</span>
+                    <strong>{user.userType === 'collector' ? '8' : '5'}</strong>
                   </div>
                 </div>
               </CardContent>
@@ -297,48 +250,33 @@ export function ProfileDashboard() {
           </div>
         </TabsContent>
 
-        <TabsContent value="listings">
+        <TabsContent value="listings" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>My Listed Items</CardTitle>
-              <CardDescription>
-                Manage your active listings and view past exchanges
-              </CardDescription>
+              <CardTitle className="text-h4">Your active listings</CardTitle>
+              <CardDescription>Manage the items you are currently sharing with the community.</CardDescription>
             </CardHeader>
             <CardContent>
-              {!listedItems || listedItems.length === 0 ? (
-                <div className="text-center py-8">
-                  <Package size={48} className="mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-h3 mb-2">No items listed yet</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Start sharing items with your community to make an environmental impact.
-                  </p>
-                  <Button>
-                    <Package size={16} className="mr-2" />
-                    List Your First Item
-                  </Button>
+              {listings.length === 0 ? (
+                <div className="text-center text-sm text-muted-foreground">
+                  <p>You have not listed any items yet.</p>
+                  <Button className="mt-4">Create your first listing</Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {listedItems.map((item) => (
-                    <Card key={item.id} className="border">
-                      <CardContent className="p-4">
-                        <div className="aspect-square bg-muted rounded-lg mb-3 flex items-center justify-center">
-                          <Package size={32} className="text-muted-foreground" />
+                <div className="space-y-3">
+                  {listings.map((item) => (
+                    <Card key={item.id} className="border-dashed">
+                      <CardContent className="flex flex-col gap-2 p-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <p className="font-medium">{item.title}</p>
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {item.status} • {item.category} • {new Date(item.createdAt).toLocaleDateString()}
+                          </p>
                         </div>
-                        <h4 className="font-medium mb-1">{item.title}</h4>
-                        <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                          {item.description}
-                        </p>
-                        <div className="flex items-center justify-between">
-                          <Badge 
-                            variant={item.status === 'active' ? 'default' : 'secondary'}
-                          >
-                            {item.status}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {item.views} views
-                          </span>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="capitalize">{item.actionType}</Badge>
+                          <Button size="sm" variant="outline">View</Button>
+                          <Button size="sm">Manage</Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -350,133 +288,37 @@ export function ProfileDashboard() {
         </TabsContent>
 
         <TabsContent value="recommendations">
-          {user && user.postcode ? (
-            <IntelligentRecommendations user={{ ...user, postcode: user.postcode }} />
-          ) : (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <MapPin size={48} className="mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-h3 mb-2">Complete your address verification</h3>
-                <p className="text-muted-foreground mb-4">
-                  To receive personalized recommendations, please complete your profile setup.
+          <IntelligentRecommendations user={user} />
+        </TabsContent>
+
+        <TabsContent value="impact" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-h4 flex items-center gap-2">
+                <Heart size={18} />
+                Community impact
+              </CardTitle>
+              <CardDescription>Track how your actions contribute to a circular economy.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-lg border p-4">
+                <p className="text-sm text-muted-foreground">Estimated CO₂ saved</p>
+                <p className="text-2xl font-semibold">
+                  {listings.reduce((total, item) => total + (item.co2Impact ?? 0), 0)}kg
                 </p>
-                <Button onClick={handleCompleteSetup}>
-                  <CheckCircle size={16} className="mr-2" />
-                  Complete Setup
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="verification">
-          <Card>
-            <CardHeader>
-              <CardTitle>Trust & Safety</CardTitle>
-              <CardDescription>
-                Build trust in the community through verification and ratings
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-h3 mb-4">Verification Status</h3>
-                  <div className="space-y-3">
-                    {Object.entries(user.verificationLevel).map(([key, verified]) => (
-                      <div key={key} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <span className="font-medium capitalize">
-                            {key.replace(/([A-Z])/g, ' $1')}
-                          </span>
-                          <p className="text-xs text-muted-foreground">
-                            {verified ? 'Verified' : 'Pending verification'}
-                          </p>
-                        </div>
-                        {verified ? (
-                          <CheckCircle size={20} className="text-green-600" />
-                        ) : (
-                          <Button variant="outline" size="sm">
-                            Verify
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="text-h3 mb-4">Community Rating</h3>
-                  <div className="text-center p-6 border rounded-lg">
-                    <div className="text-3xl font-bold mb-2">
-                      {user.rating?.toFixed(1) || 'N/A'}
-                    </div>
-                    <div className="flex justify-center mb-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          size={20}
-                          className={`${
-                            star <= (user.rating || 0)
-                              ? 'text-yellow-500 fill-current'
-                              : 'text-gray-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Based on community feedback
-                    </p>
-                  </div>
-                </div>
+                <p className="text-xs text-muted-foreground mt-1">Based on items you have listed and exchanged.</p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="impact">
-          <Card>
-            <CardHeader>
-              <CardTitle>Environmental Impact</CardTitle>
-              <CardDescription>
-                Track your contribution to sustainability
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center p-6 border rounded-lg">
-                  <Leaf size={32} className="mx-auto mb-3 text-green-600" />
-                  <div className="text-2xl font-bold text-green-600">
-                    {listedItems?.reduce((sum, item) => sum + (item.carbonImpact || 0), 0).toFixed(1) || '0.0'}
-                  </div>
-                  <p className="text-sm text-muted-foreground">kg CO2 saved</p>
+              <div className="rounded-lg border p-4">
+                <p className="text-sm text-muted-foreground">Community trust rating</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <RatingDisplay rating={user.rating ?? 4.5} totalRatings={24} size="sm" />
                 </div>
-                
-                <div className="text-center p-6 border rounded-lg">
-                  <ArrowsClockwise size={32} className="mx-auto mb-3 text-blue-600" />
-                  <div className="text-2xl font-bold text-blue-600">
-                    {listedItems?.filter(item => item.status === 'collected').length || 0}
-                  </div>
-                  <p className="text-sm text-muted-foreground">Items exchanged</p>
-                </div>
-                
-                <div className="text-center p-6 border rounded-lg">
-                  <Heart size={32} className="mx-auto mb-3 text-red-600" />
-                  <div className="text-2xl font-bold text-red-600">
-                    {listedItems?.length || 0}
-                  </div>
-                  <p className="text-sm text-muted-foreground">Community contributions</p>
-                </div>
+                <p className="text-xs text-muted-foreground mt-1">Collect feedback from verified exchanges to grow trust.</p>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* Message Center */}
-      <MessageCenter 
-        open={showMessageCenter}
-        onOpenChange={setShowMessageCenter}
-      />
     </div>
   )
 }

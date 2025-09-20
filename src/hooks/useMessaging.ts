@@ -14,6 +14,7 @@ interface UserProfile {
     phone: boolean
     identity: boolean
   }
+  avatar?: string
 }
 
 interface Message {
@@ -68,7 +69,7 @@ export function useMessaging() {
     collectorAvatar: string | undefined
   ) => {
     // Check if chat already exists
-    let existingChat = chats.find(chat => 
+    const existingChat = chats.find(chat => 
       chat.itemId === itemId && 
       chat.donorId === donorId && 
       chat.collectorId === collectorId
