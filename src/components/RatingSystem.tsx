@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Star, ThumbsUp, ThumbsDown, Clock, MessageCircle } from '@phosphor-icons/react'
+import { Star, ThumbsUp } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
 
@@ -154,7 +154,7 @@ export function RatingForm({
 }: RatingFormProps) {
   const [currentUser] = useKV('current-user', null)
   const [ratings, setRatings] = useKV<Rating[]>('user-ratings', [])
-  const [userStats, setUserStats] = useKV<Record<string, UserRatingStats>>('user-rating-stats', {})
+  const [, setUserStats] = useKV<Record<string, UserRatingStats>>('user-rating-stats', {})
   
   const [formData, setFormData] = useState({
     overall: 0,
@@ -236,6 +236,7 @@ export function RatingForm({
         review: ''
       })
     } catch (error) {
+      console.error('Failed to submit rating', error)
       toast.error('Failed to submit rating. Please try again.')
     } finally {
       setIsSubmitting(false)
@@ -333,7 +334,6 @@ export function RatingForm({
 
 // Display list of ratings for a user
 export function RatingList({ userId, ratings, showAll = false, className = '' }: RatingListProps) {
-  const [showRatingForm, setShowRatingForm] = useState(false)
   const [, setUserRatings] = useKV<Rating[]>('user-ratings', [])
   
   const userRatings = ratings.filter(r => r.targetUserId === userId)
@@ -463,11 +463,4 @@ function calculateUserStats(ratings: Rating[]): UserRatingStats {
     verifiedRatings,
     helpfulVotesReceived
   }
-}
-
-// Get user rating stats
-export function useUserRatingStats(userId: string) {
-  const [ratings] = useKV<Rating[]>('user-ratings', [])
-  const userRatings = ratings.filter(r => r.targetUserId === userId)
-  return calculateUserStats(userRatings)
 }

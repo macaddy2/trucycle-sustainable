@@ -9,7 +9,6 @@ import {
   ArrowRight,
   MapPin,
   Leaf,
-  Clock,
   Users,
   Bell,
 } from '@phosphor-icons/react'
@@ -190,6 +189,7 @@ export function IntelligentRecommendations({ user, notifications = [], onMarkAsR
 
       toast.success('Recommendations updated!')
     } catch (error) {
+      console.error('Failed to generate recommendations', error)
       toast.error('Failed to refresh recommendations')
     } finally {
       setIsLoading(false)

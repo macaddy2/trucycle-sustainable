@@ -1,13 +1,14 @@
+import type { MouseEvent } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { 
-  Bell, 
-  BellRinging, 
-  CheckCircle, 
-  Package, 
-  Heart, 
+import {
+  Bell,
+  BellRinging,
+  CheckCircle,
+  Package,
+  Heart,
   ArrowsClockwise,
   Clock,
   X
@@ -110,7 +111,7 @@ export function NotificationList({
     }
   }
 
-  const handleDeleteClick = (e: React.MouseEvent, notificationId: string) => {
+  const handleDeleteClick = (e: MouseEvent, notificationId: string) => {
     e.stopPropagation()
     if (onDeleteNotification) {
       onDeleteNotification(notificationId)
@@ -239,77 +240,3 @@ export function NotificationList({
   )
 }
 
-// Hook for managing notifications
-export function useNotifications(userId?: string) {
-  const [notifications, setNotifications] = useKV<Notification[]>('user-notifications', [])
-
-  const addNotification = (notification: Omit<Notification, 'id' | 'createdAt'>) => {
-    const newNotification: Notification = {
-      ...notification,
-      id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      createdAt: new Date().toISOString()
-    }
-
-    setNotifications(current => [newNotification, ...current])
-    return newNotification
-  }
-
-  const markAsRead = (notificationId: string) => {
-    setNotifications(current =>
-      current.map(notification =>
-        notification.id === notificationId
-          ? { ...notification, read: true }
-          : notification
-      )
-    )
-  }
-
-  const markAllAsRead = () => {
-    setNotifications(current =>
-      current.map(notification => ({ ...notification, read: true }))
-    )
-  }
-
-  const deleteNotification = (notificationId: string) => {
-    setNotifications(current =>
-      current.filter(notification => notification.id !== notificationId)
-    )
-  }
-
-  const getUnreadCount = () => {
-    return notifications.filter(n => !n.read).length
-  }
-
-  const getNotificationsByType = (type: Notification['type']) => {
-    return notifications.filter(n => n.type === type)
-  }
-
-  const getUrgentNotifications = () => {
-    return notifications.filter(n => n.urgency === 'urgent' && !n.read)
-  }
-
-  // Listen for demo notifications
-  useEffect(() => {
-    const handleDemoNotification = (event: CustomEvent) => {
-      const { notification } = event.detail
-      addNotification(notification)
-    }
-
-    window.addEventListener('add-demo-notification', handleDemoNotification as EventListener)
-    
-    return () => {
-      window.removeEventListener('add-demo-notification', handleDemoNotification as EventListener)
-    }
-  }, [])
-
-  return {
-    notifications,
-    addNotification,
-    markAsRead,
-    markAllAsRead,
-    deleteNotification,
-    getUnreadCount,
-    getNotificationsByType,
-    getUrgentNotifications
-  }
-}

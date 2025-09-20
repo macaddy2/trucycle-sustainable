@@ -1,22 +1,18 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { 
-  PaperPlaneTilt, 
-  Clock, 
-  CheckCircle, 
-  MapPin, 
-  Package, 
+import {
+  PaperPlaneTilt,
+  CheckCircle,
+  MapPin,
+  Package,
   CalendarCheck,
-  Phone,
-  Camera,
-  QrCode 
+  QrCode
 } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
@@ -67,7 +63,6 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
   const [messages, setMessages] = useKV('chat-messages', {} as Record<string, Message[]>)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
   const [showQRCode, setShowQRCode] = useState<QRCodeData | null>(null)
   const [selectedDropOffLocation, setSelectedDropOffLocation] = useState<string>('')
   
@@ -89,9 +84,15 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
   })
 
   // Get normalized data
-  const normalizedChats = chats.map(normalizeChat)
-  const selectedChat = normalizedChats.find(chat => chat.id === selectedChatId)
-  const currentMessages = selectedChatId ? (messages[selectedChatId] || []).map(normalizeMessage) : []
+  const normalizedChats = useMemo(() => chats.map(normalizeChat), [chats])
+  const selectedChat = useMemo(
+    () => normalizedChats.find(chat => chat.id === selectedChatId) ?? null,
+    [normalizedChats, selectedChatId],
+  )
+  const currentMessages = useMemo(() => {
+    if (!selectedChatId) return [] as Message[]
+    return (messages[selectedChatId] || []).map(normalizeMessage)
+  }, [messages, selectedChatId])
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -110,15 +111,18 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
 
   // Mock real-time message simulation
   useEffect(() => {
-    if (!selectedChatId || !currentUser) return
+    if (!selectedChatId || !currentUser || !selectedChat) {
+      return undefined
+    }
 
     const interval = setInterval(() => {
-      // Simulate occasional messages from other party
-      if (Math.random() > 0.98) { // 2% chance every second
-        const otherUserId = selectedChat?.donorId === currentUser.id ? 
-          selectedChat?.collectorId : selectedChat?.donorId
-        const otherUserName = selectedChat?.donorId === currentUser.id ? 
-          selectedChat?.collectorName : selectedChat?.donorName
+      if (Math.random() > 0.98) {
+        const otherUserId = selectedChat.donorId === currentUser.id
+          ? selectedChat.collectorId
+          : selectedChat.donorId
+        const otherUserName = selectedChat.donorId === currentUser.id
+          ? selectedChat.collectorName
+          : selectedChat.donorName
 
         if (otherUserId && otherUserName) {
           receiveMessage({
@@ -126,14 +130,14 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
             senderId: otherUserId,
             senderName: otherUserName,
             content: getRandomResponse(),
-            type: 'text'
+            type: 'text',
           })
         }
       }
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [selectedChatId, currentUser])
+  }, [selectedChatId, currentUser, selectedChat, receiveMessage])
 
   const getRandomResponse = () => {
     const responses = [
@@ -180,34 +184,37 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
     toast.success('Message sent')
   }
 
-  const receiveMessage = (messageData: Omit<Message, 'id' | 'timestamp'>) => {
-    const message: Message = {
-      ...messageData,
-      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date()
-    }
+  const receiveMessage = useCallback(
+    (messageData: Omit<Message, 'id' | 'timestamp'>) => {
+      const message: Message = {
+        ...messageData,
+        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date(),
+      }
 
-    setMessages(prev => ({
-      ...prev,
-      [messageData.chatId]: [...(prev[messageData.chatId] || []), message]
-    }))
+      setMessages(prev => ({
+        ...prev,
+        [messageData.chatId]: [...(prev[messageData.chatId] || []), message],
+      }))
 
-    // Update chat's last message and unread count
-    setChats(prev => prev.map(chat => 
-      chat.id === messageData.chatId 
-        ? { 
-            ...chat, 
-            lastMessage: message,
-            unreadCount: selectedChatId === messageData.chatId ? 0 : chat.unreadCount + 1
-          }
-        : chat
-    ))
+      setChats(prev =>
+        prev.map(chat =>
+          chat.id === messageData.chatId
+            ? {
+                ...chat,
+                lastMessage: message,
+                unreadCount: selectedChatId === messageData.chatId ? 0 : chat.unreadCount + 1,
+              }
+            : chat,
+        ),
+      )
 
-    // Show notification if not currently viewing this chat
-    if (selectedChatId !== messageData.chatId) {
-      toast.info(`New message from ${messageData.senderName}`)
-    }
-  }
+      if (selectedChatId !== messageData.chatId) {
+        toast.info(`New message from ${messageData.senderName}`)
+      }
+    },
+    [selectedChatId, setMessages, setChats],
+  )
 
   const markChatAsRead = (chatId: string) => {
     setChats(prev => prev.map(chat => 
@@ -295,10 +302,7 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
       icon: QrCode,
       action: () => {
         if (!selectedChat) return
-        
-        // Determine if current user is donor or collector
-        const isDonor = currentUser.id === selectedChat.donorId
-        
+
         // For demo purposes, set a sample drop-off location
         setSelectedDropOffLocation('TruCycle Partner Shop - Camden Market, London NW1 8AH')
       },

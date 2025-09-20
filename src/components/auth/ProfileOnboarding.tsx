@@ -54,7 +54,6 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
   const [isLoading, setIsLoading] = useState(false)
   
   const [user, setUser] = useKV('current-user', null)
-  const [, setUserProfiles] = useKV('user-profiles', {})
   
   const [profileData, setProfileData] = useState({
     userType: '',

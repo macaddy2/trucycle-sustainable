@@ -6,7 +6,6 @@ import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { 
   CheckCircle, 
   Clock, 
@@ -20,12 +19,13 @@ import {
   Info,
   Star
 } from '@phosphor-icons/react'
-import { useKV } from '@github/spark/hooks'
-import { VerificationLevel, getVerificationStatus } from './VerificationBadge'
+import {
+  getVerificationStatus,
+  type VerificationLevel,
+} from './verificationBadgeUtils'
 import { toast } from 'sonner'
 
 interface VerificationCenterProps {
-  userId: string
   currentVerification: VerificationLevel
   onVerificationUpdate: (verification: VerificationLevel) => void
 }
@@ -104,7 +104,7 @@ const verificationSteps: VerificationStep[] = [
   }
 ]
 
-export function VerificationCenter({ userId, currentVerification, onVerificationUpdate }: VerificationCenterProps) {
+export function VerificationCenter({ currentVerification, onVerificationUpdate }: VerificationCenterProps) {
   const [selectedStep, setSelectedStep] = useState<VerificationStep | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
@@ -145,27 +145,10 @@ export function VerificationCenter({ userId, currentVerification, onVerification
       
       setSelectedStep(null)
     } catch (error) {
+      console.error('Verification step failed', error)
       toast.error('Verification failed. Please try again.')
     } finally {
       setIsSubmitting(false)
-    }
-  }
-
-  const getStepStatus = (stepId: keyof VerificationLevel) => {
-    if (currentVerification[stepId]) return 'completed'
-    if (stepId === 'community') {
-      // Check if user meets community requirements (mock check)
-      return 'available'
-    }
-    return 'available'
-  }
-
-  const getStepColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200'
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'available': return 'bg-blue-100 text-blue-800 border-blue-200'
-      default: return 'bg-gray-100 text-gray-600 border-gray-200'
     }
   }
 
@@ -234,7 +217,6 @@ export function VerificationCenter({ userId, currentVerification, onVerification
       <div className="grid gap-4">
         <h3 className="text-h3 font-medium">Verification Steps</h3>
         {verificationSteps.map((step) => {
-          const status = getStepStatus(step.id)
           const isCompleted = currentVerification[step.id]
           
           return (
