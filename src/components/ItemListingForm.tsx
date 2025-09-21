@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -121,7 +121,7 @@ export function ItemListingForm({ onComplete, prefillFulfillmentMethod, onFulfil
     }
   }
 
-  const handleFulfillmentSelect = (method: 'pickup' | 'dropoff') => {
+  const handleFulfillmentSelect = useCallback((method: 'pickup' | 'dropoff') => {
     setFormData(prev => ({
       ...prev,
       fulfillmentMethod: method,
@@ -136,7 +136,7 @@ export function ItemListingForm({ onComplete, prefillFulfillmentMethod, onFulfil
     if (method === 'dropoff') {
       setShowDropOffSelector(true)
     }
-  }
+  }, [])
 
   const handleDropOffSelection = (location: DropOffLocation) => {
     setFormData(prev => ({
