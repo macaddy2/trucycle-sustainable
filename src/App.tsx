@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
 import { useInitializeSampleData, useRecommendationNotifications } from '@/hooks'
+import type { ListingCompletionDetails } from './components/ItemListingForm'
 
 interface UserProfile {
   id: string
@@ -43,6 +44,8 @@ function App() {
   const [showDemoGuide] = useKV<boolean>('show-demo-guide', true)
   const [pendingFulfillmentMethod, setPendingFulfillmentMethod] = useState<'pickup' | 'dropoff' | null>(null)
   const [pendingDropOffLocation, setPendingDropOffLocation] = useState<DropOffLocation | null>(null)
+  const [profileInitialTab, setProfileInitialTab] = useState<'overview' | 'listings' | 'recommendations' | 'impact'>('overview')
+  const [profileHighlightListingId, setProfileHighlightListingId] = useState<string | null>(null)
   
   const { initializeSampleChats } = useInitializeSampleData()
   const { unreadCount, triggerUrgentNotifications } = useRecommendationNotifications(user ?? null)
@@ -154,6 +157,24 @@ function App() {
     setPendingDropOffLocation(location)
     setCurrentTab('list')
   }
+
+  const handleListingComplete = useCallback(({ listing }: ListingCompletionDetails) => {
+    setProfileInitialTab('listings')
+    setProfileHighlightListingId(listing.id)
+    setCurrentTab('profile')
+    toast.success('Drop-off planned!', {
+      description: `"${listing.title}" is now listed under My Listed Items.`
+    })
+  }, [])
+
+  useEffect(() => {
+    if (currentTab !== 'profile') {
+      setProfileHighlightListingId(null)
+      if (profileInitialTab !== 'overview') {
+        setProfileInitialTab('overview')
+      }
+    }
+  }, [currentTab, profileInitialTab])
 
   // If in shop scanner mode, render only the scanner
   if (showShopScanner) {
@@ -304,7 +325,7 @@ function App() {
 
           <TabsContent value="list">
             <ItemListingForm
-              onComplete={() => setCurrentTab('browse')}
+              onComplete={handleListingComplete}
               prefillFulfillmentMethod={pendingFulfillmentMethod}
               prefillDropOffLocation={pendingDropOffLocation}
               onFulfillmentPrefillHandled={() => setPendingFulfillmentMethod(null)}
@@ -331,7 +352,10 @@ function App() {
                 userName={user?.name && typeof user.name === 'string' ? user.name.split(' ')[0] : 'User'}
               />
             )}
-            <ProfileDashboard />
+            <ProfileDashboard
+              initialActiveTab={profileInitialTab}
+              highlightListingId={profileHighlightListingId}
+            />
           </TabsContent>
         </Tabs>
       </main>
