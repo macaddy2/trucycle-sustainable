@@ -17,7 +17,7 @@ import {
   ArrowRight
 } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
-import { useMessaging } from '@/hooks'
+import { useExchangeManager, useMessaging } from '@/hooks'
 import { VerificationBadge } from './VerificationBadge'
 import type { VerificationLevel } from './verificationBadgeUtils'
 import { RatingDisplay } from './RatingSystem'
@@ -27,6 +27,7 @@ interface UserProfile {
   id: string
   name: string
   userType: 'donor' | 'collector'
+  avatar?: string
 }
 
 export interface ListingItem {
@@ -151,9 +152,10 @@ const actionIcon = {
 interface ItemListingProps {
   searchQuery: string
   onStartDonationFlow?: (method: 'pickup' | 'dropoff') => void
+  onOpenMessages?: (options?: { itemId?: string; chatId?: string; initialView?: 'chats' | 'requests' }) => void
 }
 
-export function ItemListing({ searchQuery, onStartDonationFlow }: ItemListingProps) {
+export function ItemListing({ searchQuery, onStartDonationFlow, onOpenMessages }: ItemListingProps) {
   const [currentUser] = useKV<UserProfile | null>('current-user', null)
   const [globalListings] = useKV<ListingItem[]>('global-listings', [])
   const [items, setItems] = useState<ListingItem[]>([])
@@ -162,6 +164,12 @@ export function ItemListing({ searchQuery, onStartDonationFlow }: ItemListingPro
   const [selectedCondition, setSelectedCondition] = useState('All')
   const [selectedType, setSelectedType] = useState<'All' | ListingItem['actionType']>('All')
   const { createOrGetChat, getChatForItem } = useMessaging()
+  const {
+    submitClaimRequest,
+    pendingRequestCountByItem,
+    getItemCollectionStatus,
+    getRequestsForItem,
+  } = useExchangeManager()
 
   useEffect(() => {
     setItems([...sampleItems, ...globalListings])
@@ -186,6 +194,20 @@ export function ItemListing({ searchQuery, onStartDonationFlow }: ItemListingPro
     })
   }, [items, searchQuery, selectedCategory, selectedCondition, selectedType])
 
+  const activeItemCollectionStatus = useMemo(() => {
+    if (!activeItem) return null
+    return getItemCollectionStatus(activeItem.id)
+  }, [activeItem, getItemCollectionStatus])
+
+  const activeItemRequests = useMemo(() => {
+    if (!activeItem) return [] as ReturnType<typeof getRequestsForItem>
+    return getRequestsForItem(activeItem.id)
+  }, [activeItem, getRequestsForItem])
+
+  const activeItemPendingCount = activeItem ? pendingRequestCountByItem[activeItem.id] ?? 0 : 0
+  const activeItemIsOwner = activeItem ? currentUser?.id === activeItem.ownerId : false
+  const activeItemRequestLabel = activeItem?.actionType === 'recycle' ? 'Arrange recycling' : 'Request a Claim'
+
   const formatTimeAgo = (createdAt: string) => {
     const created = new Date(createdAt)
     const diffMs = Date.now() - created.getTime()
@@ -196,19 +218,19 @@ export function ItemListing({ searchQuery, onStartDonationFlow }: ItemListingPro
     return `${days} day${days === 1 ? '' : 's'} ago`
   }
 
-  const handleClaimItem = async (item: ListingItem) => {
+  const handleContactOwner = async (item: ListingItem) => {
     if (!currentUser) {
-      toast.error('Please sign in to claim items')
+      toast.error('Please sign in to contact item owners')
       return
     }
 
     if (currentUser.id === item.ownerId) {
-      toast.error('You already own this item')
+      toast.error('This is your listing')
       return
     }
 
     try {
-      await createOrGetChat(
+      const chatId = await createOrGetChat(
         item.id,
         item.title,
         item.photos[0],
@@ -217,32 +239,43 @@ export function ItemListing({ searchQuery, onStartDonationFlow }: ItemListingPro
         item.ownerAvatar,
         currentUser.id,
         currentUser.name,
+        currentUser.avatar,
       )
 
-      toast.success(`Connected you with ${item.ownerName}`)
+      toast.success(`Opened a chat with ${item.ownerName}`)
       setActiveItem(null)
+      onOpenMessages?.({ itemId: item.id, chatId, initialView: 'chats' })
     } catch (error) {
       console.error('Failed to start conversation', error)
       toast.error('Unable to start conversation right now')
     }
   }
 
-  const renderActionButton = (item: ListingItem) => {
-    if (!currentUser || currentUser.id === item.ownerId) {
-      return null
+  const handleRequestClaim = (item: ListingItem) => {
+    if (!currentUser) {
+      toast.error('Please sign in to request this item')
+      return
     }
 
-    const label = item.actionType === 'donate'
-      ? 'Claim item'
-      : item.actionType === 'exchange'
-      ? 'Request exchange'
-      : 'Arrange recycling'
+    if (currentUser.id === item.ownerId) {
+      toast.error('You cannot request your own listing')
+      return
+    }
 
-    return (
-      <Button className="flex-1" onClick={() => handleClaimItem(item)}>
-        {label}
-      </Button>
-    )
+    const request = submitClaimRequest({
+      itemId: item.id,
+      itemTitle: item.title,
+      itemImage: item.photos[0],
+      donorId: item.ownerId,
+      donorName: item.ownerName,
+      collectorId: currentUser.id,
+      collectorName: currentUser.name,
+      collectorAvatar: currentUser.avatar,
+    })
+
+    if (request) {
+      setActiveItem(null)
+    }
   }
 
   return (
@@ -363,6 +396,12 @@ export function ItemListing({ searchQuery, onStartDonationFlow }: ItemListingPro
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredItems.map((item) => {
             const Icon = actionIcon[item.actionType]
+            const collectionStatus = getItemCollectionStatus(item.id)
+            const itemRequests = getRequestsForItem(item.id)
+            const pendingRequests = pendingRequestCountByItem[item.id] ?? 0
+            const isOwner = currentUser?.id === item.ownerId
+            const requestButtonLabel = item.actionType === 'recycle' ? 'Arrange recycling' : 'Request a Claim'
+
             return (
               <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="aspect-video bg-muted flex items-center justify-center relative">
@@ -378,6 +417,19 @@ export function ItemListing({ searchQuery, onStartDonationFlow }: ItemListingPro
                       <span className="ml-1 capitalize">{item.actionType}</span>
                     </Badge>
                     {item.verified && <Badge variant="secondary">Verified</Badge>}
+                  </div>
+
+                  <div className="absolute top-3 right-3 flex gap-2">
+                    {collectionStatus?.collected && (
+                      <Badge variant="secondary" className="bg-green-600 text-white">
+                        Collected
+                      </Badge>
+                    )}
+                    {isOwner && pendingRequests > 0 && !collectionStatus?.collected && (
+                      <Badge variant="outline" className="bg-background/80 backdrop-blur">
+                        {pendingRequests} interested
+                      </Badge>
+                    )}
                   </div>
                 </div>
 
@@ -411,13 +463,46 @@ export function ItemListing({ searchQuery, onStartDonationFlow }: ItemListingPro
                     <Button variant="outline" className="flex-1" onClick={() => setActiveItem(item)}>
                       View details
                     </Button>
-                    {renderActionButton(item)}
                     {currentUser && currentUser.id !== item.ownerId && getChatForItem(item.id) && (
-                      <Button variant="ghost" size="icon" onClick={() => handleClaimItem(item)}>
+                      <Button variant="ghost" size="icon" onClick={() => handleContactOwner(item)}>
                         <ChatCircle size={16} />
                       </Button>
                     )}
                   </div>
+
+                  {collectionStatus?.collected ? (
+                    <div className="flex items-center justify-between text-xs text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+                      <span>Collected on {new Date(collectionStatus.confirmedAt).toLocaleDateString()}</span>
+                      <Badge variant="secondary" className="bg-green-600 text-white">
+                        Rewarded
+                      </Badge>
+                    </div>
+                  ) : (
+                    <>
+                      {isOwner ? (
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => onOpenMessages?.({ itemId: item.id, initialView: 'requests' })}
+                        >
+                          {pendingRequests > 0
+                            ? `Review ${pendingRequests} interested collector${pendingRequests > 1 ? 's' : ''}`
+                            : itemRequests.length > 0
+                            ? 'View interested collectors'
+                            : 'No requests yet'}
+                        </Button>
+                      ) : (
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Button variant="outline" className="flex-1" onClick={() => handleContactOwner(item)}>
+                            Contact donor
+                          </Button>
+                          <Button className="flex-1" onClick={() => handleRequestClaim(item)}>
+                            {requestButtonLabel}
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )
@@ -493,7 +578,55 @@ export function ItemListing({ searchQuery, onStartDonationFlow }: ItemListingPro
                       </div>
                     </div>
 
-                    {renderActionButton(activeItem)}
+                    {activeItemCollectionStatus?.collected ? (
+                      <div className="bg-green-50 border border-green-100 rounded-lg px-4 py-3 text-sm text-green-700">
+                        Item collected on {new Date(activeItemCollectionStatus.confirmedAt).toLocaleDateString()}.
+                        Thank you for completing the exchange!
+                      </div>
+                    ) : activeItemIsOwner ? (
+                      <div className="space-y-3">
+                        <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 text-sm">
+                          <p className="font-medium">Interested collectors</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {activeItemPendingCount > 0
+                              ? `${activeItemPendingCount} collector${activeItemPendingCount > 1 ? 's are' : ' is'} waiting for your approval.`
+                              : activeItemRequests.length > 0
+                              ? 'No pending decisions. You can review previous requests below.'
+                              : 'No one has requested this item yet.'}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => {
+                            onOpenMessages?.({ itemId: activeItem.id, initialView: 'requests' })
+                            setActiveItem(null)
+                          }}
+                        >
+                          {activeItemPendingCount > 0
+                            ? `Review ${activeItemPendingCount} active request${activeItemPendingCount > 1 ? 's' : ''}`
+                            : activeItemRequests.length > 0
+                            ? 'View interested collectors'
+                            : 'Wait for new requests'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 sm:space-y-0 sm:flex sm:items-center sm:gap-3">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => handleContactOwner(activeItem)}
+                        >
+                          Contact donor
+                        </Button>
+                        <Button
+                          className="flex-1"
+                          onClick={() => handleRequestClaim(activeItem)}
+                        >
+                          {activeItemRequestLabel}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

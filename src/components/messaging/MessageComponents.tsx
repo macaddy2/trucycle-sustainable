@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ChatCircle, CheckCircle, Clock } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
+import { useExchangeManager } from '@/hooks'
 
 interface MessageNotificationProps {
   onOpenMessages: () => void
@@ -32,9 +33,13 @@ export function MessageNotification({ onOpenMessages }: MessageNotificationProps
   const [currentUser] = useKV('current-user', null)
   const [chats] = useKV('user-chats', [] as Chat[])
   const [showTooltip, setShowTooltip] = useState(false)
+  const { pendingRequestCountByItem } = useExchangeManager()
 
   const totalUnread = chats.reduce((sum, chat) => sum + chat.unreadCount, 0)
   const activeChats = chats.filter(chat => chat.status === 'active')
+  const pendingRequests = currentUser?.userType === 'donor'
+    ? Object.values(pendingRequestCountByItem).reduce((sum, count) => sum + count, 0)
+    : 0
 
   // Show notification tooltip for new messages
   useEffect(() => {
@@ -59,9 +64,14 @@ export function MessageNotification({ onOpenMessages }: MessageNotificationProps
           >
             <ChatCircle size={16} className="mr-2" />
             Messages
+            {pendingRequests > 0 && (
+              <Badge variant="outline" className="ml-2 hidden sm:inline-flex text-xs">
+                {pendingRequests} requests
+              </Badge>
+            )}
             {totalUnread > 0 && (
-              <Badge 
-                variant="destructive" 
+              <Badge
+                variant="destructive"
                 className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
               >
                 {totalUnread > 9 ? '9+' : totalUnread}
@@ -74,6 +84,11 @@ export function MessageNotification({ onOpenMessages }: MessageNotificationProps
             <p className="font-medium">
               {totalUnread > 0 ? `${totalUnread} new messages` : 'No new messages'}
             </p>
+            {pendingRequests > 0 && (
+              <p className="text-xs text-amber-600">
+                {pendingRequests} claim request{pendingRequests === 1 ? '' : 's'} waiting for your review.
+              </p>
+            )}
             {activeChats.slice(0, 3).map(chat => (
               <div key={chat.id} className="flex items-center space-x-2 text-sm">
                 <Avatar className="w-6 h-6">
