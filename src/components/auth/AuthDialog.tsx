@@ -34,6 +34,7 @@ interface UserProfile {
     payment: boolean
     community: boolean
   }
+  rewardsBalance?: number
 }
 
 export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthDialogProps) {
@@ -111,7 +112,8 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
             address: false,
             payment: false,
             community: false
-          }
+          },
+          rewardsBalance: 0
         }
 
         // Store user profile
@@ -142,7 +144,8 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
             address: true,
             payment: true,
             community: true
-          }
+          },
+          rewardsBalance: 120
         }
 
         setUser(mockUser)
@@ -180,7 +183,8 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
           address: false,
           payment: false,
           community: false
-        }
+        },
+        rewardsBalance: 60
       }
 
       setUser(mockUser)

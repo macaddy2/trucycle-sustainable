@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { DropOffLocationSelector } from './DropOffLocationSelector'
 import type { DropOffLocation } from './dropOffLocations'
 import { QRCodeDisplay, type QRCodeData } from './QRCode'
+import type { ListingValuation, ManagedListing } from './MyListingsView'
 
 const CATEGORIES = [
   'Electronics',
@@ -32,25 +33,101 @@ const CONDITIONS = [
 ]
 
 const ACTION_TYPES = [
-  { 
-    value: 'exchange', 
-    icon: ArrowsClockwise, 
-    label: 'Exchange', 
-    description: 'Trade with other users' 
+  {
+    value: 'exchange',
+    icon: ArrowsClockwise,
+    label: 'Exchange',
+    description: 'Trade with other users'
   },
-  { 
-    value: 'donate', 
-    icon: Heart, 
-    label: 'Donate', 
-    description: 'Give away for free' 
+  {
+    value: 'donate',
+    icon: Heart,
+    label: 'Donate',
+    description: 'Give away for free'
   },
-  { 
-    value: 'recycle', 
-    icon: Recycle, 
-    label: 'Recycle', 
-    description: 'Proper disposal/recycling' 
+  {
+    value: 'recycle',
+    icon: Recycle,
+    label: 'Recycle',
+    description: 'Proper disposal/recycling'
   }
 ]
+
+const CATEGORY_BASE_VALUES: Record<string, number> = {
+  Electronics: 240,
+  Furniture: 180,
+  Clothing: 65,
+  Books: 25,
+  'Kitchen Items': 55,
+  'Sports Equipment': 90,
+  'Home Decor': 45,
+  Other: 40,
+}
+
+const CONDITION_MULTIPLIERS: Record<string, number> = {
+  excellent: 1,
+  good: 0.75,
+  fair: 0.55,
+  poor: 0.35,
+}
+
+const ACTION_VALUE_MODIFIERS: Record<string, number> = {
+  exchange: 1,
+  donate: 0.7,
+  recycle: 0.45,
+}
+
+const ACTION_REWARD_MULTIPLIER: Record<string, number> = {
+  exchange: 0.45,
+  donate: 0.65,
+  recycle: 0.35,
+}
+
+type ValuationSummary = (ListingValuation & { narrative: string }) | null
+
+const calculateListingValuation = (
+  category: string,
+  condition: string,
+  actionType: string
+): ValuationSummary => {
+  if (!category || !condition || !actionType) {
+    return null
+  }
+
+  const baseValue = CATEGORY_BASE_VALUES[category] ?? 40
+  const conditionMultiplier = CONDITION_MULTIPLIERS[condition] ?? 0.5
+  const marketModifier = ACTION_VALUE_MODIFIERS[actionType] ?? 0.5
+  const rewardMultiplier = ACTION_REWARD_MULTIPLIER[actionType] ?? 0.4
+
+  const estimatedValueRaw = baseValue * conditionMultiplier * marketModifier
+  const estimatedValue = Math.max(10, Math.round(estimatedValueRaw / 5) * 5)
+  const spread = Math.round(estimatedValue * 0.15)
+  const recommendedPriceRange: [number, number] = [
+    Math.max(5, estimatedValue - spread),
+    estimatedValue + spread,
+  ]
+  const rewardPoints = Math.max(35, Math.round((estimatedValue / 2) * (1 + rewardMultiplier)))
+
+  const narrative = actionType === 'donate'
+    ? 'Donating unlocks priority matching with nearby causes and adds a generosity bonus to your rewards.'
+    : actionType === 'exchange'
+      ? 'Exchanging keeps value in circulation and balances rewards for both community members.'
+      : 'Responsibly recycling protects materials from landfill and awards sustainability points.'
+
+  const confidence: ListingValuation['confidence'] = condition === 'excellent'
+    ? 'high'
+    : condition === 'good'
+      ? 'medium'
+      : 'low'
+
+  return {
+    estimatedValue,
+    recommendedPriceRange,
+    rewardPoints,
+    confidence,
+    narrative,
+  }
+}
 
 interface ItemListingFormProps {
   onComplete?: () => void
@@ -68,7 +145,7 @@ export function ItemListingForm({
   onDropOffPrefillHandled
 }: ItemListingFormProps) {
   const [user] = useKV('current-user', null)
-  const [, setListings] = useKV('user-listings', [])
+  const [, setListings] = useKV<ManagedListing[]>('user-listings', [])
   const [currentStep, setCurrentStep] = useState(1)
   
   // Form state
@@ -88,6 +165,10 @@ export function ItemListingForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showDropOffSelector, setShowDropOffSelector] = useState(false)
   const [generatedQRCode, setGeneratedQRCode] = useState<QRCodeData | null>(null)
+  const valuationSummary = useMemo(
+    () => calculateListingValuation(formData.category, formData.condition, formData.actionType),
+    [formData.category, formData.condition, formData.actionType]
+  )
 
   const totalSteps = 5
   const progress = (currentStep / totalSteps) * 100
@@ -207,6 +288,15 @@ export function ItemListingForm({
       const carbonImpact = formData.actionType === 'recycle' ? 5
         : formData.actionType === 'donate' ? 3
           : 2
+      const listingValuation = valuationSummary
+        ? {
+            estimatedValue: valuationSummary.estimatedValue,
+            recommendedPriceRange: valuationSummary.recommendedPriceRange,
+            rewardPoints: valuationSummary.rewardPoints,
+            confidence: valuationSummary.confidence,
+          }
+        : undefined
+      const rewardPoints = listingValuation?.rewardPoints ?? Math.round(carbonImpact * 8)
 
       const newListing = {
         id: `listing-${Date.now()}`,
@@ -216,7 +306,10 @@ export function ItemListingForm({
         status: 'active',
         createdAt: new Date().toISOString(),
         views: 0,
-        interested: []
+        interested: [],
+        valuation: listingValuation,
+        rewardPoints,
+        co2Impact: carbonImpact
       }
 
       // Add to user's listings
@@ -613,8 +706,23 @@ export function ItemListingForm({
               </p>
             </div>
 
-            <div className="bg-muted/50 rounded-lg p-4">
-              <h3 className="font-medium mb-3">Review Your Listing</h3>
+            <div className="bg-muted/50 rounded-lg p-4 space-y-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <h3 className="font-medium text-lg">Review your listing details</h3>
+                {valuationSummary && (
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="font-semibold text-primary">
+                      Est. value £{valuationSummary.estimatedValue.toFixed(2)}
+                    </span>
+                    <Badge variant="secondary">Reward +{valuationSummary.rewardPoints} pts</Badge>
+                    {valuationSummary.confidence && (
+                      <Badge variant="outline" className="capitalize">
+                        {valuationSummary.confidence} confidence
+                      </Badge>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="space-y-2 text-sm">
                 <div><span className="font-medium">Title:</span> {formData.title}</div>
                 <div><span className="font-medium">Category:</span> {formData.category}</div>
@@ -631,6 +739,24 @@ export function ItemListingForm({
                   <div><span className="font-medium">Photos:</span> {formData.photos.length} uploaded</div>
                 )}
               </div>
+              {valuationSummary && (
+                <div className="grid gap-3 text-xs text-muted-foreground md:grid-cols-3">
+                  <div className="rounded-md border border-primary/30 bg-background/60 p-3">
+                    <p className="font-semibold text-primary">
+                      Suggested exchange window
+                    </p>
+                    <p className="mt-1">£{valuationSummary.recommendedPriceRange[0].toFixed(2)} – £{valuationSummary.recommendedPriceRange[1].toFixed(2)}</p>
+                  </div>
+                  <div className="rounded-md border border-primary/30 bg-background/60 p-3">
+                    <p className="font-semibold text-primary">Reward preview</p>
+                    <p className="mt-1">Earn {valuationSummary.rewardPoints} TruCycle points when the item is collected.</p>
+                  </div>
+                  <div className="rounded-md border border-primary/30 bg-background/60 p-3">
+                    <p className="font-semibold text-primary">Impact insight</p>
+                    <p className="mt-1">{valuationSummary.narrative}</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
