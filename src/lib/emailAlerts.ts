@@ -53,16 +53,24 @@ const buildEmailBody = (recipient: EmailRecipient, listing: ListingSummary) => {
   ].join('\n')
 }
 
-const createEmailEntry = (recipient: EmailRecipient, listing: ListingSummary): EmailOutboxEntry | null => {
-  if (!recipient.email) {
+const createEmailEntry = (
+  recipient: EmailRecipient | null | undefined,
+  listing: ListingSummary
+): EmailOutboxEntry | null => {
+  if (!recipient?.email) {
     return null
+  }
+
+  const safeRecipient: EmailRecipient = {
+    name: recipient.name || 'there',
+    email: recipient.email
   }
 
   return {
     id: `email-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     to: recipient.email,
     subject: `TruCycle listing confirmed: ${listing.title}`,
-    body: buildEmailBody(recipient, listing),
+    body: buildEmailBody(safeRecipient, listing),
     sentAt: new Date().toISOString(),
     context: {
       listingId: listing.id,
@@ -72,7 +80,7 @@ const createEmailEntry = (recipient: EmailRecipient, listing: ListingSummary): E
 }
 
 export const sendListingSubmissionEmails = async (
-  donor: EmailRecipient,
+  donor: EmailRecipient | null | undefined,
   partnerLocation: DropOffLocation | null,
   listing: ListingSummary
 ): Promise<EmailOutboxEntry[]> => {
