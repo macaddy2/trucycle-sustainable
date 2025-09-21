@@ -1,14 +1,17 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
 import { Plus, Camera, MapPin, Recycle, Heart, ArrowsClockwise, Truck, Storefront } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
-import { DropOffLocationSelector, DropOffLocation } from './DropOffLocationSelector'
+import { DropOffLocationSelector } from './DropOffLocationSelector'
+import type { DropOffLocation } from './dropOffLocations'
+import { QRCodeDisplay, type QRCodeData } from './QRCode'
 
 const CATEGORIES = [
   'Electronics',
@@ -51,9 +54,19 @@ const ACTION_TYPES = [
 
 interface ItemListingFormProps {
   onComplete?: () => void
+  prefillFulfillmentMethod?: 'pickup' | 'dropoff' | null
+  prefillDropOffLocation?: DropOffLocation | null
+  onFulfillmentPrefillHandled?: () => void
+  onDropOffPrefillHandled?: () => void
 }
 
-export function ItemListingForm({ onComplete }: ItemListingFormProps) {
+export function ItemListingForm({
+  onComplete,
+  prefillFulfillmentMethod,
+  prefillDropOffLocation,
+  onFulfillmentPrefillHandled,
+  onDropOffPrefillHandled
+}: ItemListingFormProps) {
   const [user] = useKV('current-user', null)
   const [, setListings] = useKV('user-listings', [])
   const [currentStep, setCurrentStep] = useState(1)
@@ -74,6 +87,7 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showDropOffSelector, setShowDropOffSelector] = useState(false)
+  const [generatedQRCode, setGeneratedQRCode] = useState<QRCodeData | null>(null)
 
   const totalSteps = 5
   const progress = (currentStep / totalSteps) * 100
@@ -116,7 +130,7 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
     }
   }
 
-  const handleFulfillmentSelect = (method: 'pickup' | 'dropoff') => {
+  const handleFulfillmentSelect = useCallback((method: 'pickup' | 'dropoff') => {
     setFormData(prev => ({
       ...prev,
       fulfillmentMethod: method,
@@ -131,7 +145,7 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
     if (method === 'dropoff') {
       setShowDropOffSelector(true)
     }
-  }
+  }, [])
 
   const handleDropOffSelection = (location: DropOffLocation) => {
     setFormData(prev => ({
@@ -143,6 +157,26 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
     setShowDropOffSelector(false)
     toast.success(`Selected ${location.name} for drop-off`)
   }
+
+  useEffect(() => {
+    if (!prefillFulfillmentMethod) return
+
+    handleFulfillmentSelect(prefillFulfillmentMethod)
+    onFulfillmentPrefillHandled?.()
+  }, [prefillFulfillmentMethod, handleFulfillmentSelect, onFulfillmentPrefillHandled])
+
+  useEffect(() => {
+    if (!prefillDropOffLocation) return
+
+    setFormData(prev => ({
+      ...prev,
+      fulfillmentMethod: 'dropoff',
+      dropOffLocation: prefillDropOffLocation,
+      location: prefillDropOffLocation.address
+    }))
+    setShowDropOffSelector(false)
+    onDropOffPrefillHandled?.()
+  }, [prefillDropOffLocation, onDropOffPrefillHandled])
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
@@ -170,6 +204,10 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
     setIsSubmitting(true)
 
     try {
+      const carbonImpact = formData.actionType === 'recycle' ? 5
+        : formData.actionType === 'donate' ? 3
+          : 2
+
       const newListing = {
         id: `listing-${Date.now()}`,
         ...formData,
@@ -190,9 +228,6 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
 
       // Update user's carbon footprint based on action type
       if (user.carbonFootprint) {
-        const carbonImpact = formData.actionType === 'recycle' ? 5 : 
-                           formData.actionType === 'donate' ? 3 : 2
-        
         const updatedUser = {
           ...user,
           carbonFootprint: {
@@ -205,7 +240,30 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
       }
 
       toast.success('Item listed successfully!')
-      
+
+      const qrCodeData: QRCodeData = {
+        id: `qr-${Date.now()}`,
+        type: 'donor',
+        itemId: newListing.id,
+        itemTitle: newListing.title,
+        userId: user.id,
+        userName: user.name || 'Anonymous User',
+        transactionId: `TC${Date.now()}${Math.random().toString(36).slice(-6).toUpperCase()}`,
+        dropOffLocation: formData.fulfillmentMethod === 'dropoff' && formData.dropOffLocation
+          ? `${formData.dropOffLocation.name}, ${formData.dropOffLocation.postcode}`
+          : undefined,
+        metadata: {
+          category: formData.category,
+          condition: formData.condition,
+          co2Impact: carbonImpact,
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString()
+        },
+        status: 'active'
+      }
+
+      setGeneratedQRCode(qrCodeData)
+
       // Reset form
       setFormData({
         title: '',
@@ -221,14 +279,18 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
       })
       setCurrentStep(1)
 
-      if (onComplete) {
-        onComplete()
-      }
     } catch (error) {
       console.error('Failed to create listing', error)
       toast.error('Failed to create listing. Please try again.')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleQRCodeClose = () => {
+    setGeneratedQRCode(null)
+    if (onComplete) {
+      onComplete()
     }
   }
 
@@ -260,6 +322,10 @@ export function ItemListingForm({ onComplete }: ItemListingFormProps) {
 
   return (
     <>
+      {generatedQRCode && (
+        <QRCodeDisplay qrData={generatedQRCode} onClose={handleQRCodeClose} />
+      )}
+
       {showDropOffSelector && (
         <DropOffLocationSelector
           selectedLocation={formData.dropOffLocation}
