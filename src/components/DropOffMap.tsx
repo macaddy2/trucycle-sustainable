@@ -1,213 +1,276 @@
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { MapPin, Clock, Phone, NavigationArrow } from '@phosphor-icons/react'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { MapPin, Clock, Phone, NavigationArrow, Storefront, ArrowRight } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
+import { DROP_OFF_LOCATIONS, type DropOffLocation } from './dropOffLocations'
 
-interface DropOffLocation {
-  id: string
-  name: string
-  address: string
-  postcode: string
-  distance: string
-  openHours: string
-  phone: string
-  acceptedItems: string[]
-  specialServices: string[]
-  coordinates: { lat: number; lng: number }
-  verified: boolean
+interface DropOffMapProps {
+  onPlanDropOff?: (location: DropOffLocation) => void
+  highlightGuidedFlow?: boolean
 }
 
-export function DropOffMap() {
-  const [locations] = useKV<DropOffLocation[]>('dropoff-locations', [])
+const defaultCoordinateFallback = (index: number) => ({
+  x: 40 + (index % 3) * 20,
+  y: 35 + Math.floor(index / 3) * 20
+})
 
-  const getServiceBadgeColor = (service: string) => {
-    switch (service.toLowerCase()) {
-      case 'electronics recycling': return 'bg-blue-100 text-blue-800'
-      case 'furniture collection': return 'bg-green-100 text-green-800'
-      case 'large items': return 'bg-purple-100 text-purple-800'
-      case 'hazardous waste': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
+export function DropOffMap({ onPlanDropOff, highlightGuidedFlow }: DropOffMapProps) {
+  const [storedLocations] = useKV<DropOffLocation[]>('dropoff-locations', [])
+
+  const locations = useMemo(() => {
+    const merged = new Map<string, DropOffLocation>()
+    for (const location of DROP_OFF_LOCATIONS) {
+      merged.set(location.id, location)
     }
-  }
+
+    for (const location of storedLocations ?? []) {
+      merged.set(location.id, {
+        ...location,
+        coordinates: location.coordinates ?? defaultCoordinateFallback(merged.size)
+      })
+    }
+
+    return Array.from(merged.values())
+  }, [storedLocations])
+
+  const [activeLocationId, setActiveLocationId] = useState<string | null>(locations[0]?.id ?? null)
+
+  useEffect(() => {
+    if (locations.length === 0) {
+      setActiveLocationId(null)
+      return
+    }
+
+    setActiveLocationId(prev => {
+      if (prev && locations.some(location => location.id === prev)) {
+        return prev
+      }
+      return locations[0].id
+    })
+  }, [locations])
+
+  const activeLocation = activeLocationId
+    ? locations.find(location => location.id === activeLocationId) ?? locations[0]
+    : locations[0]
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-h1 text-foreground mb-2 flex items-center space-x-2">
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
           <MapPin size={32} className="text-primary" />
-          <span>Drop-off Locations</span>
-        </h1>
+          <h1 className="text-h1 text-foreground">Drop-off Locations</h1>
+          {highlightGuidedFlow && (
+            <Badge variant="secondary" className="uppercase tracking-wide">Guided flow</Badge>
+          )}
+        </div>
         <p className="text-body text-muted-foreground">
-          Find partner locations near you for item drop-offs and collections
+          Explore our partner network, confirm a convenient location, and continue to your listing with everything pre-filled.
         </p>
       </div>
 
-      {/* Map Placeholder */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="aspect-video bg-muted relative overflow-hidden rounded-lg">
-            <div className="absolute inset-0 bg-gradient-to-br from-green-100 to-blue-100 flex items-center justify-center">
-              <div className="text-center">
-                <MapPin size={48} className="text-primary mx-auto mb-4" />
-                <h3 className="text-h3 mb-2">Interactive Map Coming Soon</h3>
-                <p className="text-body text-muted-foreground">
-                  Browse locations below or use the location finder
-                </p>
-              </div>
-            </div>
-            
-            {/* Simulated map pins */}
-            <div className="absolute top-1/4 left-1/3 w-6 h-6 bg-primary rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
-            </div>
-            <div className="absolute top-1/2 right-1/4 w-6 h-6 bg-accent rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
-            </div>
-            <div className="absolute bottom-1/3 left-1/2 w-6 h-6 bg-secondary rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
-            </div>
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1">
+            <CardTitle className="text-h3 flex items-center gap-2">
+              <Storefront size={22} className="text-primary" />
+              Choose a TruCycle partner
+            </CardTitle>
+            <CardDescription>
+              Tap a location pin to preview opening hours, accepted items, and services. Confirm the partner to continue your donation.
+            </CardDescription>
           </div>
+          <Badge variant="outline" className="w-max">
+            Availability verified hourly
+          </Badge>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {locations.length === 0 ? (
+            <div className="py-16 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                <MapPin size={28} className="text-muted-foreground" />
+              </div>
+              <p className="text-body text-muted-foreground">
+                We&apos;re onboarding partner shops near you. Check back soon!
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-[1.6fr,1fr]">
+              <div className="space-y-4">
+                <div className="overflow-hidden rounded-2xl border border-primary/30 bg-background shadow-sm">
+                  <div className="flex flex-col gap-2 border-b border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-primary/90">
+                        Interactive map
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Click pins to preview details, double-click to select instantly.
+                      </p>
+                    </div>
+                    {activeLocation && (
+                      <Badge variant="secondary" className="w-max">
+                        {activeLocation.name}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="relative aspect-[4/3] bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.15),_transparent)]">
+                    <div className="pointer-events-none absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'160\' height=\'160\' viewBox=\'0 0 160 160\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 80H160M80 0V160\' stroke=\'%23E5E7EB\' stroke-opacity=\'0.6\' stroke-width=\'1\'/%3E%3C/svg%3E')] opacity-60" />
+                    {locations.map((location, index) => (
+                      <button
+                        type="button"
+                        key={location.id}
+                        className={`group absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 p-2 shadow-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary ${
+                          activeLocationId === location.id
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-primary/40 bg-background text-primary hover:border-primary'
+                        }`}
+                        style={{
+                          left: `${location.coordinates?.x ?? defaultCoordinateFallback(index).x}%`,
+                          top: `${location.coordinates?.y ?? defaultCoordinateFallback(index).y}%`
+                        }}
+                        onClick={() => setActiveLocationId(location.id)}
+                        onDoubleClick={() => onPlanDropOff?.(location)}
+                      >
+                        <MapPin size={20} weight={activeLocationId === location.id ? 'fill' : 'regular'} />
+                        <span className="absolute top-full left-1/2 mt-2 -translate-x-1/2 whitespace-nowrap rounded-full bg-background/95 px-2 py-1 text-xs font-medium text-foreground shadow group-hover:bg-primary/10">
+                          {location.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {activeLocation && (
+                    <div className="grid gap-4 border-t border-primary/10 bg-muted/40 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                      <div className="space-y-2">
+                        <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                          <Storefront size={18} className="text-primary" />
+                          {activeLocation.name}
+                        </p>
+                        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <MapPin size={14} />
+                          {activeLocation.address}
+                        </p>
+                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          <span>Postcode: {activeLocation.postcode}</span>
+                          <span>Distance: {activeLocation.distance}</span>
+                          <span>Open: {activeLocation.openHours}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 sm:justify-self-end">
+                        <Button variant="outline">
+                          <NavigationArrow size={16} className="mr-2" />
+                          Get directions
+                        </Button>
+                        <Button onClick={() => onPlanDropOff?.(activeLocation)}>
+                          <ArrowRight size={16} className="mr-2" />
+                          Use location in listing
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <ScrollArea className="h-[420px] rounded-2xl border border-border/80 bg-background">
+                <div className="divide-y">
+                  {locations.map(location => (
+                    <div
+                      key={location.id}
+                      className={`p-5 transition hover:bg-muted/60 ${activeLocationId === location.id ? 'bg-muted/80 border-l-4 border-primary/70' : ''}`}
+                      onMouseEnter={() => setActiveLocationId(location.id)}
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="flex items-center gap-2 text-base font-semibold text-foreground">
+                            {location.name}
+                            {activeLocationId === location.id && <Badge variant="secondary">Active</Badge>}
+                          </p>
+                          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <MapPin size={14} />
+                            {location.address}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                            <span>Postcode: {location.postcode}</span>
+                            <span>{location.distance}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-2 text-sm">
+                            <Clock size={14} /> {location.openHours}
+                          </span>
+                          <span className="flex items-center gap-2 text-sm">
+                            <Phone size={14} /> {location.phone}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 space-y-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accepted Items</p>
+                          <div className="mt-1 flex flex-wrap gap-2">
+                            {location.acceptedItems.map(item => (
+                              <Badge key={item} variant="outline" className="text-xs">
+                                {item}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+
+                        {location.specialServices.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amenities</p>
+                            <div className="mt-1 flex flex-wrap gap-2">
+                              {location.specialServices.map(service => (
+                                <Badge key={service} className="bg-primary/10 text-primary">
+                                  {service}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <Button variant="ghost" size="sm" className="justify-start sm:justify-center">
+                          <NavigationArrow size={16} className="mr-2" />
+                          Get directions
+                        </Button>
+                        <Button onClick={() => onPlanDropOff?.(location)}>
+                          Plan drop-off here
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Location List */}
-      {(locations?.length || 0) === 0 ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-              <MapPin size={32} className="text-muted-foreground" />
-            </div>
-            <h3 className="text-h3 mb-2">No locations found</h3>
-            <p className="text-body text-muted-foreground mb-4">
-              We're working on adding partner locations in your area
-            </p>
-            <Button>Request New Location</Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {(locations || []).map((location) => (
-            <Card key={location.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-h3 flex items-center space-x-2">
-                      <span>{location.name}</span>
-                      {location.verified && (
-                        <Badge variant="secondary" className="ml-2">✓ Verified</Badge>
-                      )}
-                    </CardTitle>
-                    <CardDescription className="flex items-center space-x-1 mt-1">
-                      <MapPin size={14} />
-                      <span>{location.distance} away</span>
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-4">
-                {/* Address */}
-                <div>
-                  <p className="text-body">{location.address}</p>
-                  <p className="text-small text-muted-foreground">{location.postcode}</p>
-                </div>
-
-                {/* Hours and Contact */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div className="flex items-center space-x-1 text-small text-muted-foreground">
-                    <Clock size={14} />
-                    <span>{location.openHours}</span>
-                  </div>
-                  <div className="flex items-center space-x-1 text-small text-muted-foreground">
-                    <Phone size={14} />
-                    <span>{location.phone}</span>
-                  </div>
-                </div>
-
-                {/* Accepted Items */}
-                <div>
-                  <p className="text-small font-medium mb-2">Accepted Items:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {location.acceptedItems.map((item, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {item}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Special Services */}
-                {location.specialServices.length > 0 && (
-                  <div>
-                    <p className="text-small font-medium mb-2">Special Services:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {location.specialServices.map((service, index) => (
-                        <Badge 
-                          key={index} 
-                          className={getServiceBadgeColor(service)}
-                        >
-                          {service}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex space-x-2 pt-2">
-                  <Button variant="outline" className="flex-1">
-                    <NavigationArrow size={16} className="mr-2" />
-                    Directions
-                  </Button>
-                  <Button className="flex-1">
-                    Select Location
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Instructions */}
-      <Card className="bg-accent/5 border-accent/20">
+      <Card className="border-accent/20 bg-accent/5">
         <CardHeader>
-          <CardTitle className="text-h3">Drop-off Instructions</CardTitle>
+          <CardTitle className="text-h3">How the drop-off flow works</CardTitle>
+          <CardDescription>
+            Follow these quick steps to finish your donation with a QR hand-off.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-accent text-accent-foreground rounded-full flex items-center justify-center text-small font-bold">
-                1
-              </div>
-              <p className="text-body">
-                Select a location that accepts your type of item
-              </p>
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="space-y-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-foreground font-semibold">1</div>
+              <p className="text-body font-medium">Pick a partner location that accepts your item type.</p>
             </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-accent text-accent-foreground rounded-full flex items-center justify-center text-small font-bold">
-                2
-              </div>
-              <p className="text-body">
-                Ensure your item is clean and in the described condition
-              </p>
+            <div className="space-y-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-foreground font-semibold">2</div>
+              <p className="text-body font-medium">Continue to the listing form with drop-off details pre-filled.</p>
             </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-accent text-accent-foreground rounded-full flex items-center justify-center text-small font-bold">
-                3
-              </div>
-              <p className="text-body">
-                Bring your QR code (generated after item is claimed) to the location
-              </p>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-accent text-accent-foreground rounded-full flex items-center justify-center text-small font-bold">
-                4
-              </div>
-              <p className="text-body">
-                Staff will scan your code and provide a receipt for your environmental impact
-              </p>
+            <div className="space-y-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-foreground font-semibold">3</div>
+              <p className="text-body font-medium">Submit your listing to generate a QR code for fast check-in.</p>
             </div>
           </div>
         </CardContent>

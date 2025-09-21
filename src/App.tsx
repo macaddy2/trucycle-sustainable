@@ -8,6 +8,7 @@ import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, Plus, User,
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
 import { ItemListing, ItemListingForm, ProfileDashboard, DropOffMap, CarbonTracker, ShopScanner, DemoGuide } from './components'
+import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
 import { useInitializeSampleData, useRecommendationNotifications } from '@/hooks'
@@ -41,6 +42,7 @@ function App() {
   const [showShopScanner, setShowShopScanner] = useState(false)
   const [showDemoGuide] = useKV<boolean>('show-demo-guide', true)
   const [pendingFulfillmentMethod, setPendingFulfillmentMethod] = useState<'pickup' | 'dropoff' | null>(null)
+  const [pendingDropOffLocation, setPendingDropOffLocation] = useState<DropOffLocation | null>(null)
   
   const { initializeSampleChats } = useInitializeSampleData()
   const { unreadCount, triggerUrgentNotifications } = useRecommendationNotifications(user ?? null)
@@ -139,6 +141,17 @@ function App() {
 
   const handleDonationFlowStart = (method: 'pickup' | 'dropoff') => {
     setPendingFulfillmentMethod(method)
+    if (method === 'dropoff') {
+      setPendingDropOffLocation(null)
+      setCurrentTab('dropoff')
+    } else {
+      setCurrentTab('list')
+    }
+  }
+
+  const handleDropOffPlanned = (location: DropOffLocation) => {
+    setPendingFulfillmentMethod('dropoff')
+    setPendingDropOffLocation(location)
     setCurrentTab('list')
   }
 
@@ -293,12 +306,17 @@ function App() {
             <ItemListingForm
               onComplete={() => setCurrentTab('browse')}
               prefillFulfillmentMethod={pendingFulfillmentMethod}
+              prefillDropOffLocation={pendingDropOffLocation}
               onFulfillmentPrefillHandled={() => setPendingFulfillmentMethod(null)}
+              onDropOffPrefillHandled={() => setPendingDropOffLocation(null)}
             />
           </TabsContent>
 
           <TabsContent value="dropoff">
-            <DropOffMap />
+            <DropOffMap
+              onPlanDropOff={handleDropOffPlanned}
+              highlightGuidedFlow={pendingFulfillmentMethod === 'dropoff'}
+            />
           </TabsContent>
 
           <TabsContent value="impact">

@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import { Plus, Camera, MapPin, Recycle, Heart, ArrowsClockwise, Truck, Storefront } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
-import { DropOffLocationSelector, DropOffLocation } from './DropOffLocationSelector'
+import { DropOffLocationSelector } from './DropOffLocationSelector'
+import type { DropOffLocation } from './dropOffLocations'
 import { QRCodeDisplay, type QRCodeData } from './QRCode'
 
 const CATEGORIES = [
@@ -54,10 +55,18 @@ const ACTION_TYPES = [
 interface ItemListingFormProps {
   onComplete?: () => void
   prefillFulfillmentMethod?: 'pickup' | 'dropoff' | null
+  prefillDropOffLocation?: DropOffLocation | null
   onFulfillmentPrefillHandled?: () => void
+  onDropOffPrefillHandled?: () => void
 }
 
-export function ItemListingForm({ onComplete, prefillFulfillmentMethod, onFulfillmentPrefillHandled }: ItemListingFormProps) {
+export function ItemListingForm({
+  onComplete,
+  prefillFulfillmentMethod,
+  prefillDropOffLocation,
+  onFulfillmentPrefillHandled,
+  onDropOffPrefillHandled
+}: ItemListingFormProps) {
   const [user] = useKV('current-user', null)
   const [, setListings] = useKV('user-listings', [])
   const [currentStep, setCurrentStep] = useState(1)
@@ -155,6 +164,19 @@ export function ItemListingForm({ onComplete, prefillFulfillmentMethod, onFulfil
     handleFulfillmentSelect(prefillFulfillmentMethod)
     onFulfillmentPrefillHandled?.()
   }, [prefillFulfillmentMethod, handleFulfillmentSelect, onFulfillmentPrefillHandled])
+
+  useEffect(() => {
+    if (!prefillDropOffLocation) return
+
+    setFormData(prev => ({
+      ...prev,
+      fulfillmentMethod: 'dropoff',
+      dropOffLocation: prefillDropOffLocation,
+      location: prefillDropOffLocation.address
+    }))
+    setShowDropOffSelector(false)
+    onDropOffPrefillHandled?.()
+  }, [prefillDropOffLocation, onDropOffPrefillHandled])
 
   const nextStep = () => {
     if (validateStep(currentStep)) {

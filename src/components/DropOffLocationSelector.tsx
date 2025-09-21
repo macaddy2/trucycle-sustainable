@@ -4,19 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MapPin, Clock, Phone, NavigationArrow, Storefront, XCircle } from '@phosphor-icons/react'
-
-export interface DropOffLocation {
-  id: string
-  name: string
-  address: string
-  postcode: string
-  distance: string
-  openHours: string
-  phone: string
-  acceptedItems: string[]
-  specialServices: string[]
-  coordinates: { x: number; y: number }
-}
+import { DROP_OFF_LOCATIONS, type DropOffLocation } from './dropOffLocations'
 
 interface DropOffLocationSelectorProps {
   selectedLocation: DropOffLocation | null
@@ -24,47 +12,8 @@ interface DropOffLocationSelectorProps {
   onClose: () => void
 }
 
-const SAMPLE_LOCATIONS: DropOffLocation[] = [
-  {
-    id: 'loc-1',
-    name: 'Camden Circular Hub',
-    address: '145 Camden High Street, London',
-    postcode: 'NW1 7JX',
-    distance: '0.5 miles',
-    openHours: 'Mon-Sat 9:00 - 19:00',
-    phone: '020 7946 0123',
-    acceptedItems: ['Clothing', 'Books', 'Small Electronics'],
-    specialServices: ['Same-day donation receipt', 'Textile recycling bin'],
-    coordinates: { x: 42, y: 38 }
-  },
-  {
-    id: 'loc-2',
-    name: 'Greenway Reuse Depot',
-    address: '28 Holloway Road, London',
-    postcode: 'N7 8JL',
-    distance: '1.2 miles',
-    openHours: 'Daily 8:00 - 20:00',
-    phone: '020 7450 2200',
-    acceptedItems: ['Furniture', 'Appliances', 'DIY Tools'],
-    specialServices: ['Large item assistance', 'Evening drop-off slots'],
-    coordinates: { x: 58, y: 52 }
-  },
-  {
-    id: 'loc-3',
-    name: 'Shoreditch Sharing Space',
-    address: '92 Brick Lane, London',
-    postcode: 'E1 6RL',
-    distance: '2.4 miles',
-    openHours: 'Wed-Sun 10:00 - 18:00',
-    phone: '020 7301 0099',
-    acceptedItems: ['Home Decor', 'Art Supplies', 'Bikes'],
-    specialServices: ['Weekend workshops', 'Secure bike storage'],
-    coordinates: { x: 68, y: 28 }
-  }
-]
-
 export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }: DropOffLocationSelectorProps) {
-  const [activeLocationId, setActiveLocationId] = useState<string>(selectedLocation?.id ?? SAMPLE_LOCATIONS[0].id)
+  const [activeLocationId, setActiveLocationId] = useState<string>(selectedLocation?.id ?? DROP_OFF_LOCATIONS[0].id)
 
   useEffect(() => {
     if (selectedLocation) {
@@ -72,7 +21,7 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
     }
   }, [selectedLocation])
 
-  const activeLocation = SAMPLE_LOCATIONS.find(location => location.id === activeLocationId) ?? SAMPLE_LOCATIONS[0]
+  const activeLocation = DROP_OFF_LOCATIONS.find(location => location.id === activeLocationId) ?? DROP_OFF_LOCATIONS[0]
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-background/80 backdrop-blur-sm p-4 md:p-10 overflow-y-auto">
@@ -116,7 +65,7 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
 
                 <div className="relative aspect-[4/3] bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.15),_transparent)]">
                   <div className="pointer-events-none absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'160\' height=\'160\' viewBox=\'0 0 160 160\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 80H160M80 0V160\' stroke=\'%23E5E7EB\' stroke-opacity=\'0.6\' stroke-width=\'1\'/%3E%3C/svg%3E')] opacity-60" />
-                  {SAMPLE_LOCATIONS.map(location => (
+                  {DROP_OFF_LOCATIONS.map(location => (
                     <button
                       type="button"
                       key={location.id}
@@ -164,7 +113,7 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
 
             <ScrollArea className="h-[420px] rounded-2xl border border-border/80 bg-background">
               <div className="divide-y">
-                {SAMPLE_LOCATIONS.map(location => (
+                {DROP_OFF_LOCATIONS.map(location => (
                   <div
                     key={location.id}
                     className={`p-5 transition hover:bg-muted/60 ${
