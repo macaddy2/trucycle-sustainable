@@ -111,6 +111,8 @@ export function ProfileDashboard() {
   const profileInitials = user.name
     ? user.name.split(' ').map((segment) => segment[0]).join('').toUpperCase()
     : 'U'
+  const avatarSeed = encodeURIComponent(user.email || user.name || 'TruCycle user')
+  const avatarAltText = user.name || user.email || 'TruCycle user avatar'
 
   return (
     <div className="space-y-6">
@@ -119,7 +121,7 @@ export function ProfileDashboard() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
               <Avatar className="w-16 h-16">
-                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} alt={user.name} />
+                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`} alt={avatarAltText} />
                 <AvatarFallback>{profileInitials}</AvatarFallback>
               </Avatar>
               <div>
