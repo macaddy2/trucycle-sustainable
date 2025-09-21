@@ -11,6 +11,7 @@ import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
 import { DropOffLocationSelector } from './DropOffLocationSelector'
 import type { DropOffLocation } from './dropOffLocations'
+import { sendListingSubmissionEmails } from '@/lib/emailAlerts'
 import { QRCodeDisplay, type QRCodeData } from './QRCode'
 
 const CATEGORIES = [
@@ -213,7 +214,10 @@ export function ItemListingForm({
         ...formData,
         userId: user.id,
         userName: user.name || 'Anonymous User',
-        status: 'active',
+        status:
+          formData.fulfillmentMethod === 'dropoff'
+            ? 'pending_dropoff'
+            : 'active',
         createdAt: new Date().toISOString(),
         views: 0,
         interested: []
@@ -240,6 +244,25 @@ export function ItemListingForm({
       }
 
       toast.success('Item listed successfully!')
+
+      const emailResults = await sendListingSubmissionEmails(
+        { name: user.name || 'Donor', email: user.email },
+        formData.fulfillmentMethod === 'dropoff' ? formData.dropOffLocation ?? null : null,
+        {
+          id: newListing.id,
+          title: newListing.title,
+          category: newListing.category,
+          description: newListing.description,
+          fulfillmentMethod: formData.fulfillmentMethod,
+          dropOffLocation: formData.dropOffLocation
+        }
+      )
+
+      if (emailResults.length > 0) {
+        toast.success('Email alerts sent to donor and partner shop')
+      } else {
+        toast.info('Listing saved. Email alerts could not be sent automatically.')
+      }
 
       const qrCodeData: QRCodeData = {
         id: `qr-${Date.now()}`,

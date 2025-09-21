@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -31,21 +31,54 @@ interface UserProfile {
   }
 }
 
+type ListingStatus = 'active' | 'claimed' | 'collected' | 'expired' | 'pending_dropoff'
+type ProfileTab = 'overview' | 'listings' | 'recommendations' | 'impact'
+
 interface ListedItem {
   id: string
   title: string
-  status: 'active' | 'claimed' | 'collected' | 'expired'
+  status: ListingStatus
   category: string
   createdAt: string
   actionType: 'exchange' | 'donate' | 'recycle'
   co2Impact?: number
 }
 
-export function ProfileDashboard() {
+interface ProfileDashboardProps {
+  focusTab?: ProfileTab
+  onTabChange?: (tab: ProfileTab) => void
+}
+
+const STATUS_LABELS: Record<ListingStatus, string> = {
+  active: 'Active',
+  claimed: 'Claimed',
+  collected: 'Collected',
+  expired: 'Expired',
+  pending_dropoff: 'Pending dropoff'
+}
+
+const STATUS_BADGE_VARIANT: Record<ListingStatus, 'default' | 'secondary' | 'outline' | 'destructive'> = {
+  active: 'default',
+  claimed: 'secondary',
+  collected: 'outline',
+  expired: 'destructive',
+  pending_dropoff: 'secondary'
+}
+
+export function ProfileDashboard({ focusTab = 'overview', onTabChange }: ProfileDashboardProps) {
   const [user, setUser] = useKV<UserProfile | null>('current-user', null)
   const [listings] = useKV<ListedItem[]>('user-listings', [])
   const [showAuthDialog, setShowAuthDialog] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'listings' | 'recommendations' | 'impact'>('overview')
+  const [activeTab, setActiveTab] = useState<ProfileTab>(focusTab)
+
+  useEffect(() => {
+    setActiveTab(focusTab)
+  }, [focusTab])
+
+  const handleTabChange = (value: ProfileTab) => {
+    setActiveTab(value)
+    onTabChange?.(value)
+  }
 
   const verificationStats = useMemo(() => {
     if (!user) {
@@ -81,7 +114,7 @@ export function ProfileDashboard() {
 
   const handleCompleteSetup = () => {
     toast.info('Opening setup checklist...')
-    setActiveTab('overview')
+    handleTabChange('overview')
   }
 
   if (!user) {
@@ -162,7 +195,7 @@ export function ProfileDashboard() {
         </CardHeader>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
+      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as ProfileTab)}>
         <TabsList className="grid grid-cols-4 md:w-auto md:inline-flex">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="listings">My listings</TabsTrigger>
@@ -212,7 +245,7 @@ export function ProfileDashboard() {
                       <li key={item.id} className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{item.title}</p>
-                          <p className="text-xs text-muted-foreground capitalize">{item.status} • {item.category}</p>
+                          <p className="text-xs text-muted-foreground">{STATUS_LABELS[item.status]} • {item.category}</p>
                         </div>
                         <Badge variant="outline" className="capitalize">{item.actionType}</Badge>
                       </li>
@@ -269,12 +302,13 @@ export function ProfileDashboard() {
                       <CardContent className="flex flex-col gap-2 p-4 md:flex-row md:items-center md:justify-between">
                         <div>
                           <p className="font-medium">{item.title}</p>
-                          <p className="text-xs text-muted-foreground capitalize">
-                            {item.status} • {item.category} • {new Date(item.createdAt).toLocaleDateString()}
+                          <p className="text-xs text-muted-foreground">
+                            {STATUS_LABELS[item.status]} • {item.category} • {new Date(item.createdAt).toLocaleDateString()}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="capitalize">{item.actionType}</Badge>
+                          <Badge variant={STATUS_BADGE_VARIANT[item.status]}>{STATUS_LABELS[item.status]}</Badge>
                           <Button size="sm" variant="outline">View</Button>
                           <Button size="sm">Manage</Button>
                         </div>

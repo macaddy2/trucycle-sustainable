@@ -43,6 +43,7 @@ function App() {
   const [showDemoGuide] = useKV<boolean>('show-demo-guide', true)
   const [pendingFulfillmentMethod, setPendingFulfillmentMethod] = useState<'pickup' | 'dropoff' | null>(null)
   const [pendingDropOffLocation, setPendingDropOffLocation] = useState<DropOffLocation | null>(null)
+  const [profileFocusTab, setProfileFocusTab] = useState<'overview' | 'listings' | 'recommendations' | 'impact'>('overview')
   
   const { initializeSampleChats } = useInitializeSampleData()
   const { unreadCount, triggerUrgentNotifications } = useRecommendationNotifications(user ?? null)
@@ -304,7 +305,10 @@ function App() {
 
           <TabsContent value="list">
             <ItemListingForm
-              onComplete={() => setCurrentTab('browse')}
+              onComplete={() => {
+                setProfileFocusTab('listings')
+                setCurrentTab('profile')
+              }}
               prefillFulfillmentMethod={pendingFulfillmentMethod}
               prefillDropOffLocation={pendingDropOffLocation}
               onFulfillmentPrefillHandled={() => setPendingFulfillmentMethod(null)}
@@ -331,7 +335,7 @@ function App() {
                 userName={user?.name && typeof user.name === 'string' ? user.name.split(' ')[0] : 'User'}
               />
             )}
-            <ProfileDashboard />
+            <ProfileDashboard focusTab={profileFocusTab} onTabChange={setProfileFocusTab} />
           </TabsContent>
         </Tabs>
       </main>
