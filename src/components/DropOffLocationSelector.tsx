@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +15,7 @@ export interface DropOffLocation {
   phone: string
   acceptedItems: string[]
   specialServices: string[]
+  coordinates: { x: number; y: number }
 }
 
 interface DropOffLocationSelectorProps {
@@ -32,7 +34,8 @@ const SAMPLE_LOCATIONS: DropOffLocation[] = [
     openHours: 'Mon-Sat 9:00 - 19:00',
     phone: '020 7946 0123',
     acceptedItems: ['Clothing', 'Books', 'Small Electronics'],
-    specialServices: ['Same-day donation receipt', 'Textile recycling bin']
+    specialServices: ['Same-day donation receipt', 'Textile recycling bin'],
+    coordinates: { x: 42, y: 38 }
   },
   {
     id: 'loc-2',
@@ -43,7 +46,8 @@ const SAMPLE_LOCATIONS: DropOffLocation[] = [
     openHours: 'Daily 8:00 - 20:00',
     phone: '020 7450 2200',
     acceptedItems: ['Furniture', 'Appliances', 'DIY Tools'],
-    specialServices: ['Large item assistance', 'Evening drop-off slots']
+    specialServices: ['Large item assistance', 'Evening drop-off slots'],
+    coordinates: { x: 58, y: 52 }
   },
   {
     id: 'loc-3',
@@ -54,11 +58,22 @@ const SAMPLE_LOCATIONS: DropOffLocation[] = [
     openHours: 'Wed-Sun 10:00 - 18:00',
     phone: '020 7301 0099',
     acceptedItems: ['Home Decor', 'Art Supplies', 'Bikes'],
-    specialServices: ['Weekend workshops', 'Secure bike storage']
+    specialServices: ['Weekend workshops', 'Secure bike storage'],
+    coordinates: { x: 68, y: 28 }
   }
 ]
 
 export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }: DropOffLocationSelectorProps) {
+  const [activeLocationId, setActiveLocationId] = useState<string>(selectedLocation?.id ?? SAMPLE_LOCATIONS[0].id)
+
+  useEffect(() => {
+    if (selectedLocation) {
+      setActiveLocationId(selectedLocation.id)
+    }
+  }, [selectedLocation])
+
+  const activeLocation = SAMPLE_LOCATIONS.find(location => location.id === activeLocationId) ?? SAMPLE_LOCATIONS[0]
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-background/80 backdrop-blur-sm p-4 md:p-10 overflow-y-auto">
       <Card className="w-full max-w-5xl shadow-2xl border-primary/30">
@@ -68,8 +83,13 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
               <Storefront size={28} className="text-primary" />
               <span>Select a drop-off partner</span>
             </CardTitle>
-            <CardDescription>
-              Choose a trusted TruCycle partner location that best matches your item and travel plans.
+            <CardDescription className="mt-2 space-y-1">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-primary">
+                Step 2 of 3 — Choose a drop-off partner
+              </span>
+              <span>
+                Explore trusted TruCycle partners with real-time availability, amenities, and travel-friendly insights.
+              </span>
             </CardDescription>
           </div>
           <Button variant="ghost" onClick={onClose} className="self-end md:self-start">
@@ -77,90 +97,134 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
           </Button>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="aspect-video bg-muted rounded-xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/20" />
-            <div className="relative z-10 flex h-full items-center justify-center">
-              <div className="text-center max-w-md space-y-2">
-                <MapPin size={40} className="mx-auto text-primary" />
-                <h3 className="text-h3">Interactive map coming soon</h3>
-                <p className="text-sm text-muted-foreground">
-                  Explore the featured partner list below to secure your drop-off spot.
-                </p>
+          <div className="grid gap-6 lg:grid-cols-[1.6fr,1fr]">
+            <div className="space-y-4">
+              <div className="overflow-hidden rounded-2xl border border-primary/30 bg-background shadow-sm">
+                <div className="flex flex-col gap-2 border-b border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-primary/90">
+                      Choose a partner on the map
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Tap a pin to preview details, then confirm the location for your QR code hand-off.
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="w-max">
+                    Live availability checked hourly
+                  </Badge>
+                </div>
+
+                <div className="relative aspect-[4/3] bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.15),_transparent)]">
+                  <div className="pointer-events-none absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'160\' height=\'160\' viewBox=\'0 0 160 160\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 80H160M80 0V160\' stroke=\'%23E5E7EB\' stroke-opacity=\'0.6\' stroke-width=\'1\'/%3E%3C/svg%3E')] opacity-60" />
+                  {SAMPLE_LOCATIONS.map(location => (
+                    <button
+                      type="button"
+                      key={location.id}
+                      className={`group absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 p-2 shadow-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary ${
+                        selectedLocation?.id === location.id || activeLocationId === location.id
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-primary/40 bg-background text-primary hover:border-primary'
+                      }`}
+                      style={{ left: `${location.coordinates.x}%`, top: `${location.coordinates.y}%` }}
+                      onClick={() => setActiveLocationId(location.id)}
+                      onDoubleClick={() => onSelect(location)}
+                    >
+                      <MapPin size={20} weight={selectedLocation?.id === location.id || activeLocationId === location.id ? 'fill' : 'regular'} />
+                      <span className="absolute top-full left-1/2 mt-2 -translate-x-1/2 whitespace-nowrap rounded-full bg-background/95 px-2 py-1 text-xs font-medium text-foreground shadow group-hover:bg-primary/10">
+                        {location.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {activeLocation && (
+                  <div className="grid gap-4 border-t border-primary/10 bg-muted/40 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                        <Storefront size={18} className="text-primary" />
+                        {activeLocation.name}
+                      </p>
+                      <p className="text-sm text-muted-foreground flex items-center gap-2">
+                        <MapPin size={14} />
+                        {activeLocation.address}
+                      </p>
+                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span>Postcode: {activeLocation.postcode}</span>
+                        <span>Distance: {activeLocation.distance}</span>
+                        <span>Hours: {activeLocation.openHours}</span>
+                      </div>
+                    </div>
+                    <Button className="justify-self-end" onClick={() => onSelect(activeLocation)}>
+                      Confirm drop-off here
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
-            {/* Decorative pins */}
-            <div className="absolute top-1/4 left-1/3 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-primary shadow-lg" />
-            <div className="absolute bottom-1/4 right-1/4 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-secondary shadow-lg" />
-            <div className="absolute top-2/3 right-1/3 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-accent shadow-lg" />
-          </div>
 
-          <ScrollArea className="h-[360px] pr-4">
-            <div className="grid grid-cols-1 gap-4">
-              {SAMPLE_LOCATIONS.map(location => (
-                <Card
-                  key={location.id}
-                  className={`transition-all ${
-                    selectedLocation?.id === location.id ? 'border-primary shadow-lg ring-2 ring-primary/20' : 'hover:border-primary/50'
-                  }`}
-                >
-                  <CardContent className="space-y-4 p-6">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <ScrollArea className="h-[420px] rounded-2xl border border-border/80 bg-background">
+              <div className="divide-y">
+                {SAMPLE_LOCATIONS.map(location => (
+                  <div
+                    key={location.id}
+                    className={`p-5 transition hover:bg-muted/60 ${
+                      activeLocationId === location.id ? 'bg-muted/80 border-l-4 border-primary/70' : ''
+                    }`}
+                    onMouseEnter={() => setActiveLocationId(location.id)}
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <h4 className="text-lg font-semibold flex items-center gap-2">
+                        <p className="text-base font-semibold text-foreground flex items-center gap-2">
                           {location.name}
-                          {selectedLocation?.id === location.id && (
-                            <Badge variant="secondary">Selected</Badge>
-                          )}
-                        </h4>
-                        <p className="text-sm text-muted-foreground flex items-center gap-2">
-                          <MapPin size={16} />
-                          <span>{location.address}</span>
+                          {selectedLocation?.id === location.id && <Badge variant="secondary">Selected</Badge>}
                         </p>
-                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mt-2">
+                        <p className="text-sm text-muted-foreground flex items-center gap-2">
+                          <MapPin size={14} />
+                          {location.address}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                           <span>Postcode: {location.postcode}</span>
-                          <span>Distance: {location.distance}</span>
+                          <span>{location.distance}</span>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-2 text-sm text-muted-foreground min-w-[180px]">
-                        <span className="flex items-center gap-2">
-                          <Clock size={16} /> {location.openHours}
+                      <div className="flex flex-col gap-2 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-2 text-sm">
+                          <Clock size={14} /> {location.openHours}
                         </span>
-                        <span className="flex items-center gap-2">
-                          <Phone size={16} /> {location.phone}
+                        <span className="flex items-center gap-2 text-sm">
+                          <Phone size={14} /> {location.phone}
                         </span>
                       </div>
                     </div>
 
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                        Accepted Items
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {location.acceptedItems.map(item => (
-                          <Badge key={item} variant="outline" className="text-xs">
-                            {item}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-
-                    {location.specialServices.length > 0 && (
+                    <div className="mt-3 space-y-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                          Amenities & Services
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {location.specialServices.map(service => (
-                            <Badge key={service} className="bg-primary/10 text-primary">
-                              {service}
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Accepted Items</p>
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {location.acceptedItems.map(item => (
+                            <Badge key={item} variant="outline" className="text-xs">
+                              {item}
                             </Badge>
                           ))}
                         </div>
                       </div>
-                    )}
 
-                    <div className="flex flex-col-reverse gap-2 md:flex-row md:items-center md:justify-between">
-                      <Button variant="ghost" size="sm" className="justify-start md:justify-center">
+                      {location.specialServices.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amenities</p>
+                          <div className="mt-1 flex flex-wrap gap-2">
+                            {location.specialServices.map(service => (
+                              <Badge key={service} className="bg-primary/10 text-primary">
+                                {service}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <Button variant="ghost" size="sm" className="justify-start sm:justify-center">
                         <NavigationArrow size={16} className="mr-2" />
                         Get directions
                       </Button>
@@ -168,11 +232,11 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
                         {selectedLocation?.id === location.id ? 'Keep this location' : 'Select this partner'}
                       </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </ScrollArea>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
         </CardContent>
       </Card>
     </div>

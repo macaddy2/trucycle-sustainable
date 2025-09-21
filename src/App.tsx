@@ -40,6 +40,7 @@ function App() {
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [showShopScanner, setShowShopScanner] = useState(false)
   const [showDemoGuide] = useKV<boolean>('show-demo-guide', true)
+  const [pendingFulfillmentMethod, setPendingFulfillmentMethod] = useState<'pickup' | 'dropoff' | null>(null)
   
   const { initializeSampleChats } = useInitializeSampleData()
   const { unreadCount, triggerUrgentNotifications } = useRecommendationNotifications(user ?? null)
@@ -134,6 +135,11 @@ function App() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     // Search functionality will be implemented in ItemListing component
+  }
+
+  const handleDonationFlowStart = (method: 'pickup' | 'dropoff') => {
+    setPendingFulfillmentMethod(method)
+    setCurrentTab('list')
   }
 
   // If in shop scanner mode, render only the scanner
@@ -280,11 +286,15 @@ function App() {
       <main className="container mx-auto px-4 py-8">
         <Tabs value={currentTab} onValueChange={setCurrentTab}>
           <TabsContent value="browse">
-            <ItemListing searchQuery={searchQuery} />
+            <ItemListing searchQuery={searchQuery} onStartDonationFlow={handleDonationFlowStart} />
           </TabsContent>
-          
+
           <TabsContent value="list">
-            <ItemListingForm onComplete={() => setCurrentTab('browse')} />
+            <ItemListingForm
+              onComplete={() => setCurrentTab('browse')}
+              prefillFulfillmentMethod={pendingFulfillmentMethod}
+              onFulfillmentPrefillHandled={() => setPendingFulfillmentMethod(null)}
+            />
           </TabsContent>
 
           <TabsContent value="dropoff">

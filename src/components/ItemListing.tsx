@@ -4,7 +4,18 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Heart, MapPin, ArrowsClockwise, Clock, Package, ChatCircle, Recycle } from '@phosphor-icons/react'
+import {
+  Heart,
+  MapPin,
+  ArrowsClockwise,
+  Clock,
+  Package,
+  ChatCircle,
+  Recycle,
+  Truck,
+  Storefront,
+  ArrowRight
+} from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { useMessaging } from '@/hooks'
 import { VerificationBadge } from './VerificationBadge'
@@ -139,9 +150,10 @@ const actionIcon = {
 
 interface ItemListingProps {
   searchQuery: string
+  onStartDonationFlow?: (method: 'pickup' | 'dropoff') => void
 }
 
-export function ItemListing({ searchQuery }: ItemListingProps) {
+export function ItemListing({ searchQuery, onStartDonationFlow }: ItemListingProps) {
   const [currentUser] = useKV<UserProfile | null>('current-user', null)
   const [globalListings] = useKV<ListingItem[]>('global-listings', [])
   const [items, setItems] = useState<ListingItem[]>([])
@@ -241,6 +253,38 @@ export function ItemListing({ searchQuery }: ItemListingProps) {
           Discover sustainable opportunities in your community
         </p>
       </div>
+
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-2">
+            <CardTitle className="text-h3 flex items-center gap-2">
+              <ArrowRight size={20} className="text-primary" />
+              <span>Start a donation in three easy steps</span>
+            </CardTitle>
+            <CardDescription className="max-w-2xl">
+              Decide how you want to hand over your item, pick a convenient drop-off partner if needed, then submit your
+              listing to generate a QR code for a smooth hand-off.
+            </CardDescription>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button
+              variant="outline"
+              className="flex-1 min-w-[180px]"
+              onClick={() => onStartDonationFlow?.('pickup')}
+            >
+              <Truck size={18} className="mr-2" />
+              <span>Arrange a pick up</span>
+            </Button>
+            <Button
+              className="flex-1 min-w-[180px]"
+              onClick={() => onStartDonationFlow?.('dropoff')}
+            >
+              <Storefront size={18} className="mr-2" />
+              <span>Drop off at a partner</span>
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
 
       <Card>
         <CardHeader>
