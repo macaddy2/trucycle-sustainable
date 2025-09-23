@@ -11,6 +11,7 @@ import { ItemListing, ItemListingForm, ProfileDashboard, DropOffMap, CarbonTrack
 import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
+import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import { useInitializeSampleData, useRecommendationNotifications } from '@/hooks'
 import type { ListingCompletionDetails } from './components/ItemListingForm'
 
@@ -44,8 +45,9 @@ function App() {
   const [showDemoGuide] = useKV<boolean>('show-demo-guide', true)
   const [pendingFulfillmentMethod, setPendingFulfillmentMethod] = useState<'pickup' | 'dropoff' | null>(null)
   const [pendingDropOffLocation, setPendingDropOffLocation] = useState<DropOffLocation | null>(null)
-  const [profileInitialTab, setProfileInitialTab] = useState<'overview' | 'listings' | 'recommendations' | 'impact'>('overview')
-  const [profileHighlightListingId, setProfileHighlightListingId] = useState<string | null>(null)
+  const [messageCenterView, setMessageCenterView] = useState<'chats' | 'requests'>('chats')
+  const [messageCenterItemId, setMessageCenterItemId] = useState<string | undefined>()
+  const [messageCenterChatId, setMessageCenterChatId] = useState<string | undefined>()
   
   const { initializeSampleChats } = useInitializeSampleData()
   const { unreadCount, triggerUrgentNotifications } = useRecommendationNotifications(user ?? null)
@@ -71,6 +73,43 @@ function App() {
       initializeSampleChats()
     }
   }, [initializeSampleChats, user])
+
+  useEffect(() => {
+    const handleClaimRequested = (event: Event) => {
+      const detail = (event as CustomEvent<{ request: ClaimRequest }>).detail
+      if (user && detail.request.donorId === user.id) {
+        toast.info(`${detail.request.collectorName} wants "${detail.request.itemTitle}"`)
+        handleOpenMessages({ itemId: detail.request.itemId, initialView: 'requests' })
+      }
+    }
+
+    const handleClaimApproved = (event: Event) => {
+      const detail = (event as CustomEvent<{ request: ClaimRequest; chatId?: string }>).detail
+      if (user && detail.request.collectorId === user.id) {
+        toast.success(`Your request for "${detail.request.itemTitle}" was approved!`)
+        handleOpenMessages({ itemId: detail.request.itemId, chatId: detail.chatId, initialView: 'chats' })
+      }
+    }
+
+    const handleCollectionConfirmed = (event: Event) => {
+      const detail = (event as CustomEvent<{ request: ClaimRequest; rewardPoints: number }>).detail
+      if (user && detail.request.donorId === user.id) {
+        toast.success(`Collection confirmed! ${detail.rewardPoints} GreenPoints added to your rewards.`)
+      } else if (user && detail.request.collectorId === user.id) {
+        toast.success(`Thanks for collecting "${detail.request.itemTitle}". Enjoy your new item!`)
+      }
+    }
+
+    window.addEventListener('exchange-claim-requested', handleClaimRequested as EventListener)
+    window.addEventListener('exchange-claim-approved', handleClaimApproved as EventListener)
+    window.addEventListener('exchange-collection-confirmed', handleCollectionConfirmed as EventListener)
+
+    return () => {
+      window.removeEventListener('exchange-claim-requested', handleClaimRequested as EventListener)
+      window.removeEventListener('exchange-claim-approved', handleClaimApproved as EventListener)
+      window.removeEventListener('exchange-collection-confirmed', handleCollectionConfirmed as EventListener)
+    }
+  }, [handleOpenMessages, user])
 
   const handleSignIn = () => {
     setAuthMode('signin')
@@ -136,6 +175,17 @@ function App() {
       }
     })
   }
+
+  const handleOpenMessages = useCallback((options?: { itemId?: string; chatId?: string; initialView?: 'chats' | 'requests' }) => {
+    if (options?.initialView) {
+      setMessageCenterView(options.initialView)
+    } else {
+      setMessageCenterView('chats')
+    }
+    setMessageCenterItemId(options?.itemId)
+    setMessageCenterChatId(options?.chatId)
+    setShowMessageCenter(true)
+  }, [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -210,7 +260,7 @@ function App() {
               
               {user ? (
                 <div className="flex items-center space-x-2">
-                  <MessageNotification onOpenMessages={() => setShowMessageCenter(true)} />
+              <MessageNotification onOpenMessages={() => handleOpenMessages()} />
                   
                   {/* Recommendation Notifications */}
                   {unreadCount > 0 && (
@@ -320,7 +370,11 @@ function App() {
       <main className="container mx-auto px-4 py-8">
         <Tabs value={currentTab} onValueChange={setCurrentTab}>
           <TabsContent value="browse">
-            <ItemListing searchQuery={searchQuery} onStartDonationFlow={handleDonationFlowStart} />
+            <ItemListing
+              searchQuery={searchQuery}
+              onStartDonationFlow={handleDonationFlowStart}
+              onOpenMessages={handleOpenMessages}
+            />
           </TabsContent>
 
           <TabsContent value="list">
@@ -436,9 +490,19 @@ function App() {
       />
 
       {/* Message Center */}
-      <MessageCenter 
+      <MessageCenter
         open={showMessageCenter}
-        onOpenChange={setShowMessageCenter}
+        onOpenChange={(open) => {
+          setShowMessageCenter(open)
+          if (!open) {
+            setMessageCenterItemId(undefined)
+            setMessageCenterChatId(undefined)
+            setMessageCenterView('chats')
+          }
+        }}
+        itemId={messageCenterItemId}
+        chatId={messageCenterChatId}
+        initialView={messageCenterView}
       />
 
       {/* Toast Notifications */}

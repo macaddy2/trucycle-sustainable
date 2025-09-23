@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   PaperPlaneTilt,
   CheckCircle,
@@ -14,334 +15,350 @@ import {
   CalendarCheck,
   QrCode
 } from '@phosphor-icons/react'
-import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
+import { useMessaging, useExchangeManager } from '@/hooks'
+import type { Chat as MessagingChat, Message as MessagingMessage } from '@/hooks/useMessaging'
+import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import { QRCodeGenerator, QRCodeDisplay, QRCodeData } from '../QRCode'
-
-interface Message {
-  id: string
-  chatId: string
-  senderId: string
-  senderName: string
-  senderAvatar?: string
-  content: string
-  timestamp: Date | string
-  type: 'text' | 'system' | 'location' | 'image'
-  metadata?: {
-    location?: { lat: number; lng: number; address: string }
-    imageUrl?: string
-    systemAction?: string
-  }
-}
-
-interface Chat {
-  id: string
-  itemId: string
-  itemTitle: string
-  itemImage?: string
-  donorId: string
-  donorName: string
-  donorAvatar?: string
-  collectorId: string
-  collectorName: string
-  collectorAvatar?: string
-  status: 'active' | 'collection_arranged' | 'completed' | 'cancelled'
-  lastMessage?: Message
-  unreadCount: number
-  createdAt: Date | string
-}
 
 interface MessageCenterProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  itemId?: string // If provided, opens chat for specific item
+  itemId?: string
+  chatId?: string
+  initialView?: 'chats' | 'requests'
 }
 
-export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps) {
-  const [currentUser] = useKV('current-user', null)
-  const [chats, setChats] = useKV('user-chats', [] as Chat[])
-  const [messages, setMessages] = useKV('chat-messages', {} as Record<string, Message[]>)
+interface RequestGroup {
+  itemId: string
+  itemTitle: string
+  requests: ClaimRequest[]
+}
+
+const requestStatusStyles: Record<ClaimRequest['status'], string> = {
+  pending: 'bg-amber-100 text-amber-800',
+  approved: 'bg-blue-100 text-blue-800',
+  declined: 'bg-slate-100 text-slate-700',
+  completed: 'bg-green-100 text-green-700'
+}
+
+const formatRelativeTime = (date: Date | string) => {
+  const dateObj = date instanceof Date ? date : new Date(date)
+  const now = new Date()
+  const diff = now.getTime() - dateObj.getTime()
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+
+  if (minutes < 1) return 'Just now'
+  if (minutes < 60) return `${minutes}m ago`
+  if (hours < 24) return `${hours}h ago`
+  if (days < 7) return `${days}d ago`
+  return dateObj.toLocaleDateString()
+}
+
+export function MessageCenter({ open, onOpenChange, itemId, chatId, initialView = 'chats' }: MessageCenterProps) {
+  const {
+    currentUser,
+    chats,
+    messages,
+    sendMessage: dispatchMessage,
+    markMessagesAsRead,
+    updateChatStatus,
+    createOrGetChat
+  } = useMessaging()
+  const {
+    confirmClaimRequest,
+    completeClaimRequest,
+    getClaimRequestById,
+    getRequestsForDonor,
+    getRewardBalance
+  } = useExchangeManager()
+
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
+  const [activePanel, setActivePanel] = useState<'chats' | 'requests'>(initialView)
   const [newMessage, setNewMessage] = useState('')
   const [showQRCode, setShowQRCode] = useState<QRCodeData | null>(null)
-  const [selectedDropOffLocation, setSelectedDropOffLocation] = useState<string>('')
-  
+  const [selectedDropOffLocation, setSelectedDropOffLocation] = useState('')
+  const [selectedRequestItem, setSelectedRequestItem] = useState<string | null>(itemId ?? null)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  
-  // Helper function to normalize dates from KV storage
-  const normalizeChat = (chat: Chat): Chat => ({
+
+  const normalizeChat = useCallback((chat: MessagingChat): MessagingChat => ({
     ...chat,
     createdAt: chat.createdAt instanceof Date ? chat.createdAt : new Date(chat.createdAt),
-    lastMessage: chat.lastMessage ? {
-      ...chat.lastMessage,
-      timestamp: chat.lastMessage.timestamp instanceof Date ? chat.lastMessage.timestamp : new Date(chat.lastMessage.timestamp)
-    } : undefined
-  })
+    lastMessage: chat.lastMessage
+      ? {
+          ...chat.lastMessage,
+          timestamp: chat.lastMessage.timestamp instanceof Date
+            ? chat.lastMessage.timestamp
+            : new Date(chat.lastMessage.timestamp)
+        }
+      : undefined
+  }), [])
 
-  const normalizeMessage = (message: Message): Message => ({
+  const normalizeMessage = useCallback((message: MessagingMessage): MessagingMessage => ({
     ...message,
     timestamp: message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp)
-  })
+  }), [])
 
-  // Get normalized data
-  const normalizedChats = useMemo(() => chats.map(normalizeChat), [chats])
+  const normalizedChats = useMemo(() => chats.map(normalizeChat), [chats, normalizeChat])
   const selectedChat = useMemo(
     () => normalizedChats.find(chat => chat.id === selectedChatId) ?? null,
-    [normalizedChats, selectedChatId],
+    [normalizedChats, selectedChatId]
   )
   const currentMessages = useMemo(() => {
-    if (!selectedChatId) return [] as Message[]
+    if (!selectedChatId) return [] as MessagingMessage[]
     return (messages[selectedChatId] || []).map(normalizeMessage)
-  }, [messages, selectedChatId])
+  }, [messages, normalizeMessage, selectedChatId])
 
-  // Auto-scroll to bottom when new messages arrive
+  const donorRequests = useMemo(() => {
+    if (!currentUser) return [] as ClaimRequest[]
+    return getRequestsForDonor(currentUser.id)
+  }, [currentUser, getRequestsForDonor])
+
+  const groupedRequests = useMemo(() => {
+    const groups: Record<string, RequestGroup> = {}
+    donorRequests.forEach(request => {
+      if (!groups[request.itemId]) {
+        groups[request.itemId] = {
+          itemId: request.itemId,
+          itemTitle: request.itemTitle,
+          requests: []
+        }
+      }
+      groups[request.itemId].requests.push(request)
+    })
+    return Object.values(groups)
+  }, [donorRequests])
+
+  const selectedRequestGroup = useMemo(() => {
+    if (!selectedRequestItem) return null
+    return groupedRequests.find(group => group.itemId === selectedRequestItem) ?? null
+  }, [groupedRequests, selectedRequestItem])
+
+  const pendingRequestsCount = useMemo(() => {
+    return donorRequests.filter(request => request.status === 'pending').length
+  }, [donorRequests])
+
+  const linkedRequest = useMemo(() => {
+    if (!selectedChat?.linkedRequestId) return null
+    return getClaimRequestById(selectedChat.linkedRequestId)
+  }, [selectedChat, getClaimRequestById])
+
+  const messageTemplates = useMemo(() => {
+    if (!selectedChat || !currentUser) return [] as string[]
+    const otherName = currentUser.id === selectedChat.donorId
+      ? selectedChat.collectorName
+      : selectedChat.donorName
+
+    if (currentUser.id === selectedChat.donorId) {
+      return [
+        `Thanks for requesting this item, ${otherName}! It is still available.`,
+        'Could we meet at the TruCycle partner hub this weekend to hand it over?',
+        'I will prepare the item for collection. Let me know if you need any help with transport.'
+      ]
+    }
+
+    return [
+      `Hi ${otherName}, I love this item. Is it still available?`,
+      'I can collect tomorrow afternoon if that works for you.',
+      'Could you please share the pickup address when convenient?'
+    ]
+  }, [currentUser, selectedChat])
+
+  useEffect(() => {
+    setActivePanel(initialView)
+  }, [initialView])
+
+  useEffect(() => {
+    if (chatId) {
+      setSelectedChatId(chatId)
+      return
+    }
+
+    if (itemId && normalizedChats.length > 0) {
+      const existingChat = normalizedChats.find(chat => chat.itemId === itemId)
+      if (existingChat) {
+        setSelectedChatId(existingChat.id)
+      }
+    }
+  }, [chatId, itemId, normalizedChats])
+
+  useEffect(() => {
+    if (activePanel === 'requests') {
+      if (itemId && groupedRequests.some(group => group.itemId === itemId)) {
+        setSelectedRequestItem(itemId)
+      } else if (!selectedRequestItem && groupedRequests.length > 0) {
+        setSelectedRequestItem(groupedRequests[0].itemId)
+      }
+    }
+  }, [activePanel, groupedRequests, itemId, selectedRequestItem])
+
+  useEffect(() => {
+    if (!selectedChatId) return
+    markMessagesAsRead(selectedChatId)
+  }, [markMessagesAsRead, selectedChatId])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [currentMessages])
 
-  // Select chat if itemId is provided
-  useEffect(() => {
-    if (itemId && normalizedChats.length > 0) {
-      const itemChat = normalizedChats.find(chat => chat.itemId === itemId)
-      if (itemChat) {
-        setSelectedChatId(itemChat.id)
-      }
-    }
-  }, [itemId, normalizedChats])
+  const sendSystemMessage = useCallback((chatIdValue: string, content: string, action: string) => {
+    dispatchMessage(chatIdValue, content, 'system', { systemAction: action })
+  }, [dispatchMessage])
 
-  const getRandomResponse = () => {
-    const responses = [
-      "Thanks for the quick response!",
-      "That works for me. See you then!",
-      "Perfect, I'll be there",
-      "Just confirming I'm still interested",
-      "Great condition, exactly what I needed",
-      "On my way now",
-      "Running 5 minutes late, sorry!",
-      "Collection completed, thank you!"
-    ]
-    return responses[Math.floor(Math.random() * responses.length)]
-  }
-
-  const handleIncomingMessage = useCallback(
-    (messageData: Omit<Message, 'id' | 'timestamp'>) => {
-      const message: Message = {
-        ...messageData,
-        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date(),
-      }
-
-      setMessages(prev => ({
-        ...prev,
-        [messageData.chatId]: [...(prev[messageData.chatId] || []), message],
-      }))
-
-      setChats(prev =>
-        prev.map(chat =>
-          chat.id === messageData.chatId
-            ? {
-                ...chat,
-                lastMessage: message,
-                unreadCount: selectedChatId === messageData.chatId ? 0 : chat.unreadCount + 1,
-              }
-            : chat,
-        ),
-      )
-
-      if (selectedChatId !== messageData.chatId) {
-        toast.info(`New message from ${messageData.senderName}`)
-      }
-    },
-    [selectedChatId, setMessages, setChats],
-  )
-
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedChatId || !currentUser) return
-
-    const message: Message = {
-      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      chatId: selectedChatId,
-      senderId: currentUser.id,
-      senderName: currentUser.name,
-      senderAvatar: currentUser.avatar,
-      content: newMessage.trim(),
-      timestamp: new Date(),
-      type: 'text'
-    }
-
-    // Add message
-    setMessages(prev => ({
-      ...prev,
-      [selectedChatId]: [...(prev[selectedChatId] || []), message]
-    }))
-
-    // Update chat's last message
-    setChats(prev => prev.map(chat =>
-      chat.id === selectedChatId
-        ? { ...chat, lastMessage: message }
-        : chat
-    ))
-
+  const handleSendMessage = () => {
+    if (!selectedChat) return
+    if (!newMessage.trim()) return
+    dispatchMessage(selectedChat.id, newMessage.trim())
     setNewMessage('')
     toast.success('Message sent')
   }
 
-  // Mock real-time message simulation
-  useEffect(() => {
-    if (!selectedChatId || !currentUser || !selectedChat) {
-      return undefined
+  const shareLocation = useCallback(() => {
+    if (!selectedChat) return
+    if (!navigator.geolocation) {
+      toast.error('Location sharing is not supported on this device')
+      return
     }
 
-    const interval = setInterval(() => {
-      if (Math.random() > 0.98) {
-        const otherUserId = selectedChat.donorId === currentUser.id
-          ? selectedChat.collectorId
-          : selectedChat.donorId
-        const otherUserName = selectedChat.donorId === currentUser.id
-          ? selectedChat.collectorName
-          : selectedChat.donorName
-
-        if (otherUserId && otherUserName) {
-          handleIncomingMessage({
-            chatId: selectedChatId,
-            senderId: otherUserId,
-            senderName: otherUserName,
-            content: getRandomResponse(),
-            type: 'text',
-          })
+    navigator.geolocation.getCurrentPosition((position) => {
+      dispatchMessage(selectedChat.id, 'Shared location', 'location', {
+        location: {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          address: 'Current location'
         }
-      }
-    }, 1000)
+      })
+      toast.success('Location shared')
+    }, () => {
+      toast.error('Could not access location')
+    })
+  }, [dispatchMessage, selectedChat])
 
-    return () => clearInterval(interval)
-  }, [selectedChatId, currentUser, selectedChat, handleIncomingMessage])
+  const handleApproveRequest = async (request: ClaimRequest) => {
+    if (!currentUser) return
+    const approved = confirmClaimRequest(request.id)
+    if (!approved) return
 
-  const markChatAsRead = (chatId: string) => {
-    setChats(prev => prev.map(chat => 
-      chat.id === chatId ? { ...chat, unreadCount: 0 } : chat
-    ))
-  }
+    const chatIdentifier = await createOrGetChat(
+      approved.itemId,
+      approved.itemTitle,
+      approved.itemImage,
+      approved.donorId,
+      approved.donorName,
+      undefined,
+      approved.collectorId,
+      approved.collectorName,
+      approved.collectorAvatar,
+      { linkedRequestId: approved.id }
+    )
 
-  const sendSystemMessage = (action: string, content: string) => {
-    if (!selectedChatId) return
+    toast.success(`Confirmed ${approved.collectorName} for "${approved.itemTitle}"`)
+    updateChatStatus(chatIdentifier, 'collection_arranged')
+    setActivePanel('chats')
+    setSelectedChatId(chatIdentifier)
+    markMessagesAsRead(chatIdentifier)
+    sendSystemMessage(
+      chatIdentifier,
+      `${approved.donorName} confirmed this exchange. Start chatting to arrange the hand-off!`,
+      'exchange_confirmed'
+    )
 
-    const message: Message = {
-      id: `sys_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      chatId: selectedChatId,
-      senderId: 'system',
-      senderName: 'System',
-      content,
-      timestamp: new Date(),
-      type: 'system',
-      metadata: { systemAction: action }
-    }
-
-    setMessages(prev => ({
-      ...prev,
-      [selectedChatId]: [...(prev[selectedChatId] || []), message]
+    window.dispatchEvent(new CustomEvent('exchange-claim-approved', {
+      detail: { request: approved, chatId: chatIdentifier }
     }))
   }
 
-  const shareLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords
-          
-          const message: Message = {
-            id: `loc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            chatId: selectedChatId!,
-            senderId: currentUser.id,
-            senderName: currentUser.name,
-            content: 'Shared location',
-            timestamp: new Date(),
-            type: 'location',
-            metadata: {
-              location: {
-                lat: latitude,
-                lng: longitude,
-                address: 'Current location'
-              }
-            }
-          }
-
-          setMessages(prev => ({
-            ...prev,
-            [selectedChatId!]: [...(prev[selectedChatId!] || []), message]
-          }))
-
-          toast.success('Location shared')
-        },
-        () => {
-          toast.error('Could not access location')
-        }
-      )
+  const handleOpenChatForRequest = (request: ClaimRequest) => {
+    const chatForRequest = normalizedChats.find(chat => chat.linkedRequestId === request.id)
+    if (chatForRequest) {
+      setActivePanel('chats')
+      setSelectedChatId(chatForRequest.id)
+    } else {
+      toast.info('Start the exchange to open a chat with this collector')
     }
   }
+
+  const handleConfirmCollection = useCallback(() => {
+    if (!selectedChat) return
+
+    if (linkedRequest && currentUser && selectedChat.donorId === currentUser.id) {
+      const result = completeClaimRequest(linkedRequest.id)
+      if (!result) return
+      updateChatStatus(selectedChat.id, 'completed')
+      sendSystemMessage(
+        selectedChat.id,
+        `Collection confirmed. ${result.rewardPoints} GreenPoints have been awarded to the donor.`,
+        'collection_confirmed'
+      )
+      return
+    }
+
+    updateChatStatus(selectedChat.id, 'completed')
+    sendSystemMessage(selectedChat.id, 'Collection has been confirmed by both parties.', 'collection_confirmed')
+    toast.success('Collection confirmed')
+  }, [completeClaimRequest, currentUser, linkedRequest, selectedChat, sendSystemMessage, updateChatStatus])
 
   const handleQRCodeGenerated = (qrData: QRCodeData) => {
     setShowQRCode(qrData)
-    
-    // Send system message about QR code generation
-    const message = qrData.type === 'donor' 
+    const message = qrData.type === 'donor'
       ? 'Drop-off QR code generated. Please take this item and QR code to the selected drop-off location.'
       : 'Pickup QR code generated. Show this to the shop attendant to collect your item.'
-    
-    sendSystemMessage('qr_generated', message)
-  }
-
-  const quickActions = [
-    {
-      label: 'Share Location',
-      icon: MapPin,
-      action: shareLocation,
-      color: 'text-blue-600'
-    },
-    {
-      label: 'Generate QR Code',
-      icon: QrCode,
-      action: () => {
-        if (!selectedChat) return
-
-        // For demo purposes, set a sample drop-off location
-        setSelectedDropOffLocation('TruCycle Partner Shop - Camden Market, London NW1 8AH')
-      },
-      color: 'text-purple-600'
-    },
-    {
-      label: 'Confirm Collection',
-      icon: CheckCircle,
-      action: () => {
-        sendSystemMessage('collection_confirmed', 'Collection has been confirmed by both parties')
-        toast.success('Collection confirmed')
-      },
-      color: 'text-green-600'
-    },
-    {
-      label: 'Schedule Pickup',
-      icon: CalendarCheck,
-      action: () => {
-        sendSystemMessage('pickup_scheduled', 'Pickup has been scheduled for tomorrow at 2 PM')
-        toast.success('Pickup scheduled')
-      },
-      color: 'text-orange-600'
+    if (selectedChat) {
+      sendSystemMessage(selectedChat.id, message, 'qr_generated')
     }
-  ]
-
-  const formatTime = (date: Date | string) => {
-    const now = new Date()
-    const dateObj = date instanceof Date ? date : new Date(date)
-    const diff = now.getTime() - dateObj.getTime()
-    const minutes = Math.floor(diff / 60000)
-    const hours = Math.floor(diff / 3600000)
-    const days = Math.floor(diff / 86400000)
-
-    if (minutes < 1) return 'Just now'
-    if (minutes < 60) return `${minutes}m ago`
-    if (hours < 24) return `${hours}h ago`
-    if (days < 7) return `${days}d ago`
-    return dateObj.toLocaleDateString()
   }
+
+  const quickActions = useMemo(() => {
+    const actions = [
+      {
+        label: 'Share Location',
+        icon: MapPin,
+        action: shareLocation,
+        color: 'text-blue-600',
+        visible: Boolean(selectedChat)
+      },
+      {
+        label: 'Generate QR Code',
+        icon: QrCode,
+        action: () => {
+          if (!selectedChat) return
+          setSelectedDropOffLocation('TruCycle Partner Shop - Camden Market, London NW1 8AH')
+        },
+        color: 'text-purple-600',
+        visible: Boolean(selectedChat)
+      },
+      {
+        label: 'Schedule Pickup',
+        icon: CalendarCheck,
+        action: () => {
+          if (!selectedChat) return
+          sendSystemMessage(
+            selectedChat.id,
+            'Pickup has been scheduled for tomorrow at 2 PM.',
+            'pickup_scheduled'
+          )
+          toast.success('Pickup details shared')
+        },
+        color: 'text-orange-600',
+        visible: Boolean(selectedChat)
+      }
+    ]
+
+    if (linkedRequest && currentUser && selectedChat?.donorId === currentUser.id && linkedRequest.status === 'approved') {
+      actions.push({
+        label: 'Confirm Collection',
+        icon: CheckCircle,
+        action: handleConfirmCollection,
+        color: 'text-green-600',
+        visible: true
+      })
+    }
+
+    return actions.filter(action => action.visible)
+  }, [currentUser, handleConfirmCollection, linkedRequest, selectedChat, sendSystemMessage, shareLocation])
 
   if (!currentUser) {
     return (
@@ -363,271 +380,402 @@ export function MessageCenter({ open, onOpenChange, itemId }: MessageCenterProps
     )
   }
 
+  const rewardBalance = getRewardBalance(currentUser.id)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[600px] p-0">
-        <div className="flex h-full">
-          {/* Chat List Sidebar */}
-          <div className="w-1/3 border-r border-border flex flex-col">
-            <div className="p-4 border-b border-border">
+      <DialogContent className="max-w-5xl h-[640px] p-0 overflow-hidden">
+        <div className="flex flex-col h-full">
+          <div className="flex items-center justify-between border-b border-border p-4">
+            <div>
               <h2 className="text-h3 font-medium">Messages</h2>
               <p className="text-small text-muted-foreground">
-                {normalizedChats.length} active conversations
+                {normalizedChats.length} active conversation{normalizedChats.length === 1 ? '' : 's'}
               </p>
             </div>
-            
-            <ScrollArea className="flex-1">
-              {normalizedChats.length === 0 ? (
-                <div className="p-4 text-center">
-                  <Package size={32} className="mx-auto text-muted-foreground mb-2" />
-                  <p className="text-small text-muted-foreground">
-                    No messages yet. Start by claiming an item!
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-1 p-2">
-                  {normalizedChats.map(chat => (
-                    <Card 
-                      key={chat.id}
-                      className={`cursor-pointer transition-colors hover:bg-muted/50 ${
-                        selectedChatId === chat.id ? 'bg-muted border-primary' : ''
-                      }`}
-                      onClick={() => {
-                        setSelectedChatId(chat.id)
-                        markChatAsRead(chat.id)
-                      }}
-                    >
-                      <CardContent className="p-3">
-                        <div className="flex items-start space-x-3">
-                          <Avatar className="w-10 h-10">
-                            <AvatarImage src={
-                              currentUser.id === chat.donorId ? chat.collectorAvatar : chat.donorAvatar
-                            } />
-                            <AvatarFallback>
-                              {(currentUser.id === chat.donorId ? chat.collectorName : chat.donorName)[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <p className="text-small font-medium truncate">
-                                {currentUser.id === chat.donorId ? chat.collectorName : chat.donorName}
-                              </p>
-                              {chat.unreadCount > 0 && (
-                                <Badge variant="destructive" className="text-xs">
-                                  {chat.unreadCount}
-                                </Badge>
-                              )}
-                            </div>
-                            
-                            <p className="text-xs text-muted-foreground truncate">
-                              {chat.itemTitle}
-                            </p>
-                            
-                            {chat.lastMessage && (
-                              <p className="text-xs text-muted-foreground truncate mt-1">
-                                {chat.lastMessage.content}
-                              </p>
-                            )}
-                            
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {chat.lastMessage ? formatTime(chat.lastMessage.timestamp) : formatTime(chat.createdAt)}
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </div>
 
-          {/* Chat Messages Area */}
-          <div className="flex-1 flex flex-col">
-            {selectedChat ? (
-              <>
-                {/* Chat Header */}
-                <div className="p-4 border-b border-border">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <Avatar>
-                        <AvatarImage src={
-                          currentUser.id === selectedChat.donorId ? 
-                            selectedChat.collectorAvatar : selectedChat.donorAvatar
-                        } />
-                        <AvatarFallback>
-                          {(currentUser.id === selectedChat.donorId ? 
-                            selectedChat.collectorName : selectedChat.donorName)[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h3 className="font-medium">
-                          {currentUser.id === selectedChat.donorId ? 
-                            selectedChat.collectorName : selectedChat.donorName}
-                        </h3>
-                        <p className="text-small text-muted-foreground">
-                          About: {selectedChat.itemTitle}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <Badge 
-                      variant={selectedChat.status === 'active' ? 'default' : 'secondary'}
-                    >
-                      {selectedChat.status.replace('_', ' ')}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Messages */}
-                <ScrollArea className="flex-1 p-4">
-                  <div className="space-y-4">
-                    {currentMessages.map(message => (
-                      <div
-                        key={message.id}
-                        className={`flex ${
-                          message.senderId === currentUser.id ? 'justify-end' : 'justify-start'
-                        }`}
-                      >
-                        <div className={`max-w-[70%] ${
-                          message.senderId === currentUser.id
-                            ? 'bg-primary text-primary-foreground'
-                            : message.type === 'system'
-                            ? 'bg-muted text-muted-foreground'
-                            : 'bg-muted text-foreground'
-                        } rounded-lg p-3 ${message.type === 'system' ? 'mx-auto text-center' : ''}`}>
-                          
-                          {message.type === 'location' && message.metadata?.location && (
-                            <div className="flex items-center space-x-2 mb-2">
-                              <MapPin size={16} />
-                              <span className="text-small">Location shared</span>
-                            </div>
-                          )}
-                          
-                          <p className="text-small">{message.content}</p>
-                          
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="text-xs opacity-70">
-                              {message.type !== 'system' && message.senderName}
-                            </span>
-                            <span className="text-xs opacity-70">
-                              {formatTime(message.timestamp)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    <div ref={messagesEndRef} />
-                  </div>
-                </ScrollArea>
-
-                {/* Quick Actions */}
-                <div className="p-2 border-t border-border">
-                  <div className="flex space-x-2 mb-2">
-                    {quickActions.map(action => (
-                      <Button
-                        key={action.label}
-                        variant="outline"
-                        size="sm"
-                        onClick={action.action}
-                        className="flex items-center space-x-1"
-                      >
-                        <action.icon size={14} className={action.color} />
-                        <span className="text-xs">{action.label}</span>
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Message Input */}
-                <div className="p-4 border-t border-border">
-                  <div className="flex space-x-2">
-                    <Input
-                      placeholder="Type your message..."
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault()
-                          sendMessage()
-                        }
-                      }}
-                      className="flex-1"
-                    />
-                    <Button 
-                      onClick={sendMessage} 
-                      disabled={!newMessage.trim()}
-                      size="icon"
-                    >
-                      <PaperPlaneTilt size={16} />
-                    </Button>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <Package size={48} className="mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-h3 mb-2">Select a conversation</h3>
-                  <p className="text-muted-foreground">
-                    Choose a chat from the sidebar to start messaging
-                  </p>
-                </div>
-              </div>
+            {currentUser.userType === 'donor' && (
+              <Tabs value={activePanel} onValueChange={(value) => setActivePanel(value as 'chats' | 'requests')}>
+                <TabsList>
+                  <TabsTrigger value="chats">Chats</TabsTrigger>
+                  <TabsTrigger value="requests">
+                    Requests
+                    {pendingRequestsCount > 0 && (
+                      <Badge variant="destructive" className="ml-2 text-xs">
+                        {pendingRequestsCount}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             )}
           </div>
+
+          {activePanel === 'requests' && currentUser.userType === 'donor' ? (
+            <div className="flex flex-1">
+              {groupedRequests.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground space-y-4">
+                  <Package size={48} className="mx-auto text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">No claim requests yet</p>
+                    <p className="text-sm">
+                      Collectors can request your listings directly from the marketplace.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="w-1/3 border-r border-border">
+                    <ScrollArea className="h-full">
+                      <div className="p-3 space-y-2">
+                        {groupedRequests.map(group => {
+                          const pending = group.requests.filter(request => request.status === 'pending').length
+                          const approved = group.requests.filter(request => request.status === 'approved').length
+                          const collected = group.requests.some(request => request.status === 'completed')
+                          return (
+                            <Card
+                              key={group.itemId}
+                              className={`cursor-pointer transition-colors ${selectedRequestItem === group.itemId ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
+                              onClick={() => setSelectedRequestItem(group.itemId)}
+                            >
+                              <CardContent className="p-3 space-y-2">
+                                <p className="font-medium text-sm line-clamp-2">{group.itemTitle}</p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge variant="outline">{group.requests.length} interested</Badge>
+                                  {pending > 0 && (
+                                    <Badge variant="destructive">{pending} pending</Badge>
+                                  )}
+                                  {approved > 0 && (
+                                    <Badge variant="secondary">{approved} confirmed</Badge>
+                                  )}
+                                  {collected && (
+                                    <Badge variant="secondary" className="bg-green-600 text-white">Collected</Badge>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    </ScrollArea>
+                  </div>
+
+                  <div className="flex-1 flex flex-col">
+                    {selectedRequestGroup ? (
+                      <ScrollArea className="flex-1">
+                        <div className="p-4 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-h3">{selectedRequestGroup.itemTitle}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                Select a collector to confirm the exchange.
+                              </p>
+                            </div>
+                            <Badge variant="outline">Reward balance: {rewardBalance} GreenPoints</Badge>
+                          </div>
+
+                          {selectedRequestGroup.requests.map(request => {
+                            const requestChat = normalizedChats.find(chat => chat.linkedRequestId === request.id)
+                            return (
+                              <Card key={request.id} className="border-border/60">
+                                <CardContent className="p-4 space-y-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <Avatar className="h-10 w-10">
+                                        {request.collectorAvatar ? (
+                                          <AvatarImage src={request.collectorAvatar} alt={request.collectorName} />
+                                        ) : (
+                                          <AvatarFallback>{request.collectorName[0]}</AvatarFallback>
+                                        )}
+                                      </Avatar>
+                                      <div>
+                                        <p className="font-medium">{request.collectorName}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Requested {formatRelativeTime(request.createdAt)}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <Badge className={requestStatusStyles[request.status]}>
+                                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                                    </Badge>
+                                  </div>
+
+                                  <div className="flex flex-wrap gap-2 justify-between text-xs text-muted-foreground">
+                                    <span>Donor: {request.donorName}</span>
+                                    <span>Collector ID: {request.collectorId.slice(-6)}</span>
+                                  </div>
+
+                                  <div className="flex flex-wrap gap-2">
+                                    {request.status === 'pending' && (
+                                      <Button size="sm" onClick={() => handleApproveRequest(request)}>
+                                        Confirm exchange
+                                      </Button>
+                                    )}
+                                    {request.status === 'approved' && requestChat && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleOpenChatForRequest(request)}
+                                      >
+                                        Open chat
+                                      </Button>
+                                    )}
+                                    {request.status === 'approved' && !requestChat && (
+                                      <Button size="sm" variant="outline" disabled>
+                                        Chat pending activation
+                                      </Button>
+                                    )}
+                                    {request.status === 'completed' && (
+                                      <Badge variant="outline" className="bg-green-100 text-green-700">
+                                        Reward issued
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            )
+                          })}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                        Select an item to view interested collectors
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-1">
+              <div className="w-1/3 border-r border-border flex flex-col">
+                <ScrollArea className="flex-1">
+                  {normalizedChats.length === 0 ? (
+                    <div className="p-6 text-center text-sm text-muted-foreground space-y-2">
+                      <Package size={36} className="mx-auto text-muted-foreground" />
+                      <p>No conversations yet</p>
+                      <p>Start by requesting or listing an item.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 p-2">
+                      {normalizedChats.map(chat => (
+                        <Card
+                          key={chat.id}
+                          className={`cursor-pointer transition-colors ${selectedChatId === chat.id ? 'bg-muted border-primary' : 'hover:bg-muted/50'}`}
+                          onClick={() => setSelectedChatId(chat.id)}
+                        >
+                          <CardContent className="p-3">
+                            <div className="flex items-start space-x-3">
+                              <Avatar className="w-10 h-10">
+                                <AvatarImage src={currentUser.id === chat.donorId ? chat.collectorAvatar : chat.donorAvatar} />
+                                <AvatarFallback>
+                                  {(currentUser.id === chat.donorId ? chat.collectorName : chat.donorName)[0]}
+                                </AvatarFallback>
+                              </Avatar>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-small font-medium truncate">
+                                    {currentUser.id === chat.donorId ? chat.collectorName : chat.donorName}
+                                  </p>
+                                  {chat.unreadCount > 0 && (
+                                    <Badge variant="destructive" className="text-xs">
+                                      {chat.unreadCount}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {chat.itemTitle}
+                                </p>
+                                {chat.lastMessage && (
+                                  <p className="text-xs text-muted-foreground truncate mt-1">
+                                    {chat.lastMessage.content}
+                                  </p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {chat.lastMessage
+                                    ? formatRelativeTime(chat.lastMessage.timestamp)
+                                    : formatRelativeTime(chat.createdAt)}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+
+              <div className="flex-1 flex flex-col">
+                {selectedChat ? (
+                  <>
+                    <div className="p-4 border-b border-border flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarImage src={currentUser.id === selectedChat.donorId ? selectedChat.collectorAvatar : selectedChat.donorAvatar} />
+                          <AvatarFallback>
+                            {(currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName)[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="font-medium">
+                            {currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName}
+                          </h3>
+                          <p className="text-small text-muted-foreground">
+                            About: {selectedChat.itemTitle}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant={selectedChat.status === 'active' ? 'secondary' : 'outline'}>
+                        {selectedChat.status.replace('_', ' ')}
+                      </Badge>
+                    </div>
+
+                    <ScrollArea className="flex-1 p-4">
+                      <div className="space-y-4">
+                        {currentMessages.map(message => (
+                          <div
+                            key={message.id}
+                            className={`flex ${message.senderId === currentUser.id ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div
+                              className={`max-w-[70%] rounded-lg p-3 ${
+                                message.senderId === currentUser.id
+                                  ? 'bg-primary text-primary-foreground'
+                                  : message.type === 'system'
+                                  ? 'bg-muted text-muted-foreground'
+                                  : 'bg-muted text-foreground'
+                              } ${message.type === 'system' ? 'mx-auto text-center' : ''}`}
+                            >
+                              {message.type === 'location' && message.metadata?.location && (
+                                <div className="flex items-center gap-2 mb-2">
+                                  <MapPin size={16} />
+                                  <span className="text-small">Location shared</span>
+                                </div>
+                              )}
+                              <p className="text-small whitespace-pre-line">{message.content}</p>
+                              <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                                <span>{message.type !== 'system' ? message.senderName : 'System'}</span>
+                                <span>{formatRelativeTime(message.timestamp)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        <div ref={messagesEndRef} />
+                      </div>
+                    </ScrollArea>
+
+                    {quickActions.length > 0 && (
+                      <div className="p-3 border-t border-border flex flex-wrap gap-2">
+                        {quickActions.map(action => (
+                          <Button
+                            key={action.label}
+                            variant="outline"
+                            size="sm"
+                            onClick={action.action}
+                            className="flex items-center space-x-1"
+                          >
+                            <action.icon size={14} className={action.color} />
+                            <span className="text-xs">{action.label}</span>
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+
+                    {messageTemplates.length > 0 && (
+                      <div className="px-4 py-2 border-t border-border bg-muted/40 flex flex-wrap gap-2">
+                        {messageTemplates.map(template => (
+                          <Button
+                            key={template}
+                            variant="ghost"
+                            size="sm"
+                            className="text-left whitespace-normal"
+                            onClick={() => setNewMessage(template)}
+                          >
+                            {template}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="p-4 border-t border-border">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Type your message..."
+                          value={newMessage}
+                          onChange={(event) => setNewMessage(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' && !event.shiftKey) {
+                              event.preventDefault()
+                              handleSendMessage()
+                            }
+                          }}
+                          className="flex-1"
+                        />
+                        <Button onClick={handleSendMessage} disabled={!newMessage.trim()} size="icon">
+                          <PaperPlaneTilt size={16} />
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center space-y-2 text-muted-foreground">
+                      <Package size={48} className="mx-auto text-muted-foreground" />
+                      <p className="font-medium text-foreground">Select a conversation</p>
+                      <p className="text-sm">Choose a chat from the sidebar to start messaging</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* QR Code Generation Dialog */}
         {selectedDropOffLocation && selectedChat && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-background p-6 rounded-lg max-w-md w-full mx-4">
-              <h3 className="text-h3 mb-4">Generate QR Code</h3>
-              <p className="text-muted-foreground mb-4">
-                Choose your role for this transaction:
-              </p>
-              
-              <div className="space-y-3">
-                {currentUser.id === selectedChat.donorId && (
-                  <QRCodeGenerator
-                    itemId={selectedChat.itemId}
-                    itemTitle={selectedChat.itemTitle}
-                    category="general" // You can derive this from item data
-                    condition="good" // You can derive this from item data
-                    co2Impact={25} // You can derive this from item data
-                    dropOffLocation={selectedDropOffLocation}
-                    type="donor"
-                    onGenerated={handleQRCodeGenerated}
-                  />
-                )}
-                
-                {currentUser.id === selectedChat.collectorId && (
-                  <QRCodeGenerator
-                    itemId={selectedChat.itemId}
-                    itemTitle={selectedChat.itemTitle}
-                    category="general" // You can derive this from item data
-                    condition="good" // You can derive this from item data
-                    co2Impact={25} // You can derive this from item data
-                    dropOffLocation={selectedDropOffLocation}
-                    type="collector"
-                    onGenerated={handleQRCodeGenerated}
-                  />
-                )}
-                
-                <Button 
-                  variant="outline" 
-                  onClick={() => setSelectedDropOffLocation('')}
-                  className="w-full"
-                >
-                  Cancel
-                </Button>
+            <div className="bg-background p-6 rounded-lg max-w-md w-full mx-4 space-y-4">
+              <div>
+                <h3 className="text-h3 mb-2">Generate QR Code</h3>
+                <p className="text-muted-foreground text-sm">
+                  Choose your role for this transaction to generate the right QR code.
+                </p>
               </div>
+
+              {currentUser.id === selectedChat.donorId && (
+                <QRCodeGenerator
+                  itemId={selectedChat.itemId}
+                  itemTitle={selectedChat.itemTitle}
+                  category="general"
+                  condition="good"
+                  co2Impact={25}
+                  dropOffLocation={selectedDropOffLocation}
+                  type="donor"
+                  onGenerated={handleQRCodeGenerated}
+                />
+              )}
+
+              {currentUser.id === selectedChat.collectorId && (
+                <QRCodeGenerator
+                  itemId={selectedChat.itemId}
+                  itemTitle={selectedChat.itemTitle}
+                  category="general"
+                  condition="good"
+                  co2Impact={25}
+                  dropOffLocation={selectedDropOffLocation}
+                  type="collector"
+                  onGenerated={handleQRCodeGenerated}
+                />
+              )}
+
+              <Button variant="outline" onClick={() => setSelectedDropOffLocation('')} className="w-full">
+                Cancel
+              </Button>
             </div>
           </div>
         )}
 
-        {/* QR Code Display Dialog */}
         {showQRCode && (
           <QRCodeDisplay
             qrData={showQRCode}
