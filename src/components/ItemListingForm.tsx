@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -11,6 +12,7 @@ import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
 import { DropOffLocationSelector } from './DropOffLocationSelector'
 import type { DropOffLocation } from './dropOffLocations'
+import { sendListingSubmissionEmails } from '@/lib/emailAlerts'
 import { QRCodeDisplay, type QRCodeData } from './QRCode'
 
 const CATEGORIES = [
@@ -272,6 +274,25 @@ export function ItemListingForm({
       }
 
       toast.success('Item listed successfully!')
+
+      const emailResults = await sendListingSubmissionEmails(
+        { name: user.name || 'Donor', email: user.email },
+        formData.fulfillmentMethod === 'dropoff' ? formData.dropOffLocation ?? null : null,
+        {
+          id: newListing.id,
+          title: newListing.title,
+          category: newListing.category,
+          description: newListing.description,
+          fulfillmentMethod: formData.fulfillmentMethod,
+          dropOffLocation: formData.dropOffLocation
+        }
+      )
+
+      if (emailResults.length > 0) {
+        toast.success('Email alerts sent to donor and partner shop')
+      } else {
+        toast.info('Listing saved. Email alerts could not be sent automatically.')
+      }
 
       const qrCodeData: QRCodeData = {
         id: `qr-${Date.now()}`,
