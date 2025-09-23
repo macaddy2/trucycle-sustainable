@@ -1,5 +1,6 @@
 export { ItemListing } from './ItemListing'
 export { ItemListingForm } from './ItemListingForm'
+export { MyListingsView } from './MyListingsView'
 export { ProfileDashboard } from './ProfileDashboard'
 export { DropOffMap } from './DropOffMap'
 export { DropOffLocationSelector } from './DropOffLocationSelector'

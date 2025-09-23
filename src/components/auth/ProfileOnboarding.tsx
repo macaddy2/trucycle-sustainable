@@ -47,6 +47,7 @@ interface UserProfile {
     payment: boolean
     community: boolean
   }
+  rewardsBalance?: number
 }
 
 export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnboardingProps) {
@@ -153,7 +154,8 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
           address: true,
           payment: false,
           community: false
-        }
+        },
+        rewardsBalance: user?.rewardsBalance ?? 0
       }
 
       // Save to user profiles

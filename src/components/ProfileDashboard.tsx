@@ -12,8 +12,12 @@ import { AuthDialog } from './auth'
 import { VerificationBadge } from './VerificationBadge'
 import { RatingDisplay } from './RatingSystem'
 import { IntelligentRecommendations } from './IntelligentRecommendations'
-import { cn } from '@/lib/utils'
-import type { DropOffLocation } from './dropOffLocations'
+import { MyListingsView, type ManagedListing } from './MyListingsView'
+
+interface ProfileDashboardProps {
+  onCreateListing?: () => void
+  onOpenMessages?: () => void
+}
 
 interface UserProfile {
   id: string
@@ -31,33 +35,12 @@ interface UserProfile {
     payment: boolean
     community: boolean
   }
+  rewardsBalance?: number
 }
 
-type ListingStatus = 'active' | 'claimed' | 'collected' | 'expired' | 'pending_dropoff'
-
-interface ListedItem {
-  id: string
-  title: string
-  status: ListingStatus
-  category: string
-  createdAt: string
-  actionType: 'exchange' | 'donate' | 'recycle'
-  co2Impact?: number
-  fulfillmentMethod?: 'pickup' | 'dropoff'
-  dropOffLocation?: DropOffLocation | null
-}
-
-interface ProfileDashboardProps {
-  initialActiveTab?: 'overview' | 'listings' | 'recommendations' | 'impact'
-  highlightListingId?: string | null
-}
-
-export function ProfileDashboard({
-  initialActiveTab = 'overview',
-  highlightListingId = null
-}: ProfileDashboardProps) {
+export function ProfileDashboard({ onCreateListing, onOpenMessages }: ProfileDashboardProps) {
   const [user, setUser] = useKV<UserProfile | null>('current-user', null)
-  const [listings] = useKV<ListedItem[]>('user-listings', [])
+  const [listings] = useKV<ManagedListing[]>('user-listings', [])
   const [showAuthDialog, setShowAuthDialog] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'listings' | 'recommendations' | 'impact'>(initialActiveTab)
   const [highlightedListingId, setHighlightedListingId] = useState<string | null>(highlightListingId)
@@ -177,6 +160,7 @@ export function ProfileDashboard({
                   <Badge variant={user.userType === 'donor' ? 'default' : 'secondary'}>
                     {user.userType === 'donor' ? 'Donor' : 'Collector'} mode
                   </Badge>
+                  <Badge variant="outline">{(user.rewardsBalance ?? 0).toLocaleString()} pts</Badge>
                   {user.postcode && (
                     <span className="flex items-center gap-1">
                       <MapPin size={14} />
@@ -292,6 +276,10 @@ export function ProfileDashboard({
                     <span>Recommendations saved</span>
                     <strong>{user.userType === 'collector' ? '8' : '5'}</strong>
                   </div>
+                  <div className="flex items-center justify-between">
+                    <span>Reward balance</span>
+                    <strong>{user.rewardsBalance ?? 0} pts</strong>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -308,42 +296,16 @@ export function ProfileDashboard({
               {listings.length === 0 ? (
                 <div className="text-center text-sm text-muted-foreground">
                   <p>You have not listed any items yet.</p>
-                  <Button className="mt-4">Create your first listing</Button>
+                  <Button className="mt-4" onClick={onCreateListing}>Create your first listing</Button>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {listings.map((item) => (
-                    <Card
-                      key={item.id}
-                      className={cn(
-                        'border-dashed transition-all',
-                        highlightedListingId === item.id && 'border-primary bg-primary/10 shadow-lg'
-                      )}
-                    >
-                      <CardContent className="flex flex-col gap-2 p-4 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <p className="font-medium">{item.title}</p>
-                          <p className="text-xs text-muted-foreground capitalize">
-                            {formatStatus(item.status)} • {item.category} • {new Date(item.createdAt).toLocaleDateString()}
-                          {item.fulfillmentMethod === 'dropoff' && item.dropOffLocation && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Drop-off planned at {item.dropOffLocation.name} ({item.dropOffLocation.postcode})
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {highlightedListingId === item.id && (
-                            <Badge variant="secondary">New</Badge>
-                          )}
-                          <Badge variant="outline" className="capitalize">{item.actionType}</Badge>
-                          <Badge variant={STATUS_BADGE_VARIANT[item.status]}>{STATUS_LABELS[item.status]}</Badge>
-                          <Button size="sm" variant="outline">View</Button>
-                          <Button size="sm">Manage</Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                <MyListingsView
+                  variant="dashboard"
+                  defaultView="card"
+                  onAddNewItem={onCreateListing}
+                  onOpenMessages={onOpenMessages}
+                />
+
               )}
             </CardContent>
           </Card>

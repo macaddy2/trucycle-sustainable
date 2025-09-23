@@ -4,10 +4,10 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Toaster } from '@/components/ui/sonner'
-import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, Plus, User, QrCode, Bell } from '@phosphor-icons/react'
+import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, User, QrCode, Bell, Package } from '@phosphor-icons/react'
 import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
-import { ItemListing, ItemListingForm, ProfileDashboard, DropOffMap, CarbonTracker, ShopScanner, DemoGuide } from './components'
+import { ItemListing, ItemListingForm, MyListingsView, ProfileDashboard, DropOffMap, CarbonTracker, ShopScanner, DemoGuide } from './components'
 import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
@@ -31,6 +31,7 @@ interface UserProfile {
     payment: boolean
     community: boolean
   }
+  rewardsBalance?: number
 }
 
 function App() {
@@ -345,9 +346,9 @@ function App() {
                 <Search size={16} />
                 <span className="hidden sm:inline">Browse</span>
               </TabsTrigger>
-              <TabsTrigger value="list" className="flex items-center space-x-2">
-                <Plus size={16} />
-                <span className="hidden sm:inline">List Item</span>
+              <TabsTrigger value="listings" className="flex items-center space-x-2">
+                <Package size={16} />
+                <span className="hidden sm:inline">My Listed Items</span>
               </TabsTrigger>
               <TabsTrigger value="dropoff" className="flex items-center space-x-2">
                 <MapPin size={16} />
@@ -374,6 +375,13 @@ function App() {
               searchQuery={searchQuery}
               onStartDonationFlow={handleDonationFlowStart}
               onOpenMessages={handleOpenMessages}
+            />
+          </TabsContent>
+
+          <TabsContent value="listings">
+            <MyListingsView
+              onAddNewItem={() => setCurrentTab('list')}
+              onOpenMessages={() => setShowMessageCenter(true)}
             />
           </TabsContent>
 
@@ -407,8 +415,8 @@ function App() {
               />
             )}
             <ProfileDashboard
-              initialActiveTab={profileInitialTab}
-              highlightListingId={profileHighlightListingId}
+              onCreateListing={() => setCurrentTab('list')}
+              onOpenMessages={() => setShowMessageCenter(true)}
             />
           </TabsContent>
         </Tabs>
