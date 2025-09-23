@@ -12,6 +12,8 @@ import { AuthDialog } from './auth'
 import { VerificationBadge } from './VerificationBadge'
 import { RatingDisplay } from './RatingSystem'
 import { IntelligentRecommendations } from './IntelligentRecommendations'
+import { cn } from '@/lib/utils'
+import type { DropOffLocation } from './dropOffLocations'
 
 interface UserProfile {
   id: string
@@ -32,7 +34,6 @@ interface UserProfile {
 }
 
 type ListingStatus = 'active' | 'claimed' | 'collected' | 'expired' | 'pending_dropoff'
-type ProfileTab = 'overview' | 'listings' | 'recommendations' | 'impact'
 
 interface ListedItem {
   id: string
@@ -42,43 +43,36 @@ interface ListedItem {
   createdAt: string
   actionType: 'exchange' | 'donate' | 'recycle'
   co2Impact?: number
+  fulfillmentMethod?: 'pickup' | 'dropoff'
+  dropOffLocation?: DropOffLocation | null
 }
 
 interface ProfileDashboardProps {
-  focusTab?: ProfileTab
-  onTabChange?: (tab: ProfileTab) => void
+  initialActiveTab?: 'overview' | 'listings' | 'recommendations' | 'impact'
+  highlightListingId?: string | null
 }
 
-const STATUS_LABELS: Record<ListingStatus, string> = {
-  active: 'Active',
-  claimed: 'Claimed',
-  collected: 'Collected',
-  expired: 'Expired',
-  pending_dropoff: 'Pending dropoff'
-}
-
-const STATUS_BADGE_VARIANT: Record<ListingStatus, 'default' | 'secondary' | 'outline' | 'destructive'> = {
-  active: 'default',
-  claimed: 'secondary',
-  collected: 'outline',
-  expired: 'destructive',
-  pending_dropoff: 'secondary'
-}
-
-export function ProfileDashboard({ focusTab = 'overview', onTabChange }: ProfileDashboardProps) {
+export function ProfileDashboard({
+  initialActiveTab = 'overview',
+  highlightListingId = null
+}: ProfileDashboardProps) {
   const [user, setUser] = useKV<UserProfile | null>('current-user', null)
   const [listings] = useKV<ListedItem[]>('user-listings', [])
   const [showAuthDialog, setShowAuthDialog] = useState(false)
-  const [activeTab, setActiveTab] = useState<ProfileTab>(focusTab)
+  const [activeTab, setActiveTab] = useState<'overview' | 'listings' | 'recommendations' | 'impact'>(initialActiveTab)
+  const [highlightedListingId, setHighlightedListingId] = useState<string | null>(highlightListingId)
 
   useEffect(() => {
-    setActiveTab(focusTab)
-  }, [focusTab])
+    setActiveTab(initialActiveTab)
+  }, [initialActiveTab])
 
-  const handleTabChange = (value: ProfileTab) => {
-    setActiveTab(value)
-    onTabChange?.(value)
-  }
+  useEffect(() => {
+    setHighlightedListingId(highlightListingId)
+    if (!highlightListingId) return
+
+    const timer = window.setTimeout(() => setHighlightedListingId(null), 6000)
+    return () => window.clearTimeout(timer)
+  }, [highlightListingId])
 
   const verificationStats = useMemo(() => {
     if (!user) {
@@ -94,6 +88,23 @@ export function ProfileDashboard({ focusTab = 'overview', onTabChange }: Profile
   const recentListings = useMemo(() => {
     return listings.slice(0, 5)
   }, [listings])
+
+  const formatStatus = (status: ListingStatus) => {
+    switch (status) {
+      case 'pending_dropoff':
+        return 'Pending Dropoff'
+      case 'active':
+        return 'Active'
+      case 'claimed':
+        return 'Claimed'
+      case 'collected':
+        return 'Collected'
+      case 'expired':
+        return 'Expired'
+      default:
+        return status
+    }
+  }
 
   const handleToggleUserType = () => {
     if (!user) return
@@ -247,7 +258,9 @@ export function ProfileDashboard({ focusTab = 'overview', onTabChange }: Profile
                       <li key={item.id} className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{item.title}</p>
-                          <p className="text-xs text-muted-foreground">{STATUS_LABELS[item.status]} • {item.category}</p>
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {formatStatus(item.status)} • {item.category}
+                          </p>
                         </div>
                         <Badge variant="outline" className="capitalize">{item.actionType}</Badge>
                       </li>
@@ -300,15 +313,28 @@ export function ProfileDashboard({ focusTab = 'overview', onTabChange }: Profile
               ) : (
                 <div className="space-y-3">
                   {listings.map((item) => (
-                    <Card key={item.id} className="border-dashed">
+                    <Card
+                      key={item.id}
+                      className={cn(
+                        'border-dashed transition-all',
+                        highlightedListingId === item.id && 'border-primary bg-primary/10 shadow-lg'
+                      )}
+                    >
                       <CardContent className="flex flex-col gap-2 p-4 md:flex-row md:items-center md:justify-between">
                         <div>
                           <p className="font-medium">{item.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {STATUS_LABELS[item.status]} • {item.category} • {new Date(item.createdAt).toLocaleDateString()}
-                          </p>
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {formatStatus(item.status)} • {item.category} • {new Date(item.createdAt).toLocaleDateString()}
+                          {item.fulfillmentMethod === 'dropoff' && item.dropOffLocation && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Drop-off planned at {item.dropOffLocation.name} ({item.dropOffLocation.postcode})
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
+                          {highlightedListingId === item.id && (
+                            <Badge variant="secondary">New</Badge>
+                          )}
                           <Badge variant="outline" className="capitalize">{item.actionType}</Badge>
                           <Badge variant={STATUS_BADGE_VARIANT[item.status]}>{STATUS_LABELS[item.status]}</Badge>
                           <Button size="sm" variant="outline">View</Button>
