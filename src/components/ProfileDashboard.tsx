@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +12,8 @@ import { AuthDialog } from './auth'
 import { VerificationBadge } from './VerificationBadge'
 import { RatingDisplay } from './RatingSystem'
 import { IntelligentRecommendations } from './IntelligentRecommendations'
+import { cn } from '@/lib/utils'
+import type { DropOffLocation } from './dropOffLocations'
 
 interface UserProfile {
   id: string
@@ -31,21 +33,46 @@ interface UserProfile {
   }
 }
 
+type ListingStatus = 'active' | 'claimed' | 'collected' | 'expired' | 'pending_dropoff'
+
 interface ListedItem {
   id: string
   title: string
-  status: 'active' | 'claimed' | 'collected' | 'expired'
+  status: ListingStatus
   category: string
   createdAt: string
   actionType: 'exchange' | 'donate' | 'recycle'
   co2Impact?: number
+  fulfillmentMethod?: 'pickup' | 'dropoff'
+  dropOffLocation?: DropOffLocation | null
 }
 
-export function ProfileDashboard() {
+interface ProfileDashboardProps {
+  initialActiveTab?: 'overview' | 'listings' | 'recommendations' | 'impact'
+  highlightListingId?: string | null
+}
+
+export function ProfileDashboard({
+  initialActiveTab = 'overview',
+  highlightListingId = null
+}: ProfileDashboardProps) {
   const [user, setUser] = useKV<UserProfile | null>('current-user', null)
   const [listings] = useKV<ListedItem[]>('user-listings', [])
   const [showAuthDialog, setShowAuthDialog] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'listings' | 'recommendations' | 'impact'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'listings' | 'recommendations' | 'impact'>(initialActiveTab)
+  const [highlightedListingId, setHighlightedListingId] = useState<string | null>(highlightListingId)
+
+  useEffect(() => {
+    setActiveTab(initialActiveTab)
+  }, [initialActiveTab])
+
+  useEffect(() => {
+    setHighlightedListingId(highlightListingId)
+    if (!highlightListingId) return
+
+    const timer = window.setTimeout(() => setHighlightedListingId(null), 6000)
+    return () => window.clearTimeout(timer)
+  }, [highlightListingId])
 
   const verificationStats = useMemo(() => {
     if (!user) {
@@ -61,6 +88,23 @@ export function ProfileDashboard() {
   const recentListings = useMemo(() => {
     return listings.slice(0, 5)
   }, [listings])
+
+  const formatStatus = (status: ListingStatus) => {
+    switch (status) {
+      case 'pending_dropoff':
+        return 'Pending Dropoff'
+      case 'active':
+        return 'Active'
+      case 'claimed':
+        return 'Claimed'
+      case 'collected':
+        return 'Collected'
+      case 'expired':
+        return 'Expired'
+      default:
+        return status
+    }
+  }
 
   const handleToggleUserType = () => {
     if (!user) return
@@ -81,7 +125,7 @@ export function ProfileDashboard() {
 
   const handleCompleteSetup = () => {
     toast.info('Opening setup checklist...')
-    setActiveTab('overview')
+    handleTabChange('overview')
   }
 
   if (!user) {
@@ -111,6 +155,8 @@ export function ProfileDashboard() {
   const profileInitials = user.name
     ? user.name.split(' ').map((segment) => segment[0]).join('').toUpperCase()
     : 'U'
+  const avatarSeed = encodeURIComponent(user.email || user.name || 'TruCycle user')
+  const avatarAltText = user.name || user.email || 'TruCycle user avatar'
 
   return (
     <div className="space-y-6">
@@ -119,7 +165,7 @@ export function ProfileDashboard() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
               <Avatar className="w-16 h-16">
-                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} alt={user.name} />
+                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`} alt={avatarAltText} />
                 <AvatarFallback>{profileInitials}</AvatarFallback>
               </Avatar>
               <div>
@@ -162,7 +208,7 @@ export function ProfileDashboard() {
         </CardHeader>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
+      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as ProfileTab)}>
         <TabsList className="grid grid-cols-4 md:w-auto md:inline-flex">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="listings">My listings</TabsTrigger>
@@ -212,7 +258,9 @@ export function ProfileDashboard() {
                       <li key={item.id} className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{item.title}</p>
-                          <p className="text-xs text-muted-foreground capitalize">{item.status} • {item.category}</p>
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {formatStatus(item.status)} • {item.category}
+                          </p>
                         </div>
                         <Badge variant="outline" className="capitalize">{item.actionType}</Badge>
                       </li>
@@ -265,16 +313,30 @@ export function ProfileDashboard() {
               ) : (
                 <div className="space-y-3">
                   {listings.map((item) => (
-                    <Card key={item.id} className="border-dashed">
+                    <Card
+                      key={item.id}
+                      className={cn(
+                        'border-dashed transition-all',
+                        highlightedListingId === item.id && 'border-primary bg-primary/10 shadow-lg'
+                      )}
+                    >
                       <CardContent className="flex flex-col gap-2 p-4 md:flex-row md:items-center md:justify-between">
                         <div>
                           <p className="font-medium">{item.title}</p>
                           <p className="text-xs text-muted-foreground capitalize">
-                            {item.status} • {item.category} • {new Date(item.createdAt).toLocaleDateString()}
-                          </p>
+                            {formatStatus(item.status)} • {item.category} • {new Date(item.createdAt).toLocaleDateString()}
+                          {item.fulfillmentMethod === 'dropoff' && item.dropOffLocation && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Drop-off planned at {item.dropOffLocation.name} ({item.dropOffLocation.postcode})
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
+                          {highlightedListingId === item.id && (
+                            <Badge variant="secondary">New</Badge>
+                          )}
                           <Badge variant="outline" className="capitalize">{item.actionType}</Badge>
+                          <Badge variant={STATUS_BADGE_VARIANT[item.status]}>{STATUS_LABELS[item.status]}</Badge>
                           <Button size="sm" variant="outline">View</Button>
                           <Button size="sm">Manage</Button>
                         </div>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -11,6 +12,7 @@ import { useKV } from '@github/spark/hooks'
 import { toast } from 'sonner'
 import { DropOffLocationSelector } from './DropOffLocationSelector'
 import type { DropOffLocation } from './dropOffLocations'
+import { sendListingSubmissionEmails } from '@/lib/emailAlerts'
 import { QRCodeDisplay, type QRCodeData } from './QRCode'
 
 const CATEGORIES = [
@@ -52,8 +54,33 @@ const ACTION_TYPES = [
   }
 ]
 
+export interface CreatedListing {
+  id: string
+  title: string
+  description: string
+  category: string
+  condition: string
+  actionType: string
+  photos: string[]
+  location: string
+  contactMethod: string
+  fulfillmentMethod: 'pickup' | 'dropoff'
+  dropOffLocation: DropOffLocation | null
+  userId: string
+  userName: string
+  status: 'active' | 'pending_dropoff'
+  createdAt: string
+  views: number
+  interested: string[]
+}
+
+export interface ListingCompletionDetails {
+  listing: CreatedListing
+  qrCode: QRCodeData
+}
+
 interface ItemListingFormProps {
-  onComplete?: () => void
+  onComplete?: (details: ListingCompletionDetails) => void
   prefillFulfillmentMethod?: 'pickup' | 'dropoff' | null
   prefillDropOffLocation?: DropOffLocation | null
   onFulfillmentPrefillHandled?: () => void
@@ -88,6 +115,7 @@ export function ItemListingForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showDropOffSelector, setShowDropOffSelector] = useState(false)
   const [generatedQRCode, setGeneratedQRCode] = useState<QRCodeData | null>(null)
+  const [lastCreatedListing, setLastCreatedListing] = useState<CreatedListing | null>(null)
 
   const totalSteps = 5
   const progress = (currentStep / totalSteps) * 100
@@ -208,12 +236,18 @@ export function ItemListingForm({
         : formData.actionType === 'donate' ? 3
           : 2
 
-      const newListing = {
+      const fulfillmentMethod = formData.fulfillmentMethod || 'pickup'
+      const listingStatus: CreatedListing['status'] =
+        fulfillmentMethod === 'dropoff' ? 'pending_dropoff' : 'active'
+
+      const newListing: CreatedListing = {
         id: `listing-${Date.now()}`,
         ...formData,
+        fulfillmentMethod,
+        dropOffLocation: formData.dropOffLocation,
         userId: user.id,
         userName: user.name || 'Anonymous User',
-        status: 'active',
+        status: listingStatus,
         createdAt: new Date().toISOString(),
         views: 0,
         interested: []
@@ -241,6 +275,25 @@ export function ItemListingForm({
 
       toast.success('Item listed successfully!')
 
+      const emailResults = await sendListingSubmissionEmails(
+        { name: user.name || 'Donor', email: user.email },
+        formData.fulfillmentMethod === 'dropoff' ? formData.dropOffLocation ?? null : null,
+        {
+          id: newListing.id,
+          title: newListing.title,
+          category: newListing.category,
+          description: newListing.description,
+          fulfillmentMethod: formData.fulfillmentMethod,
+          dropOffLocation: formData.dropOffLocation
+        }
+      )
+
+      if (emailResults.length > 0) {
+        toast.success('Email alerts sent to donor and partner shop')
+      } else {
+        toast.info('Listing saved. Email alerts could not be sent automatically.')
+      }
+
       const qrCodeData: QRCodeData = {
         id: `qr-${Date.now()}`,
         type: 'donor',
@@ -263,6 +316,39 @@ export function ItemListingForm({
       }
 
       setGeneratedQRCode(qrCodeData)
+      setLastCreatedListing(newListing)
+
+      if (fulfillmentMethod === 'dropoff' && formData.dropOffLocation) {
+        const emailLog = await spark.kv.get('email-log') || []
+        const partnerEmail = `${formData.dropOffLocation.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '')}@partner.trucycle`
+
+        const emailEntries = [
+          {
+            id: `email-${Date.now()}-user`,
+            to: user.email,
+            subject: `Drop-off scheduled: ${newListing.title}`,
+            body: `Hi ${user.name || 'there'},\n\nYour item "${newListing.title}" is scheduled for drop-off at ${formData.dropOffLocation.name}. Present the attached QR code when you arrive.`,
+            context: 'dropoff_confirmation',
+            createdAt: new Date().toISOString()
+          },
+          {
+            id: `email-${Date.now()}-partner`,
+            to: partnerEmail,
+            subject: `New TruCycle drop-off from ${user.name || 'TruCycle user'}`,
+            body: `${user.name || 'A TruCycle user'} is planning to drop off "${newListing.title}" at your location (${formData.dropOffLocation.address}). Please prepare to scan their QR code upon arrival.`,
+            context: 'partner_notification',
+            createdAt: new Date().toISOString(),
+            locationId: formData.dropOffLocation.id
+          }
+        ]
+
+        await spark.kv.set('email-log', [...emailLog, ...emailEntries])
+        toast.success('Email confirmations sent', {
+          description: `We notified you and ${formData.dropOffLocation.name} about this drop-off.`
+        })
+      }
 
       // Reset form
       setFormData({
@@ -288,10 +374,11 @@ export function ItemListingForm({
   }
 
   const handleQRCodeClose = () => {
-    setGeneratedQRCode(null)
-    if (onComplete) {
-      onComplete()
+    if (onComplete && generatedQRCode && lastCreatedListing) {
+      onComplete({ listing: lastCreatedListing, qrCode: generatedQRCode })
     }
+    setGeneratedQRCode(null)
+    setLastCreatedListing(null)
   }
 
   if (!user) {
