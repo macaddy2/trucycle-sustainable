@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -42,7 +42,20 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages }: ProfileDas
   const [user, setUser] = useKV<UserProfile | null>('current-user', null)
   const [listings] = useKV<ManagedListing[]>('user-listings', [])
   const [showAuthDialog, setShowAuthDialog] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'listings' | 'recommendations' | 'impact'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'listings' | 'recommendations' | 'impact'>(initialActiveTab)
+  const [highlightedListingId, setHighlightedListingId] = useState<string | null>(highlightListingId)
+
+  useEffect(() => {
+    setActiveTab(initialActiveTab)
+  }, [initialActiveTab])
+
+  useEffect(() => {
+    setHighlightedListingId(highlightListingId)
+    if (!highlightListingId) return
+
+    const timer = window.setTimeout(() => setHighlightedListingId(null), 6000)
+    return () => window.clearTimeout(timer)
+  }, [highlightListingId])
 
   const verificationStats = useMemo(() => {
     if (!user) {
@@ -58,6 +71,23 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages }: ProfileDas
   const recentListings = useMemo(() => {
     return listings.slice(0, 5)
   }, [listings])
+
+  const formatStatus = (status: ListingStatus) => {
+    switch (status) {
+      case 'pending_dropoff':
+        return 'Pending Dropoff'
+      case 'active':
+        return 'Active'
+      case 'claimed':
+        return 'Claimed'
+      case 'collected':
+        return 'Collected'
+      case 'expired':
+        return 'Expired'
+      default:
+        return status
+    }
+  }
 
   const handleToggleUserType = () => {
     if (!user) return
@@ -78,7 +108,7 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages }: ProfileDas
 
   const handleCompleteSetup = () => {
     toast.info('Opening setup checklist...')
-    setActiveTab('overview')
+    handleTabChange('overview')
   }
 
   if (!user) {
@@ -108,6 +138,8 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages }: ProfileDas
   const profileInitials = user.name
     ? user.name.split(' ').map((segment) => segment[0]).join('').toUpperCase()
     : 'U'
+  const avatarSeed = encodeURIComponent(user.email || user.name || 'TruCycle user')
+  const avatarAltText = user.name || user.email || 'TruCycle user avatar'
 
   return (
     <div className="space-y-6">
@@ -116,7 +148,7 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages }: ProfileDas
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
               <Avatar className="w-16 h-16">
-                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} alt={user.name} />
+                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`} alt={avatarAltText} />
                 <AvatarFallback>{profileInitials}</AvatarFallback>
               </Avatar>
               <div>
@@ -160,7 +192,7 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages }: ProfileDas
         </CardHeader>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
+      <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as ProfileTab)}>
         <TabsList className="grid grid-cols-4 md:w-auto md:inline-flex">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="listings">My listings</TabsTrigger>
@@ -210,7 +242,9 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages }: ProfileDas
                       <li key={item.id} className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{item.title}</p>
-                          <p className="text-xs text-muted-foreground capitalize">{item.status} • {item.category}</p>
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {formatStatus(item.status)} • {item.category}
+                          </p>
                         </div>
                         <Badge variant="outline" className="capitalize">{item.actionType}</Badge>
                       </li>
@@ -271,6 +305,7 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages }: ProfileDas
                   onAddNewItem={onCreateListing}
                   onOpenMessages={onOpenMessages}
                 />
+
               )}
             </CardContent>
           </Card>

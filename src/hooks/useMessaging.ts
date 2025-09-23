@@ -45,6 +45,7 @@ interface Chat {
   collectorId: string
   collectorName: string
   collectorAvatar?: string
+  linkedRequestId?: string
   status: 'active' | 'collection_arranged' | 'completed' | 'cancelled'
   lastMessage?: Message
   unreadCount: number
@@ -66,16 +67,24 @@ export function useMessaging() {
     donorAvatar: string | undefined,
     collectorId: string,
     collectorName: string,
-    collectorAvatar: string | undefined
+    collectorAvatar: string | undefined,
+    options?: { linkedRequestId?: string }
   ) => {
     // Check if chat already exists
-    const existingChat = chats.find(chat => 
-      chat.itemId === itemId && 
-      chat.donorId === donorId && 
+    const existingChat = chats.find(chat =>
+      chat.itemId === itemId &&
+      chat.donorId === donorId &&
       chat.collectorId === collectorId
     )
 
     if (existingChat) {
+      if (options?.linkedRequestId && existingChat.linkedRequestId !== options.linkedRequestId) {
+        setChats(prev => prev.map(chat =>
+          chat.id === existingChat.id
+            ? { ...chat, linkedRequestId: options.linkedRequestId }
+            : chat
+        ))
+      }
       return existingChat.id
     }
 
@@ -92,6 +101,7 @@ export function useMessaging() {
       collectorId,
       collectorName,
       collectorAvatar,
+      linkedRequestId: options?.linkedRequestId,
       status: 'active',
       unreadCount: 0,
       createdAt: new Date(),
@@ -290,3 +300,5 @@ export function useMessaging() {
     getChatForItem
   }
 }
+
+export type { Message, Chat }
