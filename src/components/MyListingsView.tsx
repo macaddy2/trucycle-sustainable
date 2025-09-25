@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,6 +9,8 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ChatCircle, CheckCircle, Clock, Package, Plus, ShieldCheck } from '@phosphor-icons/react'
 import { useMessaging } from '@/hooks'
+import type { ListingClassificationResult } from '@/lib/ai/classifier'
+import type { ModerationResult } from '@/lib/ai/moderation'
 
 interface UserProfile {
   id: string
@@ -27,7 +29,7 @@ export interface ListingValuation {
 export interface ManagedListing {
   id: string
   title: string
-  status: 'active' | 'claimed' | 'collected' | 'expired'
+  status: 'active' | 'pending_dropoff' | 'claimed' | 'collected' | 'expired'
   category: string
   createdAt: string
   actionType: 'exchange' | 'donate' | 'recycle'
@@ -36,6 +38,8 @@ export interface ManagedListing {
   valuation?: ListingValuation
   rewardPoints?: number
   co2Impact?: number
+  aiClassification?: ListingClassificationResult
+  moderation?: ModerationResult
 }
 
 interface MyListingsViewProps {
@@ -45,13 +49,20 @@ interface MyListingsViewProps {
   onOpenMessages?: () => void
 }
 
+
+const CLASSIFICATION_TEXT: Record<'exchange' | 'donate' | 'recycle', string> = {
+  exchange: 'Free exchange',
+  donate: 'Community donation',
+  recycle: 'Professional recycling',
+}
+
 const statusCopy: Record<ManagedListing['status'], { label: string; tone: 'default' | 'success' | 'warning' | 'outline' }> = {
   active: { label: 'Active', tone: 'outline' },
+  pending_dropoff: { label: 'Pending drop-off', tone: 'warning' },
   claimed: { label: 'Claimed', tone: 'warning' },
   collected: { label: 'Collected', tone: 'success' },
   expired: { label: 'Expired', tone: 'default' },
 }
-
 const formatDate = (value: string) => {
   const date = new Date(value)
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -179,9 +190,19 @@ export function MyListingsView({
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={status.tone === 'default' ? 'default' : status.tone} className="capitalize">
-                    {status.label}
-                  </Badge>
+                  <div className="space-y-1">
+                    <Badge variant={status.tone === 'default' ? 'default' : status.tone} className="capitalize">
+                      {status.label}
+                    </Badge>
+                    {listing.aiClassification && (
+                      <p className="text-[11px] text-muted-foreground">
+                        {CLASSIFICATION_TEXT[listing.aiClassification.recommendedAction]} ({listing.aiClassification.confidence} confidence)
+                      </p>
+                    )}
+                    {listing.moderation?.status === 'flagged' && (
+                      <p className="text-[11px] text-destructive">{listing.moderation.message}</p>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="capitalize">{listing.actionType}</TableCell>
                 <TableCell>
@@ -250,6 +271,39 @@ export function MyListingsView({
                   <span className="capitalize">{listing.fulfillmentMethod} ready</span>
                 )}
               </div>
+              {(listing.aiClassification || listing.moderation) && (
+                <div className="space-y-2 text-xs">
+                  {listing.aiClassification && (
+                    <div className="rounded-md border border-primary/20 bg-primary/5 p-3 space-y-1">
+                      <p className="font-semibold text-primary">{CLASSIFICATION_TEXT[listing.aiClassification.recommendedAction]}</p>
+                      <p className="text-muted-foreground">{listing.aiClassification.reasoning}</p>
+                    </div>
+                  )}
+                  {listing.moderation && (
+                    <div
+                      className={
+                        listing.moderation.status === 'flagged'
+                          ? 'rounded-md border p-3 space-y-1 border-destructive/40 bg-destructive/10 text-destructive'
+                          : 'rounded-md border p-3 space-y-1 border-secondary/40 bg-secondary/10'
+                      }
+                    >
+                      <p className="font-semibold">
+                        {listing.moderation.status === 'flagged' ? 'Flagged for review' : 'Image check passed'}
+                      </p>
+                      <p className="text-muted-foreground">{listing.moderation.message}</p>
+                      {listing.moderation.labels.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {listing.moderation.labels.map((label) => (
+                            <Badge key={label} variant="outline">
+                              {label}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="rounded-md bg-muted/60 p-3 text-xs text-muted-foreground space-y-1">
                 <p>Reward on completion:{' '}
                   {typeof reward === 'number' ? <span className="font-medium text-primary">+{reward} pts</span> : 'Pending'}</p>
@@ -337,3 +391,8 @@ export function MyListingsView({
     </Card>
   )
 }
+
+
+
+
+

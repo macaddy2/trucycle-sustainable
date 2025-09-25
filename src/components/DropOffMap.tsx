@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MapPin, Clock, Phone, NavigationArrow, Storefront, ArrowRight } from '@phosphor-icons/react'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/useKV'
 import { DROP_OFF_LOCATIONS, type DropOffLocation } from './dropOffLocations'
 
 interface DropOffMapProps {

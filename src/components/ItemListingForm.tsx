@@ -6,13 +6,15 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Badge } from '@/components/ui/badge'
 import { Plus, Camera, MapPin, Recycle, Heart, ArrowsClockwise, Truck, Storefront } from '@phosphor-icons/react'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
+import { kvGet, kvSet } from '@/lib/kvStore'
 import { DropOffLocationSelector } from './DropOffLocationSelector'
 import type { DropOffLocation } from './dropOffLocations'
 import { sendListingSubmissionEmails } from '@/lib/emailAlerts'
+import { classifyListing, type ListingClassificationResult } from '@/lib/ai/classifier'
+import { moderateImages, type ModerationResult } from '@/lib/ai/moderation'
 import { QRCodeDisplay, type QRCodeData } from './QRCode'
 import type { ListingValuation, ManagedListing } from './MyListingsView'
 
@@ -33,6 +35,12 @@ const CONDITIONS = [
   { value: 'fair', label: 'Fair', description: 'Noticeable wear but functional' },
   { value: 'poor', label: 'Poor', description: 'Significant wear, may need repair' }
 ]
+
+const CLASSIFICATION_LABELS: Record<'exchange' | 'donate' | 'recycle', string> = {
+  exchange: 'Free exchange',
+  donate: 'Community donation',
+  recycle: 'Professional recycling',
+}
 
 const ACTION_TYPES = [
   {
@@ -130,6 +138,18 @@ const calculateListingValuation = (
   }
 }
 
+type CreatedListing = ManagedListing & {
+  userId: string
+  userName: string
+  views: number
+  interested: string[]
+}
+
+export type ListingCompletionDetails = {
+  listing: CreatedListing
+  qrCode: QRCodeData
+}
+
 interface ItemListingFormProps {
   onComplete?: (details: ListingCompletionDetails) => void
   prefillFulfillmentMethod?: 'pickup' | 'dropoff' | null
@@ -166,13 +186,83 @@ export function ItemListingForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showDropOffSelector, setShowDropOffSelector] = useState(false)
   const [generatedQRCode, setGeneratedQRCode] = useState<QRCodeData | null>(null)
+  const [classificationResult, setClassificationResult] = useState<ListingClassificationResult | null>(null)
+  const [classificationLoading, setClassificationLoading] = useState(false)
+  const [moderationResult, setModerationResult] = useState<ModerationResult | null>(null)
+  const [moderationLoading, setModerationLoading] = useState(false)
   const valuationSummary = useMemo(
     () => calculateListingValuation(formData.category, formData.condition, formData.actionType),
     [formData.category, formData.condition, formData.actionType]
   )
   const totalSteps = 5
   const progress = (currentStep / totalSteps) * 100
+  useEffect(() => {
+    const { title, description, category, condition } = formData;
+    if (!title && !description) {
+      setClassificationResult(null);
+      return;
+    }
+    let cancelled = false;
+    setClassificationLoading(true);
+    classifyListing({
+      title,
+      description,
+      category,
+      condition: condition || 'unspecified',
+    })
+      .then((result) => {
+        if (!cancelled) {
+          setClassificationResult(result);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setClassificationResult(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setClassificationLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.title, formData.description, formData.category, formData.condition]);
 
+  useEffect(() => {
+    const descriptors = formData.photos.length > 0
+      ? formData.photos
+      : [formData.description || formData.title || ''];
+    if (!descriptors.some(Boolean)) {
+      setModerationResult(null);
+      return;
+    }
+    let cancelled = false;
+    setModerationLoading(true);
+    moderateImages(descriptors)
+      .then((result) => {
+        if (!cancelled) {
+          setModerationResult(result);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setModerationResult(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setModerationLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.photos, formData.description, formData.title]);
+
+
+  const moderationToneClass = moderationResult?.status === 'flagged' ? 'border-destructive/40 bg-destructive/10' : 'bg-muted/40'
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
@@ -301,6 +391,25 @@ export function ItemListingForm({
       const fulfillmentMethod = formData.fulfillmentMethod || 'pickup'
       const listingStatus: CreatedListing['status'] =
         fulfillmentMethod === 'dropoff' ? 'pending_dropoff' : 'active'
+      let classification = classificationResult
+      if (!classification) {
+        classification = await classifyListing({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          condition: formData.condition || 'unspecified',
+        })
+        setClassificationResult(classification)
+      }
+
+      let moderation = moderationResult
+      if (!moderation) {
+        const descriptors = formData.photos.length > 0
+          ? formData.photos
+          : [formData.description || formData.title || ''];
+        moderation = await moderateImages(descriptors)
+        setModerationResult(moderation)
+      }
 
       const newListing: CreatedListing = {
         id: `listing-${Date.now()}`,
@@ -315,6 +424,8 @@ export function ItemListingForm({
         interested: [],
         valuation: listingValuation,
         rewardPoints,
+        moderation,
+        aiClassification: classification,
         co2Impact: carbonImpact
       }
 
@@ -322,8 +433,8 @@ export function ItemListingForm({
       setListings(currentListings => [...currentListings, newListing])
 
       // Add to global listings for browsing
-      const globalListings = await spark.kv.get('global-listings') || []
-      await spark.kv.set('global-listings', [...globalListings, newListing])
+      const globalListings = await kvGet('global-listings') || []
+      await kvSet('global-listings', [...globalListings, newListing])
 
       // Update user's carbon footprint based on action type
       if (user.carbonFootprint) {
@@ -335,7 +446,7 @@ export function ItemListingForm({
             itemsProcessed: user.carbonFootprint.itemsProcessed + 1
           }
         }
-        await spark.kv.set('current-user', updatedUser)
+        await kvSet('current-user', updatedUser)
       }
 
       toast.success('Item listed successfully!')
@@ -384,7 +495,7 @@ export function ItemListingForm({
       setLastCreatedListing(newListing)
 
       if (fulfillmentMethod === 'dropoff' && formData.dropOffLocation) {
-        const emailLog = await spark.kv.get('email-log') || []
+        const emailLog = await kvGet('email-log') || []
         const partnerEmail = `${formData.dropOffLocation.name
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '')}@partner.trucycle`
@@ -394,7 +505,6 @@ export function ItemListingForm({
             id: `email-${Date.now()}-user`,
             to: user.email,
             subject: `Drop-off scheduled: ${newListing.title}`,
-            body: `Hi ${user.name || 'there'},\n\nYour item "${newListing.title}" is scheduled for drop-off at ${formData.dropOffLocation.name}. Present the attached QR code when you arrive.`,
             context: 'dropoff_confirmation',
             createdAt: new Date().toISOString()
           },
@@ -409,7 +519,7 @@ export function ItemListingForm({
           }
         ]
 
-        await spark.kv.set('email-log', [...emailLog, ...emailEntries])
+        await kvSet('email-log', [...emailLog, ...emailEntries])
         toast.success('Email confirmations sent', {
           description: `We notified you and ${formData.dropOffLocation.name} about this drop-off.`
         })
@@ -497,6 +607,55 @@ export function ItemListingForm({
         <Progress value={progress} className="mt-2" />
       </CardHeader>
       <CardContent className="space-y-6">
+        {(classificationLoading || classificationResult || moderationLoading || moderationResult) && (
+          <div className="grid gap-4 md:grid-cols-2">
+            {(classificationLoading || classificationResult) && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">
+                <p className="text-sm font-semibold text-primary">AI category guidance</p>
+                {classificationLoading ? (
+                  <p className="text-xs text-muted-foreground">Analysing your listing details…</p>
+                ) : classificationResult ? (
+                  <>
+                    <Badge variant="outline" className="uppercase tracking-wide">
+                      {CLASSIFICATION_LABELS[classificationResult.recommendedAction]}
+                    </Badge>
+                    <p className="text-sm">{classificationResult.reasoning}</p>
+                    {classificationResult.highlights.length > 0 && (
+                      <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                        {classificationResult.highlights.map((point, index) => (
+                          <li key={index}>{point}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Provide more detail to receive tailored recommendations.</p>
+                )}
+              </div>
+            )}
+            {(moderationLoading || moderationResult) && (
+              <div className={`rounded-lg border p-4 space-y-2 ${moderationToneClass}`}>
+                <p className="text-sm font-semibold">Image safety check</p>
+                {moderationLoading ? (
+                  <p className="text-xs text-muted-foreground">Reviewing photos for safety…</p>
+                ) : moderationResult ? (
+                  <>
+                    <p className="text-sm">{moderationResult.message}</p>
+                    {moderationResult.labels.length > 0 && (
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        {moderationResult.labels.map((label) => (
+                          <Badge key={label} variant="outline">{label}</Badge>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Add a photo or description to run an automated safety check.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {/* Step 1: Basic Information */}
         {currentStep === 1 && (
           <div className="space-y-4">

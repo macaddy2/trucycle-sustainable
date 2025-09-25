@@ -17,7 +17,8 @@ import {
   User,
   Shield
 } from '@phosphor-icons/react'
-import { useKV } from '@github/spark/hooks'
+import { kvGet, kvSet } from '@/lib/kvStore'
+import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
 interface ProfileOnboardingProps {
@@ -100,6 +101,27 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
     return prefix && londonPrefixes.includes(prefix)
   }
 
+  const deriveAreaDetails = (postcode: string) => {
+    const normalized = postcode.trim().toUpperCase();
+    const areaMappings = [
+      { pattern: /^EC/, area: 'City of London', district: 'Central', serviceArea: 'Central London' },
+      { pattern: /^WC/, area: 'West Central London', district: 'Central', serviceArea: 'Central London' },
+      { pattern: /^NW/, area: 'North West London', district: 'North West', serviceArea: 'North West London' },
+      { pattern: /^SE/, area: 'South East London', district: 'South East', serviceArea: 'South East London' },
+      { pattern: /^SW/, area: 'South West London', district: 'South West', serviceArea: 'South West London' },
+      { pattern: /^E/, area: 'East London', district: 'East', serviceArea: 'East London' },
+      { pattern: /^W/, area: 'West London', district: 'West', serviceArea: 'West London' },
+      { pattern: /^N/, area: 'North London', district: 'North', serviceArea: 'North London' },
+    ];
+    const match = areaMappings.find(mapping => mapping.pattern.test(normalized));
+    return match ?? { area: 'Greater London', district: 'Greater London', serviceArea: 'Greater London' };
+  };
+
+  const verifyPostcodeDetails = async (postcode: string) => ({
+    isValid: true,
+    ...deriveAreaDetails(postcode),
+  });
+
   const handleComplete = async () => {
     if (!profileData.postcode || !validatePostcode(profileData.postcode)) {
       toast.error('Please enter a valid postcode')
@@ -114,18 +136,7 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
     setIsLoading(true)
 
     try {
-      // Simulate address authentication
-      const addressPrompt = spark.llmPrompt`Verify that postcode ${profileData.postcode} is a valid London postcode and provide area information. Return a JSON response with:
-      {
-        "isValid": true/false,
-        "area": "area name",
-        "district": "district name", 
-        "coordinates": {"lat": number, "lng": number},
-        "serviceArea": "zone name"
-      }`
-
-      const addressVerification = await spark.llm(addressPrompt, 'gpt-4o-mini', true)
-      const verificationData = JSON.parse(addressVerification)
+      const verificationData = await verifyPostcodeDetails(profileData.postcode)
 
       if (!verificationData.isValid) {
         toast.error('Invalid postcode. Please check and try again.')
@@ -159,8 +170,8 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
       }
 
       // Save to user profiles
-      const userProfiles = await spark.kv.get('user-profiles') || {}
-      await spark.kv.set('user-profiles', {
+      const userProfiles = await kvGet('user-profiles') || {}
+      await kvSet('user-profiles', {
         ...userProfiles,
         [updatedUser.id]: updatedUser
       })
@@ -190,7 +201,7 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
         updatedAt: new Date().toISOString()
       }
 
-      await spark.kv.set(`user-preferences-${updatedUser.id}`, initialPreferences)
+      await kvSet(`user-preferences-${updatedUser.id}`, initialPreferences)
 
       setUser(updatedUser)
       
@@ -434,3 +445,4 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
     </Dialog>
   )
 }
+

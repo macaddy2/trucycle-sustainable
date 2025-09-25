@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { QrCode, Scan, Package, User, MapPin, CheckCircle, X } from '@phosphor-icons/react'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
+import { kvGet, kvSet } from '@/lib/kvStore'
 
 interface QRCodeData {
   id: string
@@ -62,7 +63,7 @@ export function ShopScanner() {
       const qrData = JSON.parse(qrCodeString)
       
       // Verify the QR code exists in global registry
-      const globalQRCodes = await spark.kv.get<QRCodeData[]>('global-qr-codes') || []
+      const globalQRCodes = await kvGet<QRCodeData[]>('global-qr-codes') || []
       const foundQR = globalQRCodes.find(qr => qr.transactionId === qrData.transactionId)
 
       if (!foundQR) {
@@ -98,7 +99,7 @@ export function ShopScanner() {
 
     try {
       // Update QR code status in global registry
-      const globalQRCodes = await spark.kv.get<QRCodeData[]>('global-qr-codes') || []
+      const globalQRCodes = await kvGet<QRCodeData[]>('global-qr-codes') || []
       const updatedQRCodes = globalQRCodes.map(qr => 
         qr.transactionId === scannedData.transactionId 
           ? { 
@@ -107,7 +108,7 @@ export function ShopScanner() {
             }
           : qr
       )
-      await spark.kv.set('global-qr-codes', updatedQRCodes)
+      await kvSet('global-qr-codes', updatedQRCodes)
 
       // Record transaction in shop history
       const transaction: ScannedTransaction = {

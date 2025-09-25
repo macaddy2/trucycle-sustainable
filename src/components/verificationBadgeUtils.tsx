@@ -6,10 +6,10 @@ import {
   Phone,
   CreditCard,
   MapPin,
-  Award,
+  Medal,
 } from '@phosphor-icons/react'
 
-export interface VerificationLevel {
+export interface VerificationLevel { 
   email: boolean
   phone: boolean
   identity: boolean
@@ -24,7 +24,7 @@ export const verificationDetailConfig = [
   { key: 'identity', label: 'Identity Verified', icon: <Certificate size={12} /> },
   { key: 'address', label: 'Address Verified', icon: <MapPin size={12} /> },
   { key: 'payment', label: 'Payment Verified', icon: <CreditCard size={12} /> },
-  { key: 'community', label: 'Community Verified', icon: <Award size={12} /> },
+  { key: 'community', label: 'Community Verified', icon: <Medal size={12} /> },
 ] satisfies Array<{ key: keyof VerificationLevel; label: string; icon: JSX.Element }>
 
 export function getVerificationStatus(verified: VerificationLevel) {

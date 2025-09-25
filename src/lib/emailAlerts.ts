@@ -1,3 +1,4 @@
+import { kvGet, kvSet } from '@/lib/kvStore'
 import type { DropOffLocation } from '@/components/dropOffLocations'
 
 interface EmailRecipient {
@@ -110,8 +111,8 @@ export const sendListingSubmissionEmails = async (
   }
 
   try {
-    const existing = (await spark.kv.get('email-outbox')) ?? []
-    await spark.kv.set('email-outbox', [...existing, ...outboxEntries])
+    const existing = (await kvGet('email-outbox')) ?? []
+    await kvSet('email-outbox', [...existing, ...outboxEntries])
   } catch (error) {
     console.error('Failed to log email alerts', error)
   }

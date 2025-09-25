@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { QRCodeGenerator, QRCodeDisplay, QRCodeData, QRCodeScanner } from './QRCode'
 import QRFlowGuide from './QRFlowGuide'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
 export function QRTestInterface() {

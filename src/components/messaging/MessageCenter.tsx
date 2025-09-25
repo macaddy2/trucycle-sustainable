@@ -385,6 +385,9 @@ export function MessageCenter({ open, onOpenChange, itemId, chatId, initialView 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl h-[640px] p-0 overflow-hidden">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Message Center</DialogTitle>
+        </DialogHeader>
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between border-b border-border p-4">
             <div>

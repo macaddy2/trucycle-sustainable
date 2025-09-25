@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { QrCode, Download, Share, Clock, MapPin, Package } from '@phosphor-icons/react'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
+import { kvGet, kvSet } from '@/lib/kvStore'
 
 interface QRCodeData {
   id: string
@@ -307,8 +308,8 @@ export function QRCodeGenerator({
       setGeneratedQRCodes(updatedQRCodes)
 
       // Also save to a global QR codes registry for shop scanning
-      const globalQRCodes = await spark.kv.get<QRCodeData[]>('global-qr-codes') || []
-      await spark.kv.set('global-qr-codes', [...globalQRCodes, qrData])
+      const globalQRCodes = await kvGet<QRCodeData[]>('global-qr-codes') || []
+      await kvSet('global-qr-codes', [...globalQRCodes, qrData])
 
       onGenerated?.(qrData)
       toast.success(`${type === 'donor' ? 'Drop-off' : 'Pickup'} QR code generated successfully`)
@@ -349,7 +350,7 @@ export function QRCodeScanner() {
       const qrData = JSON.parse(scanInput)
       
       // Verify the QR code exists in global registry
-      const globalQRCodes = await spark.kv.get<QRCodeData[]>('global-qr-codes') || []
+      const globalQRCodes = await kvGet<QRCodeData[]>('global-qr-codes') || []
       const foundQR = globalQRCodes.find(qr => qr.transactionId === qrData.transactionId)
 
       if (!foundQR) {
@@ -373,7 +374,7 @@ export function QRCodeScanner() {
           ? { ...qr, status: 'scanned' as const }
           : qr
       )
-      await spark.kv.set('global-qr-codes', updatedQRCodes)
+      await kvSet('global-qr-codes', updatedQRCodes)
 
       setScannedData(foundQR)
       toast.success('QR code scanned successfully')

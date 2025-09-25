@@ -16,7 +16,7 @@ import {
   Storefront,
   ArrowRight
 } from '@phosphor-icons/react'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/useKV'
 import { useExchangeManager, useMessaging } from '@/hooks'
 import { VerificationBadge } from './VerificationBadge'
 import type { VerificationLevel } from './verificationBadgeUtils'

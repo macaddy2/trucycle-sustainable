@@ -10,7 +10,7 @@ import {
 } from './verificationBadgeUtils'
 
 export interface VerificationBadgeProps {
-  verified: VerificationLevel
+  verified?: VerificationLevel | Partial<VerificationLevel>
   className?: string
   showTooltip?: boolean
   variant?: 'default' | 'compact' | 'detailed'
@@ -22,16 +22,23 @@ export function VerificationBadge({
   showTooltip = true,
   variant = 'default' 
 }: VerificationBadgeProps) {
-  const status = getVerificationStatus(verified)
+  const normalizedVerification: VerificationLevel = {
+    email: false,
+    phone: false,
+    identity: false,
+    address: false,
+    payment: false,
+    community: false,
+    ...(verified ?? {}),
+  };
+  const status = getVerificationStatus(normalizedVerification)
   const badgeText = getVerificationBadgeText(status)
   const colorClass = getVerificationColor(status)
   const icon = getVerificationIcon(status)
-
   const verificationDetails = verificationDetailConfig.map(detail => ({
     ...detail,
-    verified: verified[detail.key],
+    verified: normalizedVerification[detail.key],
   }))
-
   const completedCount = verificationDetails.filter(item => item.verified).length
 
   if (variant === 'compact') {
@@ -141,3 +148,4 @@ export function VerificationBadge({
     </TooltipProvider>
   )
 }
+

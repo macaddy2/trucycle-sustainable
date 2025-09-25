@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Toaster } from '@/components/ui/sonner'
 import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, User, QrCode, Bell, Package } from '@phosphor-icons/react'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import { ItemListing, ItemListingForm, MyListingsView, ProfileDashboard, DropOffMap, CarbonTracker, ShopScanner, DemoGuide } from './components'
 import type { DropOffLocation } from './components/dropOffLocations'
@@ -49,11 +49,23 @@ function App() {
   const [messageCenterView, setMessageCenterView] = useState<'chats' | 'requests'>('chats')
   const [messageCenterItemId, setMessageCenterItemId] = useState<string | undefined>()
   const [messageCenterChatId, setMessageCenterChatId] = useState<string | undefined>()
+    const [profileInitialTab, setProfileInitialTab] = useState<'overview' | 'listings' | 'recommendations' | 'impact'>('overview')
+  const [profileHighlightListingId, setProfileHighlightListingId] = useState<string | null>(null)
   
   const { initializeSampleChats } = useInitializeSampleData()
   const { unreadCount, triggerUrgentNotifications } = useRecommendationNotifications(user ?? null)
 
   // Check for shop scanner mode in URL
+  const handleOpenMessages = useCallback((options?: { itemId?: string; chatId?: string; initialView?: 'chats' | 'requests' }) => {
+    if (options?.initialView) {
+      setMessageCenterView(options.initialView)
+    } else {
+      setMessageCenterView('chats')
+    }
+    setMessageCenterItemId(options?.itemId)
+    setMessageCenterChatId(options?.chatId)
+    setShowMessageCenter(true)
+  }, [])
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     if (urlParams.get('mode') === 'shop-scanner') {
@@ -177,22 +189,12 @@ function App() {
     })
   }
 
-  const handleOpenMessages = useCallback((options?: { itemId?: string; chatId?: string; initialView?: 'chats' | 'requests' }) => {
-    if (options?.initialView) {
-      setMessageCenterView(options.initialView)
-    } else {
-      setMessageCenterView('chats')
-    }
-    setMessageCenterItemId(options?.itemId)
-    setMessageCenterChatId(options?.chatId)
-    setShowMessageCenter(true)
-  }, [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    // Search functionality will be implemented in ItemListing component
+    setCurrentTab('browse')
+    document.getElementById('item-listing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
-
   const handleDonationFlowStart = (method: 'pickup' | 'dropoff') => {
     setPendingFulfillmentMethod(method)
     if (method === 'dropoff') {
@@ -371,11 +373,13 @@ function App() {
       <main className="container mx-auto px-4 py-8">
         <Tabs value={currentTab} onValueChange={setCurrentTab}>
           <TabsContent value="browse">
+            <section id="item-listing-section">
             <ItemListing
               searchQuery={searchQuery}
               onStartDonationFlow={handleDonationFlowStart}
               onOpenMessages={handleOpenMessages}
             />
+            </section>
           </TabsContent>
 
           <TabsContent value="listings">
@@ -520,3 +524,4 @@ function App() {
 }
 
 export default App
+

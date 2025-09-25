@@ -14,7 +14,7 @@ import {
   CreditCard, 
   MapPin, 
   Certificate, 
-  Award,
+  Medal,
   Upload,
   Info,
   Star
@@ -96,7 +96,7 @@ const verificationSteps: VerificationStep[] = [
     id: 'community',
     title: 'Community Standing',
     description: 'Earned through successful exchanges and positive reviews',
-    icon: <Award size={20} />,
+    icon: <Medal size={20} />,
     requirement: '5+ successful exchanges with 4.5+ average rating',
     estimatedTime: 'Ongoing',
     difficulty: 'Medium',

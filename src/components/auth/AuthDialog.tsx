@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Card, CardContent } from '@/components/ui/card'
 import { Eye, EyeSlash, GoogleLogo, FacebookLogo, EnvelopeSimple } from '@phosphor-icons/react'
-import { useKV } from '@github/spark/hooks'
+import { kvGet, kvSet } from '@/lib/kvStore'
+import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
 interface AuthDialogProps {
@@ -117,8 +118,8 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
         }
 
         // Store user profile
-        const userProfiles = await spark.kv.get('user-profiles') || {}
-        await spark.kv.set('user-profiles', {
+        const userProfiles = await kvGet('user-profiles') || {}
+        await kvSet('user-profiles', {
           ...userProfiles,
           [newUser.id]: newUser
         })

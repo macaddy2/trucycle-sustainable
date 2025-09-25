@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
 import { CheckCircle, MapPin, Bell, Heart, Shield, Package, Star } from '@phosphor-icons/react'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import { AuthDialog } from './auth'
 import { VerificationBadge } from './VerificationBadge'
@@ -14,9 +14,12 @@ import { RatingDisplay } from './RatingSystem'
 import { IntelligentRecommendations } from './IntelligentRecommendations'
 import { MyListingsView, type ManagedListing } from './MyListingsView'
 
+type ProfileTab = 'overview' | 'listings' | 'recommendations' | 'impact'
 interface ProfileDashboardProps {
   onCreateListing?: () => void
   onOpenMessages?: () => void
+  initialActiveTab?: ProfileTab
+  highlightListingId?: string | null
 }
 
 interface UserProfile {
@@ -38,7 +41,7 @@ interface UserProfile {
   rewardsBalance?: number
 }
 
-export function ProfileDashboard({ onCreateListing, onOpenMessages }: ProfileDashboardProps) {
+export function ProfileDashboard({ onCreateListing, onOpenMessages, initialActiveTab = 'overview', highlightListingId = null }: ProfileDashboardProps) {
   const [user, setUser] = useKV<UserProfile | null>('current-user', null)
   const [listings] = useKV<ManagedListing[]>('user-listings', [])
   const [showAuthDialog, setShowAuthDialog] = useState(false)
@@ -111,6 +114,9 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages }: ProfileDas
     handleTabChange('overview')
   }
 
+  const handleTabChange = (tab: ProfileTab) => {
+    setActiveTab(tab)
+  }
   if (!user) {
     return (
       <>
