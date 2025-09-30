@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Plus, Camera, MapPin, Recycle, Heart, ArrowsClockwise, Truck, Storefront } from '@phosphor-icons/react'
+import { Plus, Camera, MapPin, Recycle, Heart, ArrowsClockwise, Truck, Storefront, X } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import { kvGet, kvSet } from '@/lib/kvStore'
@@ -168,6 +168,7 @@ export function ItemListingForm({
   const [user] = useKV('current-user', null)
   const [, setListings] = useKV<ManagedListing[]>('user-listings', [])
   const [currentStep, setCurrentStep] = useState(1)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Form state
   const [formData, setFormData] = useState({
@@ -179,13 +180,14 @@ export function ItemListingForm({
     photos: [] as string[],
     location: '',
     contactMethod: 'platform',
-    fulfillmentMethod: '' as 'pickup' | 'dropoff' | '',
+    fulfillmentMethod: 'pickup' as 'pickup' | 'dropoff' | '',
     dropOffLocation: null as DropOffLocation | null
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showDropOffSelector, setShowDropOffSelector] = useState(false)
   const [generatedQRCode, setGeneratedQRCode] = useState<QRCodeData | null>(null)
+  const [lastCreatedListing, setLastCreatedListing] = useState<CreatedListing | null>(null)
   const [classificationResult, setClassificationResult] = useState<ListingClassificationResult | null>(null)
   const [classificationLoading, setClassificationLoading] = useState(false)
   const [moderationResult, setModerationResult] = useState<ModerationResult | null>(null)
@@ -194,10 +196,25 @@ export function ItemListingForm({
     () => calculateListingValuation(formData.category, formData.condition, formData.actionType),
     [formData.category, formData.condition, formData.actionType]
   )
+  const estimatedCarbonImpact = useMemo(() => {
+    if (!formData.actionType) {
+      return null
+    }
+
+    if (formData.actionType === 'recycle') {
+      return 5
+    }
+
+    if (formData.actionType === 'donate') {
+      return 3
+    }
+
+    return 2
+  }, [formData.actionType])
   const totalSteps = 5
   const progress = (currentStep / totalSteps) * 100
+  const { title, description, category, condition, photos } = formData
   useEffect(() => {
-    const { title, description, category, condition } = formData;
     if (!title && !description) {
       setClassificationResult(null);
       return;
@@ -228,12 +245,12 @@ export function ItemListingForm({
     return () => {
       cancelled = true;
     };
-  }, [formData.title, formData.description, formData.category, formData.condition]);
+  }, [title, description, category, condition]);
 
   useEffect(() => {
-    const descriptors = formData.photos.length > 0
-      ? formData.photos
-      : [formData.description || formData.title || ''];
+    const descriptors = photos.length > 0
+      ? photos
+      : [description || title || ''];
     if (!descriptors.some(Boolean)) {
       setModerationResult(null);
       return;
@@ -259,22 +276,34 @@ export function ItemListingForm({
     return () => {
       cancelled = true;
     };
-  }, [formData.photos, formData.description, formData.title]);
+  }, [photos, description, title]);
 
 
-  const moderationToneClass = moderationResult?.status === 'flagged' ? 'border-destructive/40 bg-destructive/10' : 'bg-muted/40'
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
   const handlePhotoUpload = () => {
-    // Simulate photo upload - in real app this would handle file selection
-    const newPhotoUrl = `/api/placeholder/400/300?random=${Date.now()}`
-    setFormData(prev => ({
-      ...prev,
-      photos: [...prev.photos, newPhotoUrl]
-    }))
-    toast.success('Photo added successfully')
+    fileInputRef.current?.click()
+  }
+
+  const handlePhotoSelection = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      setFormData(prev => ({
+        ...prev,
+        photos: [...prev.photos, result]
+      }))
+      toast.success('Photo added successfully')
+    }
+    reader.readAsDataURL(file)
+    event.target.value = ''
   }
 
   const removePhoto = (index: number) => {
@@ -287,7 +316,7 @@ export function ItemListingForm({
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        return formData.title.trim() !== '' && formData.description.trim() !== ''
+        return formData.title.trim() !== '' && formData.description.trim() !== '' && formData.photos.length > 0
       case 2:
         return formData.category !== '' && formData.condition !== ''
       case 3:
@@ -349,11 +378,25 @@ export function ItemListingForm({
     onDropOffPrefillHandled?.()
   }, [prefillDropOffLocation, onDropOffPrefillHandled])
 
+  useEffect(() => {
+    if (formData.actionType === 'donate') {
+      if (formData.fulfillmentMethod !== 'dropoff') {
+        handleFulfillmentSelect('dropoff')
+      }
+    } else if (formData.fulfillmentMethod === 'dropoff' && !formData.dropOffLocation) {
+      handleFulfillmentSelect('pickup')
+    }
+  }, [formData.actionType, formData.fulfillmentMethod, formData.dropOffLocation, handleFulfillmentSelect])
+
   const nextStep = () => {
     if (validateStep(currentStep)) {
       setCurrentStep(prev => Math.min(prev + 1, totalSteps))
     } else {
-      toast.error('Please fill in all required fields')
+      if (currentStep === 1 && formData.photos.length === 0) {
+        toast.error('Add at least one photo to continue')
+      } else {
+        toast.error('Please fill in all required fields')
+      }
     }
   }
 
@@ -375,9 +418,7 @@ export function ItemListingForm({
     setIsSubmitting(true)
 
     try {
-      const carbonImpact = formData.actionType === 'recycle' ? 5
-        : formData.actionType === 'donate' ? 3
-          : 2
+      const carbonImpact = estimatedCarbonImpact ?? 2
       const listingValuation = valuationSummary
         ? {
             estimatedValue: valuationSummary.estimatedValue,
@@ -535,7 +576,7 @@ export function ItemListingForm({
         photos: [],
         location: '',
         contactMethod: 'platform',
-        fulfillmentMethod: '',
+        fulfillmentMethod: 'pickup',
         dropOffLocation: null
       })
       setCurrentStep(1)
@@ -607,55 +648,6 @@ export function ItemListingForm({
         <Progress value={progress} className="mt-2" />
       </CardHeader>
       <CardContent className="space-y-6">
-        {(classificationLoading || classificationResult || moderationLoading || moderationResult) && (
-          <div className="grid gap-4 md:grid-cols-2">
-            {(classificationLoading || classificationResult) && (
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">
-                <p className="text-sm font-semibold text-primary">AI category guidance</p>
-                {classificationLoading ? (
-                  <p className="text-xs text-muted-foreground">Analysing your listing details…</p>
-                ) : classificationResult ? (
-                  <>
-                    <Badge variant="outline" className="uppercase tracking-wide">
-                      {CLASSIFICATION_LABELS[classificationResult.recommendedAction]}
-                    </Badge>
-                    <p className="text-sm">{classificationResult.reasoning}</p>
-                    {classificationResult.highlights.length > 0 && (
-                      <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-                        {classificationResult.highlights.map((point, index) => (
-                          <li key={index}>{point}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Provide more detail to receive tailored recommendations.</p>
-                )}
-              </div>
-            )}
-            {(moderationLoading || moderationResult) && (
-              <div className={`rounded-lg border p-4 space-y-2 ${moderationToneClass}`}>
-                <p className="text-sm font-semibold">Image safety check</p>
-                {moderationLoading ? (
-                  <p className="text-xs text-muted-foreground">Reviewing photos for safety…</p>
-                ) : moderationResult ? (
-                  <>
-                    <p className="text-sm">{moderationResult.message}</p>
-                    {moderationResult.labels.length > 0 && (
-                      <div className="flex flex-wrap gap-2 text-xs">
-                        {moderationResult.labels.map((label) => (
-                          <Badge key={label} variant="outline">{label}</Badge>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Add a photo or description to run an automated safety check.</p>
-                )}
-              </div>
-            )}
-          </div>
-        )}
         {/* Step 1: Basic Information */}
         {currentStep === 1 && (
           <div className="space-y-4">
@@ -682,8 +674,15 @@ export function ItemListingForm({
             </div>
 
             <div>
-              <Label>Photos (Optional)</Label>
+              <Label>Photos *</Label>
               <div className="mt-2 space-y-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoSelection}
+                  className="hidden"
+                />
                 <Button
                   type="button"
                   variant="outline"
@@ -710,7 +709,7 @@ export function ItemListingForm({
                           onClick={() => removePhoto(index)}
                           className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
                         >
-                          Ã—
+                          <X size={12} />
                         </Button>
                       </div>
                     ))}
@@ -720,6 +719,56 @@ export function ItemListingForm({
             </div>
           </div>
         )}
+            {(classificationLoading || classificationResult || moderationLoading || moderationResult) && (
+              <div className="grid gap-4 md:grid-cols-2">
+                {(classificationLoading || classificationResult) && (
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">
+                    <p className="text-sm font-semibold text-primary">AI category guidance</p>
+                    {classificationLoading ? (
+                      <p className="text-xs text-muted-foreground">Analysing your listing details.</p>
+                    ) : classificationResult ? (
+                      <>
+                        <Badge variant="outline" className="uppercase tracking-wide">
+                          {CLASSIFICATION_LABELS[classificationResult.recommendedAction]}
+                        </Badge>
+                        <p className="text-sm">{classificationResult.reasoning}</p>
+                        {classificationResult.highlights.length > 0 && (
+                          <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                            {classificationResult.highlights.map((point, index) => (
+                              <li key={index}>{point}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Provide more detail to receive tailored recommendations.</p>
+                    )}
+                  </div>
+                )}
+                {(moderationLoading || moderationResult) && (
+                  <div className={`rounded-lg border p-4 space-y-2 ${moderationResult?.status === 'flagged' ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'bg-muted/40'}`}>
+                    <p className="text-sm font-semibold">Image safety check</p>
+                    {moderationLoading ? (
+                      <p className="text-xs text-muted-foreground">Reviewing photos for safety.</p>
+                    ) : moderationResult ? (
+                      <>
+                        <p className="text-sm">{moderationResult.message}</p>
+                        {moderationResult.labels.length > 0 && (
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            {moderationResult.labels.map((label) => (
+                              <Badge key={label} variant="outline">{label}</Badge>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Add a photo or description to run an automated safety check.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
 
         {/* Step 2: Category & Condition */}
         {currentStep === 2 && (
@@ -933,6 +982,9 @@ export function ItemListingForm({
                       Est. value Â£{valuationSummary.estimatedValue.toFixed(2)}
                     </span>
                     <Badge variant="secondary">Reward +{valuationSummary.rewardPoints} pts</Badge>
+                    {estimatedCarbonImpact !== null && (
+                      <Badge variant="outline" className="capitalize">-{estimatedCarbonImpact}kg CO2</Badge>
+                    )}
                     {valuationSummary.confidence && (
                       <Badge variant="outline" className="capitalize">
                         {valuationSummary.confidence} confidence
@@ -953,6 +1005,9 @@ export function ItemListingForm({
                     ? `${formData.dropOffLocation.name}, ${formData.dropOffLocation.postcode}`
                     : formData.location}
                 </div>
+                {estimatedCarbonImpact !== null && (
+                  <div><span className="font-medium">Estimated CO2 impact:</span> -{estimatedCarbonImpact}kg saved</div>
+                )}
                 {formData.photos.length > 0 && (
                   <div><span className="font-medium">Photos:</span> {formData.photos.length} uploaded</div>
                 )}
@@ -972,6 +1027,9 @@ export function ItemListingForm({
                   <div className="rounded-md border border-primary/30 bg-background/60 p-3">
                     <p className="font-semibold text-primary">Impact insight</p>
                     <p className="mt-1">{valuationSummary.narrative}</p>
+                    {estimatedCarbonImpact !== null && (
+                      <p className="mt-2 text-foreground font-medium">Approx. -{estimatedCarbonImpact}kg CO2 saved</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -1005,3 +1063,5 @@ export function ItemListingForm({
     </>
   )
 }
+
+

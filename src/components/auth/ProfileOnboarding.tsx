@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Progress } from '@/components/ui/progress'
@@ -25,6 +26,7 @@ interface ProfileOnboardingProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onComplete: () => void
+  mode?: 'onboarding' | 'edit'
 }
 
 interface UserProfile {
@@ -49,19 +51,35 @@ interface UserProfile {
     community: boolean
   }
   rewardsBalance?: number
+  partnerAccess?: boolean
 }
 
-export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnboardingProps) {
+export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onboarding' }: ProfileOnboardingProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   
   const [user, setUser] = useKV('current-user', null)
   
   const [profileData, setProfileData] = useState({
-    userType: '',
-    postcode: '',
-    motivation: ''
+    userType: user?.userType ?? '',
+    postcode: user?.postcode ?? '',
+    motivation: '',
+    partnerAccess: Boolean(user?.partnerAccess)
   })
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    setCurrentStep(1)
+    setProfileData({
+      userType: user?.userType ?? '',
+      postcode: user?.postcode ?? '',
+      motivation: '',
+      partnerAccess: Boolean(user?.partnerAccess)
+    })
+  }, [open, user])
 
   const totalSteps = 3
   const progress = (currentStep / totalSteps) * 100
@@ -71,14 +89,23 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
       toast.error('Please select your profile type')
       return
     }
-    
-    if (currentStep === 2 && !profileData.postcode) {
-      toast.error('Please enter your postcode')
-      return
+
+    if (currentStep === 2) {
+      if (!profileData.postcode.trim()) {
+        toast.error('Enter IG11 7FR to continue')
+        return
+      }
+
+      if (!validatePostcode(profileData.postcode)) {
+        toast.error('TruCycle is onboarding in IG11 7FR only right now')
+        return
+      }
+
+      setProfileData((prev) => ({ ...prev, postcode: formatPostcode(prev.postcode) }))
     }
 
     if (currentStep < totalSteps) {
-      setCurrentStep(prev => prev + 1)
+      setCurrentStep((prev) => prev + 1)
     }
   }
 
@@ -88,48 +115,41 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
     }
   }
 
-  const validatePostcode = (postcode: string) => {
-    // Simple UK postcode validation
-    const postcodeRegex = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9][A-Z]{2}$/i
-    return postcodeRegex.test(postcode.trim())
+  const ALLOWED_POSTCODE = 'IG117FR'
+  const normalizePostcode = (value: string) => value.replace(/\s+/g, '').toUpperCase()
+  const formatPostcode = (value: string) => {
+    const normalized = normalizePostcode(value)
+    if (!normalized) {
+      return ''
+    }
+    return normalized.replace(/^(\w{2,4})(\w{3})$/, '$1 $2')
   }
 
-  const checkLondonPostcode = (postcode: string) => {
-    // Simplified London postcode check
-    const londonPrefixes = ['E', 'EC', 'N', 'NW', 'SE', 'SW', 'W', 'WC']
-    const prefix = postcode.trim().toUpperCase().match(/^[A-Z]+/)?.[0]
-    return prefix && londonPrefixes.includes(prefix)
+  const handlePostcodeChange = (value: string) => {
+    const sanitized = value.toUpperCase().replace(/[^A-Z0-9\s]/g, '')
+    const normalized = normalizePostcode(sanitized).slice(0, ALLOWED_POSTCODE.length)
+    const formatted = formatPostcode(normalized)
+    setProfileData((prev) => ({ ...prev, postcode: formatted }))
   }
+
+  const validatePostcode = (postcode: string) => normalizePostcode(postcode) === ALLOWED_POSTCODE
 
   const deriveAreaDetails = (postcode: string) => {
-    const normalized = postcode.trim().toUpperCase();
-    const areaMappings = [
-      { pattern: /^EC/, area: 'City of London', district: 'Central', serviceArea: 'Central London' },
-      { pattern: /^WC/, area: 'West Central London', district: 'Central', serviceArea: 'Central London' },
-      { pattern: /^NW/, area: 'North West London', district: 'North West', serviceArea: 'North West London' },
-      { pattern: /^SE/, area: 'South East London', district: 'South East', serviceArea: 'South East London' },
-      { pattern: /^SW/, area: 'South West London', district: 'South West', serviceArea: 'South West London' },
-      { pattern: /^E/, area: 'East London', district: 'East', serviceArea: 'East London' },
-      { pattern: /^W/, area: 'West London', district: 'West', serviceArea: 'West London' },
-      { pattern: /^N/, area: 'North London', district: 'North', serviceArea: 'North London' },
-    ];
-    const match = areaMappings.find(mapping => mapping.pattern.test(normalized));
-    return match ?? { area: 'Greater London', district: 'Greater London', serviceArea: 'Greater London' };
-  };
+    if (validatePostcode(postcode)) {
+      return { area: 'Barking', district: 'East London', serviceArea: 'Barking & Dagenham' }
+    }
+
+    return { area: 'Greater London', district: 'Greater London', serviceArea: 'Greater London' }
+  }
 
   const verifyPostcodeDetails = async (postcode: string) => ({
-    isValid: true,
+    isValid: validatePostcode(postcode),
     ...deriveAreaDetails(postcode),
-  });
+  })
 
   const handleComplete = async () => {
     if (!profileData.postcode || !validatePostcode(profileData.postcode)) {
-      toast.error('Please enter a valid postcode')
-      return
-    }
-
-    if (!checkLondonPostcode(profileData.postcode)) {
-      toast.error('Sorry, TruCycle currently only operates in London')
+      toast.error('TruCycle is onboarding in IG11 7FR only right now')
       return
     }
 
@@ -139,7 +159,7 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
       const verificationData = await verifyPostcodeDetails(profileData.postcode)
 
       if (!verificationData.isValid) {
-        toast.error('Invalid postcode. Please check and try again.')
+        toast.error('Please use postcode IG11 7FR to continue onboarding')
         return
       }
 
@@ -150,7 +170,7 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
         email: user?.email || '',
         name: user?.name || '',
         userType: profileData.userType as 'donor' | 'collector',
-        postcode: profileData.postcode.toUpperCase(),
+        postcode: formatPostcode(profileData.postcode) || 'IG11 7FR',
         area: verificationData.area,
         district: verificationData.district,
         serviceArea: verificationData.serviceArea,
@@ -160,13 +180,14 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
         addressVerifiedAt: new Date().toISOString(),
         verificationLevel: {
           email: true,
-          phone: false,
-          identity: false,
+          phone: user?.verificationLevel?.phone ?? false,
+          identity: user?.verificationLevel?.identity ?? false,
           address: true,
-          payment: false,
-          community: false
+          payment: user?.verificationLevel?.payment ?? false,
+          community: Boolean(profileData.partnerAccess)
         },
-        rewardsBalance: user?.rewardsBalance ?? 0
+        rewardsBalance: user?.rewardsBalance ?? 0,
+        partnerAccess: Boolean(profileData.partnerAccess)
       }
 
       // Save to user profiles
@@ -287,10 +308,31 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
               </Card>
             </RadioGroup>
 
+            <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium">Partner shop tools</p>
+                <p className="text-xs text-muted-foreground">
+                  Toggle this on if you run a partner site and need QR check-in and collection logs.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="partner-access"
+                  checked={profileData.partnerAccess}
+                  onCheckedChange={(checked) =>
+                    setProfileData(prev => ({ ...prev, partnerAccess: Boolean(checked) }))
+                  }
+                />
+                <Label htmlFor="partner-access" className="text-xs text-muted-foreground">
+                  I manage a TruCycle partner location
+                </Label>
+              </div>
+            </div>
+
             <Card className="bg-muted/30">
               <CardContent className="pt-4">
                 <p className="text-xs text-muted-foreground text-center">
-                  Don't worry - you can always change your profile type later in settings
+                  You can adjust your profile type or partner access later from settings.
                 </p>
               </CardContent>
             </Card>
@@ -306,7 +348,7 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
               </div>
               <h3 className="text-h3">Verify Your Location</h3>
               <p className="text-muted-foreground">
-                We need your postcode to confirm you're in our London service area
+                We're currently onboarding Barking households in IG11 7FR.
               </p>
             </div>
 
@@ -316,11 +358,19 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
                 <Input
                   id="postcode"
                   type="text"
-                  placeholder="e.g., SW1A 1AA"
+                  placeholder="IG11 7FR"
                   value={profileData.postcode}
-                  onChange={(e) => setProfileData(prev => ({ ...prev, postcode: e.target.value }))}
+                  onChange={(event) => handlePostcodeChange(event.target.value)}
                   className="text-center text-lg font-medium"
                 />
+                <p className="text-xs text-muted-foreground text-center">
+                  Use IG11 7FR (case-insensitive) to unlock the full onboarding demo.
+                </p>
+                {!validatePostcode(profileData.postcode) && profileData.postcode.trim() !== '' && (
+                  <p className="text-xs text-destructive text-center">
+                    This postcode isn't part of the Barking pilot yet.
+                  </p>
+                )}
               </div>
 
               <Card className="bg-accent/10">
@@ -362,10 +412,15 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
                     <div>
                       <p className="font-medium">{user?.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {profileData.userType === 'donor' ? 'Donor' : 'Collector'} • {profileData.postcode}
+                        {profileData.userType === 'donor' ? 'Donor' : 'Collector'} • {formatPostcode(profileData.postcode)}
                       </p>
                     </div>
                   </div>
+                  {profileData.partnerAccess && (
+                    <Badge variant="outline" className="uppercase tracking-wide text-xs">
+                      Partner tools enabled
+                    </Badge>
+                  )}
 
                   <div className="space-y-2">
                     <h4 className="font-medium text-sm">What's next?</h4>
@@ -398,9 +453,11 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete }: ProfileOnb
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-h2 text-center">Profile Setup</DialogTitle>
+          <DialogTitle className="text-h2 text-center">
+            {mode === 'edit' ? 'Update Profile' : 'Profile Setup'}
+          </DialogTitle>
           <DialogDescription className="text-center">
-            Step {currentStep} of {totalSteps}
+            {mode === 'edit' ? 'Refresh your details below to keep your profile accurate.' : `Step ${currentStep} of ${totalSteps}`}
           </DialogDescription>
         </DialogHeader>
 

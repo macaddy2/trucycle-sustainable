@@ -1,25 +1,23 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
-import { CheckCircle, MapPin, Bell, Heart, Shield, Package, Star } from '@phosphor-icons/react'
+import { CheckCircle, MapPin, Bell, Heart, Shield, Package, Star, NotePencil, SignOut } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import { AuthDialog } from './auth'
 import { VerificationBadge } from './VerificationBadge'
 import { RatingDisplay } from './RatingSystem'
-import { IntelligentRecommendations } from './IntelligentRecommendations'
-import { MyListingsView, type ManagedListing } from './MyListingsView'
+import type { ManagedListing } from './MyListingsView'
 
-type ProfileTab = 'overview' | 'listings' | 'recommendations' | 'impact'
+type ProfileTab = 'overview' | 'impact'
 interface ProfileDashboardProps {
   onCreateListing?: () => void
   onOpenMessages?: () => void
   initialActiveTab?: ProfileTab
-  highlightListingId?: string | null
 }
 
 interface UserProfile {
@@ -39,41 +37,38 @@ interface UserProfile {
     community: boolean
   }
   rewardsBalance?: number
+  partnerAccess?: boolean
 }
 
-export function ProfileDashboard({ onCreateListing, onOpenMessages, initialActiveTab = 'overview', highlightListingId = null }: ProfileDashboardProps) {
+type ListingStatus = ManagedListing['status']
+
+const VERIFICATION_KEYS: Array<keyof UserProfile['verificationLevel']> = ['email', 'phone', 'identity', 'address']
+
+export function ProfileDashboard({ onCreateListing: _onCreateListing, onOpenMessages: _onOpenMessages, initialActiveTab = 'overview' }: ProfileDashboardProps) {
   const [user, setUser] = useKV<UserProfile | null>('current-user', null)
   const [listings] = useKV<ManagedListing[]>('user-listings', [])
   const [showAuthDialog, setShowAuthDialog] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'listings' | 'recommendations' | 'impact'>(initialActiveTab)
-  const [highlightedListingId, setHighlightedListingId] = useState<string | null>(highlightListingId)
+  const [activeTab, setActiveTab] = useState<ProfileTab>(initialActiveTab)
 
   useEffect(() => {
-    setActiveTab(initialActiveTab)
+    setActiveTab(initialActiveTab === 'impact' ? 'impact' : 'overview')
   }, [initialActiveTab])
-
-  useEffect(() => {
-    setHighlightedListingId(highlightListingId)
-    if (!highlightListingId) return
-
-    const timer = window.setTimeout(() => setHighlightedListingId(null), 6000)
-    return () => window.clearTimeout(timer)
-  }, [highlightListingId])
 
   const verificationStats = useMemo(() => {
     if (!user) {
-      return { completed: 0, total: 0 }
+      return { completed: 0, total: VERIFICATION_KEYS.length }
     }
-    const values = Object.values(user.verificationLevel)
-    return {
-      completed: values.filter(Boolean).length,
-      total: values.length,
-    }
+
+    const completed = VERIFICATION_KEYS.filter((key) => user.verificationLevel[key]).length
+    return { completed, total: VERIFICATION_KEYS.length }
   }, [user])
 
-  const recentListings = useMemo(() => {
-    return listings.slice(0, 5)
-  }, [listings])
+  const displayedVerification = useMemo(() => {
+    if (!user) return []
+    return VERIFICATION_KEYS.map((key) => ({ key, value: user.verificationLevel[key] }))
+  }, [user])
+
+  const recentListings = useMemo(() => listings.slice(0, 5), [listings])
 
   const formatStatus = (status: ListingStatus) => {
     switch (status) {
@@ -96,10 +91,7 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages, initialActiv
     if (!user) return
 
     const nextType = user.userType === 'donor' ? 'collector' : 'donor'
-    const updatedUser: UserProfile = {
-      ...user,
-      userType: nextType,
-    }
+    const updatedUser: UserProfile = { ...user, userType: nextType }
     setUser(updatedUser)
 
     toast.success(`Switched to ${nextType} view`, {
@@ -109,14 +101,20 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages, initialActiv
     })
   }
 
-  const handleCompleteSetup = () => {
-    toast.info('Opening setup checklist...')
-    handleTabChange('overview')
+  const handleEditProfile = () => {
+    window.dispatchEvent(new CustomEvent('open-profile-onboarding'))
+  }
+
+  const handleSignOut = () => {
+    setUser(null)
+    toast.success('Signed out')
+    setShowAuthDialog(true)
   }
 
   const handleTabChange = (tab: ProfileTab) => {
     setActiveTab(tab)
   }
+
   if (!user) {
     return (
       <>
@@ -140,7 +138,6 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages, initialActiv
     )
   }
 
-  const allVerified = verificationStats.completed === verificationStats.total
   const profileInitials = user.name
     ? user.name.split(' ').map((segment) => segment[0]).join('').toUpperCase()
     : 'U'
@@ -187,22 +184,22 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages, initialActiv
               <Button variant="outline" onClick={handleToggleUserType}>
                 Switch to {user.userType === 'donor' ? 'collector' : 'donor'} mode
               </Button>
-              {!allVerified && (
-                <Button onClick={handleCompleteSetup}>
-                  <CheckCircle size={16} className="mr-2" />
-                  Complete setup
-                </Button>
-              )}
+              <Button variant="outline" onClick={handleEditProfile}>
+                <NotePencil size={16} className="mr-2" />
+                Edit profile
+              </Button>
+              <Button variant="destructive" onClick={handleSignOut}>
+                <SignOut size={16} className="mr-2" />
+                Sign out
+              </Button>
             </div>
           </div>
         </CardHeader>
       </Card>
 
       <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as ProfileTab)}>
-        <TabsList className="grid grid-cols-4 md:w-auto md:inline-flex">
+        <TabsList className="grid grid-cols-2 md:w-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="listings">My listings</TabsTrigger>
-          <TabsTrigger value="recommendations">For you</TabsTrigger>
           <TabsTrigger value="impact">Impact</TabsTrigger>
         </TabsList>
 
@@ -221,8 +218,8 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages, initialActiv
               <CardContent>
                 <Progress value={verificationStats.total === 0 ? 0 : (verificationStats.completed / verificationStats.total) * 100} className="mb-4" />
                 <div className="space-y-2 text-sm">
-                  {Object.entries(user.verificationLevel).map(([key, value]) => (
-                    <div key={key} className="flex items-center justify-between">
+                  {displayedVerification.map(({ key, value }) => (
+                    <div key={key as string} className="flex items-center justify-between">
                       <span className="capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
                       {value ? <CheckCircle size={16} className="text-green-600" /> : <Badge variant="outline">Pending</Badge>}
                     </div>
@@ -279,10 +276,6 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages, initialActiv
                     <strong>{verificationStats.completed}</strong>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>Recommendations saved</span>
-                    <strong>{user.userType === 'collector' ? '8' : '5'}</strong>
-                  </div>
-                  <div className="flex items-center justify-between">
                     <span>Reward balance</span>
                     <strong>{user.rewardsBalance ?? 0} pts</strong>
                   </div>
@@ -290,35 +283,6 @@ export function ProfileDashboard({ onCreateListing, onOpenMessages, initialActiv
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="listings" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-h4">Your active listings</CardTitle>
-              <CardDescription>Manage the items you are currently sharing with the community.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {listings.length === 0 ? (
-                <div className="text-center text-sm text-muted-foreground">
-                  <p>You have not listed any items yet.</p>
-                  <Button className="mt-4" onClick={onCreateListing}>Create your first listing</Button>
-                </div>
-              ) : (
-                <MyListingsView
-                  variant="dashboard"
-                  defaultView="card"
-                  onAddNewItem={onCreateListing}
-                  onOpenMessages={onOpenMessages}
-                />
-
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="recommendations">
-          <IntelligentRecommendations user={user} />
         </TabsContent>
 
         <TabsContent value="impact" className="space-y-4">

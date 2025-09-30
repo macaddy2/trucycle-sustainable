@@ -36,6 +36,7 @@ interface UserProfile {
     community: boolean
   }
   rewardsBalance?: number
+  partnerAccess?: boolean
 }
 
 export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthDialogProps) {
@@ -114,7 +115,8 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
             payment: false,
             community: false
           },
-          rewardsBalance: 0
+          rewardsBalance: 0,
+          partnerAccess: false
         }
 
         // Store user profile

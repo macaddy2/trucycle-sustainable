@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,12 +15,30 @@ interface DropOffMapProps {
   highlightGuidedFlow?: boolean
 }
 
-const defaultCoordinateFallback = (index: number) => ({
-  x: 40 + (index % 3) * 20,
-  y: 35 + Math.floor(index / 3) * 20
+const defaultCoordinateFallback = (index: number): { lat: number; lng: number } => ({
+  lat: 51.541 + (index % 3) * 0.01,
+  lng: -0.142 + Math.floor(index / 3) * 0.01
+})
+
+const activeMarkerIcon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  shadowSize: [41, 41],
+  shadowAnchor: [12, 41],
 })
 
 export function DropOffMap({ onPlanDropOff, highlightGuidedFlow }: DropOffMapProps) {
+
+function RecenterMap({ center }: { center: [number, number] }) {
+  const map = useMap()
+  useEffect(() => {
+    map.setView(center)
+  }, [center, map])
+  return null
+}
+
   const [storedLocations] = useKV<DropOffLocation[]>('dropoff-locations', [])
 
   const locations = useMemo(() => {
@@ -106,7 +127,7 @@ export function DropOffMap({ onPlanDropOff, highlightGuidedFlow }: DropOffMapPro
                         Interactive map
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Click pins to preview details, double-click to select instantly.
+                        Select a pin to preview partner details and confirm a drop-off location.
                       </p>
                     </div>
                     {activeLocation && (
@@ -116,31 +137,44 @@ export function DropOffMap({ onPlanDropOff, highlightGuidedFlow }: DropOffMapPro
                     )}
                   </div>
 
-                  <div className="relative aspect-[4/3] bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.15),_transparent)]">
-                    <div className="pointer-events-none absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'160\' height=\'160\' viewBox=\'0 0 160 160\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 80H160M80 0V160\' stroke=\'%23E5E7EB\' stroke-opacity=\'0.6\' stroke-width=\'1\'/%3E%3C/svg%3E')] opacity-60" />
-                    {locations.map((location, index) => (
-                      <button
-                        type="button"
+                  <MapContainer
+                    center={[activeLocation?.coordinates.lat ?? 51.5416, activeLocation?.coordinates.lng ?? -0.143]}
+                    zoom={12}
+                    scrollWheelZoom={false}
+                    className="h-[360px] w-full"
+                  >
+                    <TileLayer
+                      attribution="&copy; <a href='https://www.openstreetmap.org/'>OpenStreetMap</a> contributors"
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    {locations.map(location => (
+                      <Marker
                         key={location.id}
-                        className={`group absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 p-2 shadow-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary ${
-                          activeLocationId === location.id
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-primary/40 bg-background text-primary hover:border-primary'
-                        }`}
-                        style={{
-                          left: `${location.coordinates?.x ?? defaultCoordinateFallback(index).x}%`,
-                          top: `${location.coordinates?.y ?? defaultCoordinateFallback(index).y}%`
+                        position={[location.coordinates.lat, location.coordinates.lng]}
+                        eventHandlers={{
+                          click: () => setActiveLocationId(location.id),
                         }}
-                        onClick={() => setActiveLocationId(location.id)}
-                        onDoubleClick={() => onPlanDropOff?.(location)}
+                        icon={activeLocationId === location.id ? activeMarkerIcon : undefined}
                       >
-                        <MapPin size={20} weight={activeLocationId === location.id ? 'fill' : 'regular'} />
-                        <span className="absolute top-full left-1/2 mt-2 -translate-x-1/2 whitespace-nowrap rounded-full bg-background/95 px-2 py-1 text-xs font-medium text-foreground shadow group-hover:bg-primary/10">
-                          {location.name}
-                        </span>
-                      </button>
+                        <Popup minWidth={240}>
+                          <div className="space-y-2">
+                            <p className="font-semibold">{location.name}</p>
+                            <p className="text-xs text-muted-foreground">{location.address}</p>
+                            <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                              <span>{location.distance}</span>
+                              <span>{location.openHours}</span>
+                            </div>
+                            <Button size="sm" className="w-full" onClick={() => onPlanDropOff?.(location)}>
+                              Use this location
+                            </Button>
+                          </div>
+                        </Popup>
+                      </Marker>
                     ))}
-                  </div>
+                    {activeLocation && (
+                      <RecenterMap center={[activeLocation.coordinates.lat, activeLocation.coordinates.lng]} />
+                    )}
+                  </MapContainer>
 
                   {activeLocation && (
                     <div className="grid gap-4 border-t border-primary/10 bg-muted/40 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -172,8 +206,8 @@ export function DropOffMap({ onPlanDropOff, highlightGuidedFlow }: DropOffMapPro
                     </div>
                   )}
                 </div>
-              </div>
 
+              </div>
               <ScrollArea className="h-[420px] rounded-2xl border border-border/80 bg-background">
                 <div className="divide-y">
                   {locations.map(location => (

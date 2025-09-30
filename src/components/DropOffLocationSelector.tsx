@@ -3,6 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { MapPin, Clock, Phone, NavigationArrow, Storefront, XCircle } from '@phosphor-icons/react'
 import { DROP_OFF_LOCATIONS, type DropOffLocation } from './dropOffLocations'
 
@@ -12,7 +15,24 @@ interface DropOffLocationSelectorProps {
   onClose: () => void
 }
 
+const selectorMarkerIcon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  shadowSize: [41, 41],
+  shadowAnchor: [12, 41],
+})
+
 export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }: DropOffLocationSelectorProps) {
+  const RecenterMap = ({ center }: { center: [number, number] }) => {
+    const map = useMap()
+    useEffect(() => {
+      map.setView(center)
+    }, [center, map])
+    return null
+  }
+
   const [activeLocationId, setActiveLocationId] = useState<string>(selectedLocation?.id ?? DROP_OFF_LOCATIONS[0].id)
 
   useEffect(() => {
@@ -63,28 +83,37 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
                   </Badge>
                 </div>
 
-                <div className="relative aspect-[4/3] bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.15),_transparent)]">
-                  <div className="pointer-events-none absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'160\' height=\'160\' viewBox=\'0 0 160 160\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 80H160M80 0V160\' stroke=\'%23E5E7EB\' stroke-opacity=\'0.6\' stroke-width=\'1\'/%3E%3C/svg%3E')] opacity-60" />
+                <MapContainer
+                  center={[activeLocation.coordinates.lat, activeLocation.coordinates.lng]}
+                  zoom={12}
+                  scrollWheelZoom={false}
+                  className="h-[320px] w-full"
+                >
+                  <TileLayer
+                    attribution="&copy; <a href='https://www.openstreetmap.org/'>OpenStreetMap</a> contributors"
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
                   {DROP_OFF_LOCATIONS.map(location => (
-                    <button
-                      type="button"
+                    <Marker
                       key={location.id}
-                      className={`group absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 p-2 shadow-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary ${
-                        selectedLocation?.id === location.id || activeLocationId === location.id
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-primary/40 bg-background text-primary hover:border-primary'
-                      }`}
-                      style={{ left: `${location.coordinates.x}%`, top: `${location.coordinates.y}%` }}
-                      onClick={() => setActiveLocationId(location.id)}
-                      onDoubleClick={() => onSelect(location)}
+                      position={[location.coordinates.lat, location.coordinates.lng]}
+                      icon={selectedLocation?.id === location.id ? selectorMarkerIcon : undefined}
+                      eventHandlers={{
+                        click: () => setActiveLocationId(location.id),
+                        dblclick: () => onSelect(location)
+                      }}
                     >
-                      <MapPin size={20} weight={selectedLocation?.id === location.id || activeLocationId === location.id ? 'fill' : 'regular'} />
-                      <span className="absolute top-full left-1/2 mt-2 -translate-x-1/2 whitespace-nowrap rounded-full bg-background/95 px-2 py-1 text-xs font-medium text-foreground shadow group-hover:bg-primary/10">
-                        {location.name}
-                      </span>
-                    </button>
+                      <Popup minWidth={220}>
+                        <div className="space-y-2">
+                          <p className="font-medium">{location.name}</p>
+                          <p className="text-xs text-muted-foreground">{location.address}</p>
+                          <Button size="sm" className="w-full" onClick={() => onSelect(location)}>Use this location</Button>
+                        </div>
+                      </Popup>
+                    </Marker>
                   ))}
-                </div>
+                  <RecenterMap center={[activeLocation.coordinates.lat, activeLocation.coordinates.lng]} />
+                </MapContainer>
 
                 {activeLocation && (
                   <div className="grid gap-4 border-t border-primary/10 bg-muted/40 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">

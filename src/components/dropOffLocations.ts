@@ -9,7 +9,7 @@ export interface DropOffLocation {
   contactEmail?: string
   acceptedItems: string[]
   specialServices: string[]
-  coordinates: { x: number; y: number }
+  coordinates: { lat: number; lng: number }
 }
 
 export const DROP_OFF_LOCATIONS: DropOffLocation[] = [
@@ -24,7 +24,7 @@ export const DROP_OFF_LOCATIONS: DropOffLocation[] = [
     contactEmail: 'hello@camdencircularhub.uk',
     acceptedItems: ['Clothing', 'Books', 'Small Electronics'],
     specialServices: ['Same-day donation receipt', 'Textile recycling bin'],
-    coordinates: { x: 42, y: 38 }
+    coordinates: { lat: 51.5416, lng: -0.143 }
   },
   {
     id: 'loc-2',
@@ -37,7 +37,7 @@ export const DROP_OFF_LOCATIONS: DropOffLocation[] = [
     contactEmail: 'care@greenwayreuse.org',
     acceptedItems: ['Furniture', 'Appliances', 'DIY Tools'],
     specialServices: ['Large item assistance', 'Evening drop-off slots'],
-    coordinates: { x: 58, y: 52 }
+    coordinates: { lat: 51.5521, lng: -0.1139 }
   },
   {
     id: 'loc-3',
@@ -50,6 +50,6 @@ export const DROP_OFF_LOCATIONS: DropOffLocation[] = [
     contactEmail: 'team@shoreditchsharing.co.uk',
     acceptedItems: ['Home Decor', 'Art Supplies', 'Bikes'],
     specialServices: ['Weekend workshops', 'Secure bike storage'],
-    coordinates: { x: 68, y: 28 }
+    coordinates: { lat: 51.521, lng: -0.0713 }
   }
 ]

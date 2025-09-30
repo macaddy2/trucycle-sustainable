@@ -1,18 +1,19 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Toaster } from '@/components/ui/sonner'
-import { MapPin, Recycle, ArrowsClockwise, Leaf, Question as Search, User, QrCode, Bell, Package } from '@phosphor-icons/react'
+import { Recycle, ArrowsClockwise, Leaf, Question as Search, User, QrCode, Bell, Package, Storefront, ChatCircle } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import { ItemListing, ItemListingForm, MyListingsView, ProfileDashboard, DropOffMap, CarbonTracker, ShopScanner, DemoGuide } from './components'
+import { NotificationList, type Notification } from './components/NotificationList'
 import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
-import { useInitializeSampleData, useRecommendationNotifications } from '@/hooks'
+import { useInitializeSampleData, useRecommendationNotifications, useNotifications } from '@/hooks'
 import type { ListingCompletionDetails } from './components/ItemListingForm'
 
 interface UserProfile {
@@ -32,28 +33,68 @@ interface UserProfile {
     community: boolean
   }
   rewardsBalance?: number
+  partnerAccess?: boolean
 }
 
 function App() {
   const [currentTab, setCurrentTab] = useState('browse')
   const [searchQuery, setSearchQuery] = useState('')
   const [user, setUser] = useKV<UserProfile | null>('current-user', null)
+  const [onboardingDismissals, setOnboardingDismissals] = useKV<Record<string, boolean>>('onboarding-dismissals', {})
   const [showAuthDialog, setShowAuthDialog] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
-  const [showMessageCenter, setShowMessageCenter] = useState(false)
+  const [onboardingMode, setOnboardingMode] = useState<'onboarding' | 'edit'>('onboarding')
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [showShopScanner, setShowShopScanner] = useState(false)
-  const [showDemoGuide] = useKV<boolean>('show-demo-guide', true)
+  const [showDemoGuide, setShowDemoGuide] = useKV<boolean>('show-demo-guide', true)
   const [pendingFulfillmentMethod, setPendingFulfillmentMethod] = useState<'pickup' | 'dropoff' | null>(null)
   const [pendingDropOffLocation, setPendingDropOffLocation] = useState<DropOffLocation | null>(null)
   const [messageCenterView, setMessageCenterView] = useState<'chats' | 'requests'>('chats')
   const [messageCenterItemId, setMessageCenterItemId] = useState<string | undefined>()
   const [messageCenterChatId, setMessageCenterChatId] = useState<string | undefined>()
-    const [profileInitialTab, setProfileInitialTab] = useState<'overview' | 'listings' | 'recommendations' | 'impact'>('overview')
-  const [profileHighlightListingId, setProfileHighlightListingId] = useState<string | null>(null)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   
   const { initializeSampleChats } = useInitializeSampleData()
-  const { unreadCount, triggerUrgentNotifications } = useRecommendationNotifications(user ?? null)
+  const {
+    notifications: systemNotifications,
+    markAsRead: markSystemNotificationAsRead,
+    markAllAsRead: markAllSystemNotifications,
+    deleteNotification: deleteSystemNotification,
+    unreadCount: systemUnreadCount,
+  } = useNotifications()
+  const {
+    notifications: recommendationNotifications,
+    unreadCount: recommendationUnreadCount,
+    markAsRead: markRecommendationAsRead,
+    triggerUrgentNotifications,
+  } = useRecommendationNotifications(user ?? null)
+
+  const navTabs = useMemo(() => {
+    const isCollector = user?.userType === 'collector'
+    const isDonor = user?.userType === 'donor'
+
+    return [
+      { value: 'browse', label: 'Browse', Icon: Search, show: !isDonor },
+      { value: 'listings', label: isCollector ? 'My Collected Items' : 'My Listed Items', Icon: Package, show: true },
+      { value: 'messages', label: 'Messages', Icon: ChatCircle, show: Boolean(user) },
+      { value: 'dropoff', label: 'Partner Shops', Icon: Storefront, show: !isCollector },
+      { value: 'impact', label: 'Impact', Icon: Leaf, show: true },
+      { value: 'profile', label: 'Profile', Icon: User, show: true },
+    ].filter((tab) => tab.show)
+  }, [user])
+
+  const hasBrowseTab = navTabs.some((tab) => tab.value === 'browse')
+  const hasDropOffTab = navTabs.some((tab) => tab.value === 'dropoff')
+  const hasDismissedOnboarding = user ? Boolean(onboardingDismissals[user.id]) : false
+
+  useEffect(() => {
+    if (!navTabs.some((tab) => tab.value === currentTab)) {
+      const fallbackTab = navTabs[0]?.value ?? currentTab
+      if (fallbackTab !== currentTab) {
+        setCurrentTab(fallbackTab)
+      }
+    }
+  }, [navTabs, currentTab])
 
   // Check for shop scanner mode in URL
   const handleOpenMessages = useCallback((options?: { itemId?: string; chatId?: string; initialView?: 'chats' | 'requests' }) => {
@@ -64,8 +105,22 @@ function App() {
     }
     setMessageCenterItemId(options?.itemId)
     setMessageCenterChatId(options?.chatId)
-    setShowMessageCenter(true)
-  }, [])
+    setNotificationsOpen(false)
+    setCurrentTab('messages')
+  }, [setNotificationsOpen])
+
+  const handleDemoGuideComplete = useCallback(() => {
+    setShowDemoGuide(false)
+  }, [setShowDemoGuide])
+
+  useEffect(() => {
+    if (currentTab !== 'messages') {
+      setMessageCenterItemId(undefined)
+      setMessageCenterChatId(undefined)
+      setMessageCenterView('chats')
+    }
+  }, [currentTab])
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     if (urlParams.get('mode') === 'shop-scanner') {
@@ -75,10 +130,11 @@ function App() {
 
   // Check if user needs onboarding
   useEffect(() => {
-    if (user && !user.onboardingCompleted) {
+    if (user && !user.onboardingCompleted && !hasDismissedOnboarding) {
+      setOnboardingMode('onboarding')
       setShowOnboarding(true)
     }
-  }, [user])
+  }, [user, hasDismissedOnboarding])
 
   // Initialize sample data when user logs in
   useEffect(() => {
@@ -86,6 +142,93 @@ function App() {
       initializeSampleChats()
     }
   }, [initializeSampleChats, user])
+
+  useEffect(() => {
+    const handleOpenProfileOnboarding = () => {
+      setOnboardingMode('edit')
+      setShowOnboarding(true)
+      if (user) {
+        setOnboardingDismissals((prev) => ({ ...prev, [user.id]: false }))
+      }
+    }
+
+    window.addEventListener('open-profile-onboarding', handleOpenProfileOnboarding)
+    return () => {
+      window.removeEventListener('open-profile-onboarding', handleOpenProfileOnboarding)
+    }
+  }, [user, setOnboardingDismissals])
+
+  useEffect(() => {
+    if (user && user.onboardingCompleted && onboardingDismissals[user.id]) {
+      setOnboardingDismissals((prev) => ({ ...prev, [user.id]: false }))
+    }
+  }, [user, onboardingDismissals, setOnboardingDismissals])
+
+  useEffect(() => {
+    setOnboardingMode('onboarding')
+  }, [user?.id])
+
+  const trayNotifications = useMemo(() => {
+    const items: Array<{ source: 'system' | 'recommendation'; notification: Notification }> = []
+
+    systemNotifications.forEach((notification) => {
+      items.push({ source: 'system', notification })
+    })
+
+    recommendationNotifications.forEach((notification) => {
+      items.push({
+        source: 'recommendation',
+        notification: {
+          id: notification.id,
+          userId: notification.userId,
+          type: notification.type === 'community_need' ? 'community_need' : 'item_match',
+          title: notification.title,
+          message: notification.message,
+          urgency: notification.type === 'urgent_request' ? 'urgent' : notification.urgency,
+          createdAt: notification.createdAt,
+          read: notification.read,
+          actionUrl: notification.actionUrl,
+          metadata: notification.itemId ? { itemId: notification.itemId } : undefined,
+        },
+      })
+    })
+
+    return items.sort((a, b) => new Date(b.notification.createdAt).getTime() - new Date(a.notification.createdAt).getTime())
+  }, [systemNotifications, recommendationNotifications])
+
+  const notificationSourceMap = useMemo(() => {
+    const map = new Map<string, 'system' | 'recommendation'>()
+    trayNotifications.forEach(({ source, notification }) => {
+      map.set(notification.id, source)
+    })
+    return map
+  }, [trayNotifications])
+
+  const hasUnreadNotifications = trayNotifications.some(({ notification }) => !notification.read)
+  const totalUnreadNotifications = systemUnreadCount + recommendationUnreadCount
+
+  const handleNotificationMarkAsRead = useCallback((id: string) => {
+    const source = notificationSourceMap.get(id)
+    if (source === 'system') {
+      markSystemNotificationAsRead(id)
+    } else if (source === 'recommendation') {
+      markRecommendationAsRead(id)
+    }
+  }, [markSystemNotificationAsRead, markRecommendationAsRead, notificationSourceMap])
+
+  const handleNotificationDelete = useCallback((id: string) => {
+    const source = notificationSourceMap.get(id)
+    if (source === 'system') {
+      deleteSystemNotification(id)
+    } else if (source === 'recommendation') {
+      markRecommendationAsRead(id)
+    }
+  }, [deleteSystemNotification, markRecommendationAsRead, notificationSourceMap])
+
+  const handleNotificationsMarkAll = useCallback(() => {
+    markAllSystemNotifications()
+    recommendationNotifications.forEach((notification) => markRecommendationAsRead(notification.id))
+  }, [markAllSystemNotifications, markRecommendationAsRead, recommendationNotifications])
 
   useEffect(() => {
     const handleClaimRequested = (event: Event) => {
@@ -140,8 +283,22 @@ function App() {
     }
   }
 
+  const handleOnboardingOpenChange = useCallback((open: boolean) => {
+    setShowOnboarding(open)
+    if (!open) {
+      if (user && onboardingMode === 'onboarding' && !user.onboardingCompleted) {
+        setOnboardingDismissals((prev) => ({ ...prev, [user.id]: true }))
+      }
+      setOnboardingMode('onboarding')
+    }
+  }, [user, onboardingMode, setOnboardingDismissals])
+
   const handleOnboardingComplete = () => {
     setShowOnboarding(false)
+    setOnboardingMode('onboarding')
+    if (user) {
+      setOnboardingDismissals((prev) => ({ ...prev, [user.id]: false }))
+    }
   }
 
   const handleToggleUserType = () => {
@@ -190,20 +347,14 @@ function App() {
   }
 
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    setCurrentTab('browse')
-    document.getElementById('item-listing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-  const handleDonationFlowStart = (method: 'pickup' | 'dropoff') => {
-    setPendingFulfillmentMethod(method)
-    if (method === 'dropoff') {
-      setPendingDropOffLocation(null)
-      setCurrentTab('dropoff')
-    } else {
-      setCurrentTab('list')
+  const handleSearch = () => {
+    const targetTab = hasBrowseTab ? 'browse' : navTabs[0]?.value ?? currentTab
+    setCurrentTab(targetTab)
+    if (targetTab === 'browse') {
+      document.getElementById('item-listing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
+
 
   const handleDropOffPlanned = (location: DropOffLocation) => {
     setPendingFulfillmentMethod('dropoff')
@@ -212,22 +363,11 @@ function App() {
   }
 
   const handleListingComplete = useCallback(({ listing }: ListingCompletionDetails) => {
-    setProfileInitialTab('listings')
-    setProfileHighlightListingId(listing.id)
     setCurrentTab('profile')
     toast.success('Drop-off planned!', {
       description: `"${listing.title}" is now listed under My Listed Items.`
     })
   }, [])
-
-  useEffect(() => {
-    if (currentTab !== 'profile') {
-      setProfileHighlightListingId(null)
-      if (profileInitialTab !== 'overview') {
-        setProfileInitialTab('overview')
-      }
-    }
-  }, [currentTab, profileInitialTab])
 
   // If in shop scanner mode, render only the scanner
   if (showShopScanner) {
@@ -248,43 +388,39 @@ function App() {
             </div>
 
             <div className="hidden md:flex items-center space-x-6">
-              <form onSubmit={handleSearch} className="flex items-center space-x-2">
-                <div className="relative">
-                  <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Search items..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 w-64"
-                  />
-                </div>
-              </form>
-              
               {user ? (
                 <div className="flex items-center space-x-2">
-              <MessageNotification onOpenMessages={() => handleOpenMessages()} />
-                  
-                  {/* Recommendation Notifications */}
-                  {unreadCount > 0 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentTab('profile')}
-                      className="relative"
-                      title={`${unreadCount} new ${user?.userType === 'collector' ? 'item recommendation' : 'community need'}${unreadCount !== 1 ? 's' : ''}`}
-                    >
-                      <Bell size={16} />
-                      <Badge 
-                        variant="destructive" 
-                        className="absolute -top-2 -right-2 text-xs w-5 h-5 p-0 flex items-center justify-center"
+                  <MessageNotification onOpenMessages={handleOpenMessages} />
+
+                  <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="relative"
+                        title={totalUnreadNotifications > 0 ? `${totalUnreadNotifications} new notification${totalUnreadNotifications === 1 ? '' : 's'}` : 'Notifications'}
                       >
-                        {unreadCount}
-                      </Badge>
-                    </Button>
-                  )}
-                  
-                  {/* Trigger Urgent Notifications */}
+                        <Bell size={16} />
+                        {totalUnreadNotifications > 0 && (
+                          <Badge
+                            variant="destructive"
+                            className="absolute -top-2 -right-2 text-xs w-5 h-5 p-0 flex items-center justify-center"
+                          >
+                            {totalUnreadNotifications > 99 ? '99+' : totalUnreadNotifications}
+                          </Badge>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[360px] p-0" align="end">
+                      <NotificationList
+                        notifications={trayNotifications.map(({ notification }) => notification)}
+                        onMarkAsRead={handleNotificationMarkAsRead}
+                        onMarkAllAsRead={hasUnreadNotifications ? handleNotificationsMarkAll : undefined}
+                        onDeleteNotification={handleNotificationDelete}
+                      />
+                    </PopoverContent>
+                  </Popover>
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -298,17 +434,20 @@ function App() {
                   >
                     <Bell size={16} className="animate-pulse" />
                   </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setShowShopScanner(true)}
-                    title="Shop Scanner (For Partner Shops)"
-                  >
-                    <QrCode size={16} />
-                  </Button>
-                  <Button 
-                    variant="outline" 
+
+                  {user?.partnerAccess && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowShopScanner(true)}
+                      title="Shop Scanner (For Partner Shops)"
+                    >
+                      <QrCode size={16} />
+                    </Button>
+                  )}
+
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => setCurrentTab('profile')}
                   >
@@ -318,14 +457,6 @@ function App() {
                 </div>
               ) : (
                 <div className="flex items-center space-x-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setShowShopScanner(true)}
-                    title="Shop Scanner (For Partner Shops)"
-                  >
-                    <QrCode size={16} />
-                  </Button>
                   <Button variant="outline" size="sm" onClick={handleSignIn}>
                     Sign In
                   </Button>
@@ -334,6 +465,7 @@ function App() {
                   </Button>
                 </div>
               )}
+
             </div>
           </div>
         </div>
@@ -343,27 +475,13 @@ function App() {
       <nav className="border-b border-border bg-background">
         <div className="container mx-auto px-4">
           <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-5 md:flex md:w-auto">
-              <TabsTrigger value="browse" className="flex items-center space-x-2">
-                <Search size={16} />
-                <span className="hidden sm:inline">Browse</span>
-              </TabsTrigger>
-              <TabsTrigger value="listings" className="flex items-center space-x-2">
-                <Package size={16} />
-                <span className="hidden sm:inline">My Listed Items</span>
-              </TabsTrigger>
-              <TabsTrigger value="dropoff" className="flex items-center space-x-2">
-                <MapPin size={16} />
-                <span className="hidden sm:inline">Drop-off</span>
-              </TabsTrigger>
-              <TabsTrigger value="impact" className="flex items-center space-x-2">
-                <Leaf size={16} />
-                <span className="hidden sm:inline">Impact</span>
-              </TabsTrigger>
-              <TabsTrigger value="profile" className="flex items-center space-x-2">
-                <User size={16} />
-                <span className="hidden sm:inline">Profile</span>
-              </TabsTrigger>
+            <TabsList className="grid w-full grid-flow-col auto-cols-fr md:flex md:w-auto md:gap-2">
+              {navTabs.map(({ value, label, Icon }) => (
+                <TabsTrigger key={value} value={value} className="flex items-center space-x-2">
+                  <Icon size={16} />
+                  <span className="hidden sm:inline">{label}</span>
+                </TabsTrigger>
+              ))}
             </TabsList>
           </Tabs>
         </div>
@@ -372,22 +490,36 @@ function App() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs value={currentTab} onValueChange={setCurrentTab}>
-          <TabsContent value="browse">
-            <section id="item-listing-section">
-            <ItemListing
-              searchQuery={searchQuery}
-              onStartDonationFlow={handleDonationFlowStart}
-              onOpenMessages={handleOpenMessages}
-            />
-            </section>
-          </TabsContent>
+          {hasBrowseTab && (
+            <TabsContent value="browse">
+              <section id="item-listing-section">
+                <ItemListing
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  onSearchSubmit={handleSearch}
+                  onOpenMessages={handleOpenMessages}
+                />
+              </section>
+            </TabsContent>
+          )}
 
           <TabsContent value="listings">
             <MyListingsView
               onAddNewItem={() => setCurrentTab('list')}
-              onOpenMessages={() => setShowMessageCenter(true)}
+              onOpenMessages={handleOpenMessages}
             />
           </TabsContent>
+
+          {user && (
+            <TabsContent value="messages">
+              <MessageCenter
+                mode="page"
+                itemId={messageCenterItemId}
+                chatId={messageCenterChatId}
+                initialView={messageCenterView}
+              />
+            </TabsContent>
+          )}
 
           <TabsContent value="list">
             <ItemListingForm
@@ -399,12 +531,14 @@ function App() {
             />
           </TabsContent>
 
-          <TabsContent value="dropoff">
-            <DropOffMap
-              onPlanDropOff={handleDropOffPlanned}
-              highlightGuidedFlow={pendingFulfillmentMethod === 'dropoff'}
-            />
-          </TabsContent>
+          {hasDropOffTab && (
+            <TabsContent value="dropoff">
+              <DropOffMap
+                onPlanDropOff={handleDropOffPlanned}
+                highlightGuidedFlow={pendingFulfillmentMethod === 'dropoff'}
+              />
+            </TabsContent>
+          )}
 
           <TabsContent value="impact">
             <CarbonTracker />
@@ -416,11 +550,12 @@ function App() {
                 onSwitchProfile={handleToggleUserType}
                 currentUserType={user.userType}
                 userName={user?.name && typeof user.name === 'string' ? user.name.split(' ')[0] : 'User'}
+                onComplete={handleDemoGuideComplete}
               />
             )}
             <ProfileDashboard
               onCreateListing={() => setCurrentTab('list')}
-              onOpenMessages={() => setShowMessageCenter(true)}
+              onOpenMessages={handleOpenMessages}
             />
           </TabsContent>
         </Tabs>
@@ -478,7 +613,7 @@ function App() {
           </div>
           
           <div className="mt-8 pt-8 border-t border-border text-center text-small text-muted-foreground">
-            <p>&copy; 2024 TruCycle. Building sustainable communities in London.</p>
+            <p>&copy; {new Date().getFullYear()} TruCycle. Building sustainable communities in London.</p>
           </div>
         </div>
       </footer>
@@ -497,24 +632,9 @@ function App() {
 
       <ProfileOnboarding 
         open={showOnboarding} 
-        onOpenChange={setShowOnboarding}
+        onOpenChange={handleOnboardingOpenChange}
         onComplete={handleOnboardingComplete}
-      />
-
-      {/* Message Center */}
-      <MessageCenter
-        open={showMessageCenter}
-        onOpenChange={(open) => {
-          setShowMessageCenter(open)
-          if (!open) {
-            setMessageCenterItemId(undefined)
-            setMessageCenterChatId(undefined)
-            setMessageCenterView('chats')
-          }
-        }}
-        itemId={messageCenterItemId}
-        chatId={messageCenterChatId}
-        initialView={messageCenterView}
+        mode={onboardingMode}
       />
 
       {/* Toast Notifications */}
@@ -524,4 +644,5 @@ function App() {
 }
 
 export default App
+
 

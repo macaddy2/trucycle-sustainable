@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,9 +17,10 @@ interface DemoGuideProps {
   onSwitchProfile: () => void
   currentUserType: 'donor' | 'collector'
   userName: string
+  onComplete?: () => void
 }
 
-export function DemoGuide({ onSwitchProfile, currentUserType, userName }: DemoGuideProps) {
+export function DemoGuide({ onSwitchProfile, currentUserType, userName, onComplete }: DemoGuideProps) {
   const [completedSteps, setCompletedSteps] = useState<string[]>([])
 
   const markStepComplete = (stepId: string) => {
@@ -84,6 +85,12 @@ export function DemoGuide({ onSwitchProfile, currentUserType, userName }: DemoGu
   ]
 
   const allStepsCompleted = demoSteps.every(step => completedSteps.includes(step.id))
+
+  useEffect(() => {
+    if (allStepsCompleted) {
+      onComplete?.()
+    }
+  }, [allStepsCompleted, onComplete])
 
   return (
     <Card className="mb-6 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
@@ -190,3 +197,4 @@ export function DemoGuide({ onSwitchProfile, currentUserType, userName }: DemoGu
     </Card>
   )
 }
+

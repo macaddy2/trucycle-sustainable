@@ -7,6 +7,7 @@ interface UserProfile {
   userType: 'donor' | 'collector'
   postcode?: string
   onboardingCompleted: boolean
+  partnerAccess?: boolean
 }
 
 interface RecommendationNotification {

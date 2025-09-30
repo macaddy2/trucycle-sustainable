@@ -22,11 +22,12 @@ import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import { QRCodeGenerator, QRCodeDisplay, QRCodeData } from '../QRCode'
 
 interface MessageCenterProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   itemId?: string
   chatId?: string
   initialView?: 'chats' | 'requests'
+  mode?: 'modal' | 'page'
 }
 
 interface RequestGroup {
@@ -57,7 +58,9 @@ const formatRelativeTime = (date: Date | string) => {
   return dateObj.toLocaleDateString()
 }
 
-export function MessageCenter({ open, onOpenChange, itemId, chatId, initialView = 'chats' }: MessageCenterProps) {
+export function MessageCenter({ open = false, onOpenChange, itemId, chatId, initialView = 'chats', mode = 'modal' }: MessageCenterProps) {
+  const isPage = mode === 'page'
+  const handleDialogOpenChange = useCallback((value: boolean) => onOpenChange?.(value), [onOpenChange])
   const {
     currentUser,
     chats,
@@ -361,8 +364,19 @@ export function MessageCenter({ open, onOpenChange, itemId, chatId, initialView 
   }, [currentUser, handleConfirmCollection, linkedRequest, selectedChat, sendSystemMessage, shareLocation])
 
   if (!currentUser) {
+    if (isPage) {
+      return (
+        <Card className="border-border">
+          <CardContent className="py-12 text-center space-y-4">
+            <h2 className="text-h3 font-medium">Messages</h2>
+            <p className="text-muted-foreground">Please sign in to access your messages.</p>
+          </CardContent>
+        </Card>
+      )
+    }
+
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Sign in Required</DialogTitle>
@@ -371,7 +385,7 @@ export function MessageCenter({ open, onOpenChange, itemId, chatId, initialView 
             <p className="text-muted-foreground mb-4">
               Please sign in to access your messages
             </p>
-            <Button onClick={() => onOpenChange(false)}>
+            <Button onClick={() => handleDialogOpenChange(false)}>
               Close
             </Button>
           </div>
@@ -382,409 +396,423 @@ export function MessageCenter({ open, onOpenChange, itemId, chatId, initialView 
 
   const rewardBalance = getRewardBalance(currentUser.id)
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl h-[640px] p-0 overflow-hidden">
-        <DialogHeader className="sr-only">
-          <DialogTitle>Message Center</DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col h-full">
-          <div className="flex items-center justify-between border-b border-border p-4">
-            <div>
-              <h2 className="text-h3 font-medium">Messages</h2>
-              <p className="text-small text-muted-foreground">
-                {normalizedChats.length} active conversation{normalizedChats.length === 1 ? '' : 's'}
-              </p>
-            </div>
-
-            {currentUser.userType === 'donor' && (
-              <Tabs value={activePanel} onValueChange={(value) => setActivePanel(value as 'chats' | 'requests')}>
-                <TabsList>
-                  <TabsTrigger value="chats">Chats</TabsTrigger>
-                  <TabsTrigger value="requests">
-                    Requests
-                    {pendingRequestsCount > 0 && (
-                      <Badge variant="destructive" className="ml-2 text-xs">
-                        {pendingRequestsCount}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            )}
-          </div>
-
-          {activePanel === 'requests' && currentUser.userType === 'donor' ? (
-            <div className="flex flex-1">
-              {groupedRequests.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground space-y-4">
-                  <Package size={48} className="mx-auto text-muted-foreground" />
+  const renderBody = () => (
+    <>
+              <div className={`flex flex-col ${isPage ? 'h-[min(80vh,640px)]' : 'h-full'}`}>
+                <div className="flex items-center justify-between border-b border-border p-4">
                   <div>
-                    <p className="font-medium">No claim requests yet</p>
-                    <p className="text-sm">
-                      Collectors can request your listings directly from the marketplace.
+                    <h2 className="text-h3 font-medium">Messages</h2>
+                    <p className="text-small text-muted-foreground">
+                      {normalizedChats.length} active conversation{normalizedChats.length === 1 ? '' : 's'}
                     </p>
                   </div>
-                </div>
-              ) : (
-                <>
-                  <div className="w-1/3 border-r border-border">
-                    <ScrollArea className="h-full">
-                      <div className="p-3 space-y-2">
-                        {groupedRequests.map(group => {
-                          const pending = group.requests.filter(request => request.status === 'pending').length
-                          const approved = group.requests.filter(request => request.status === 'approved').length
-                          const collected = group.requests.some(request => request.status === 'completed')
-                          return (
-                            <Card
-                              key={group.itemId}
-                              className={`cursor-pointer transition-colors ${selectedRequestItem === group.itemId ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
-                              onClick={() => setSelectedRequestItem(group.itemId)}
-                            >
-                              <CardContent className="p-3 space-y-2">
-                                <p className="font-medium text-sm line-clamp-2">{group.itemTitle}</p>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <Badge variant="outline">{group.requests.length} interested</Badge>
-                                  {pending > 0 && (
-                                    <Badge variant="destructive">{pending} pending</Badge>
-                                  )}
-                                  {approved > 0 && (
-                                    <Badge variant="secondary">{approved} confirmed</Badge>
-                                  )}
-                                  {collected && (
-                                    <Badge variant="secondary" className="bg-green-600 text-white">Collected</Badge>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          )
-                        })}
-                      </div>
-                    </ScrollArea>
-                  </div>
-
-                  <div className="flex-1 flex flex-col">
-                    {selectedRequestGroup ? (
-                      <ScrollArea className="flex-1">
-                        <div className="p-4 space-y-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="text-h3">{selectedRequestGroup.itemTitle}</h3>
-                              <p className="text-sm text-muted-foreground">
-                                Select a collector to confirm the exchange.
-                              </p>
-                            </div>
-                            <Badge variant="outline">Reward balance: {rewardBalance} GreenPoints</Badge>
-                          </div>
-
-                          {selectedRequestGroup.requests.map(request => {
-                            const requestChat = normalizedChats.find(chat => chat.linkedRequestId === request.id)
-                            return (
-                              <Card key={request.id} className="border-border/60">
-                                <CardContent className="p-4 space-y-4">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <Avatar className="h-10 w-10">
-                                        {request.collectorAvatar ? (
-                                          <AvatarImage src={request.collectorAvatar} alt={request.collectorName} />
-                                        ) : (
-                                          <AvatarFallback>{request.collectorName[0]}</AvatarFallback>
-                                        )}
-                                      </Avatar>
-                                      <div>
-                                        <p className="font-medium">{request.collectorName}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                          Requested {formatRelativeTime(request.createdAt)}
-                                        </p>
-                                      </div>
-                                    </div>
-                                    <Badge className={requestStatusStyles[request.status]}>
-                                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                                    </Badge>
-                                  </div>
-
-                                  <div className="flex flex-wrap gap-2 justify-between text-xs text-muted-foreground">
-                                    <span>Donor: {request.donorName}</span>
-                                    <span>Collector ID: {request.collectorId.slice(-6)}</span>
-                                  </div>
-
-                                  <div className="flex flex-wrap gap-2">
-                                    {request.status === 'pending' && (
-                                      <Button size="sm" onClick={() => handleApproveRequest(request)}>
-                                        Confirm exchange
-                                      </Button>
-                                    )}
-                                    {request.status === 'approved' && requestChat && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleOpenChatForRequest(request)}
-                                      >
-                                        Open chat
-                                      </Button>
-                                    )}
-                                    {request.status === 'approved' && !requestChat && (
-                                      <Button size="sm" variant="outline" disabled>
-                                        Chat pending activation
-                                      </Button>
-                                    )}
-                                    {request.status === 'completed' && (
-                                      <Badge variant="outline" className="bg-green-100 text-green-700">
-                                        Reward issued
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            )
-                          })}
-                        </div>
-                      </ScrollArea>
-                    ) : (
-                      <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                        Select an item to view interested collectors
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-1">
-              <div className="w-1/3 border-r border-border flex flex-col">
-                <ScrollArea className="flex-1">
-                  {normalizedChats.length === 0 ? (
-                    <div className="p-6 text-center text-sm text-muted-foreground space-y-2">
-                      <Package size={36} className="mx-auto text-muted-foreground" />
-                      <p>No conversations yet</p>
-                      <p>Start by requesting or listing an item.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1 p-2">
-                      {normalizedChats.map(chat => (
-                        <Card
-                          key={chat.id}
-                          className={`cursor-pointer transition-colors ${selectedChatId === chat.id ? 'bg-muted border-primary' : 'hover:bg-muted/50'}`}
-                          onClick={() => setSelectedChatId(chat.id)}
-                        >
-                          <CardContent className="p-3">
-                            <div className="flex items-start space-x-3">
-                              <Avatar className="w-10 h-10">
-                                <AvatarImage src={currentUser.id === chat.donorId ? chat.collectorAvatar : chat.donorAvatar} />
-                                <AvatarFallback>
-                                  {(currentUser.id === chat.donorId ? chat.collectorName : chat.donorName)[0]}
-                                </AvatarFallback>
-                              </Avatar>
-
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-small font-medium truncate">
-                                    {currentUser.id === chat.donorId ? chat.collectorName : chat.donorName}
-                                  </p>
-                                  {chat.unreadCount > 0 && (
-                                    <Badge variant="destructive" className="text-xs">
-                                      {chat.unreadCount}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {chat.itemTitle}
-                                </p>
-                                {chat.lastMessage && (
-                                  <p className="text-xs text-muted-foreground truncate mt-1">
-                                    {chat.lastMessage.content}
-                                  </p>
-                                )}
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {chat.lastMessage
-                                    ? formatRelativeTime(chat.lastMessage.timestamp)
-                                    : formatRelativeTime(chat.createdAt)}
-                                </p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
+      
+                  {currentUser.userType === 'donor' && (
+                    <Tabs value={activePanel} onValueChange={(value) => setActivePanel(value as 'chats' | 'requests')}>
+                      <TabsList>
+                        <TabsTrigger value="chats">Chats</TabsTrigger>
+                        <TabsTrigger value="requests">
+                          Requests
+                          {pendingRequestsCount > 0 && (
+                            <Badge variant="destructive" className="ml-2 text-xs">
+                              {pendingRequestsCount}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
                   )}
-                </ScrollArea>
-              </div>
-
-              <div className="flex-1 flex flex-col">
-                {selectedChat ? (
-                  <>
-                    <div className="p-4 border-b border-border flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarImage src={currentUser.id === selectedChat.donorId ? selectedChat.collectorAvatar : selectedChat.donorAvatar} />
-                          <AvatarFallback>
-                            {(currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName)[0]}
-                          </AvatarFallback>
-                        </Avatar>
+                </div>
+      
+                {activePanel === 'requests' && currentUser.userType === 'donor' ? (
+                  <div className="flex flex-1">
+                    {groupedRequests.length === 0 ? (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground space-y-4">
+                        <Package size={48} className="mx-auto text-muted-foreground" />
                         <div>
-                          <h3 className="font-medium">
-                            {currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName}
-                          </h3>
-                          <p className="text-small text-muted-foreground">
-                            About: {selectedChat.itemTitle}
+                          <p className="font-medium">No claim requests yet</p>
+                          <p className="text-sm">
+                            Collectors can request your listings directly from the marketplace.
                           </p>
                         </div>
                       </div>
-                      <Badge variant={selectedChat.status === 'active' ? 'secondary' : 'outline'}>
-                        {selectedChat.status.replace('_', ' ')}
-                      </Badge>
-                    </div>
-
-                    <ScrollArea className="flex-1 p-4">
-                      <div className="space-y-4">
-                        {currentMessages.map(message => (
-                          <div
-                            key={message.id}
-                            className={`flex ${message.senderId === currentUser.id ? 'justify-end' : 'justify-start'}`}
-                          >
-                            <div
-                              className={`max-w-[70%] rounded-lg p-3 ${
-                                message.senderId === currentUser.id
-                                  ? 'bg-primary text-primary-foreground'
-                                  : message.type === 'system'
-                                  ? 'bg-muted text-muted-foreground'
-                                  : 'bg-muted text-foreground'
-                              } ${message.type === 'system' ? 'mx-auto text-center' : ''}`}
-                            >
-                              {message.type === 'location' && message.metadata?.location && (
-                                <div className="flex items-center gap-2 mb-2">
-                                  <MapPin size={16} />
-                                  <span className="text-small">Location shared</span>
+                    ) : (
+                      <>
+                        <div className="w-1/3 border-r border-border">
+                          <ScrollArea className="h-full">
+                            <div className="p-3 space-y-2">
+                              {groupedRequests.map(group => {
+                                const pending = group.requests.filter(request => request.status === 'pending').length
+                                const approved = group.requests.filter(request => request.status === 'approved').length
+                                const collected = group.requests.some(request => request.status === 'completed')
+                                return (
+                                  <Card
+                                    key={group.itemId}
+                                    className={`cursor-pointer transition-colors ${selectedRequestItem === group.itemId ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
+                                    onClick={() => setSelectedRequestItem(group.itemId)}
+                                  >
+                                    <CardContent className="p-3 space-y-2">
+                                      <p className="font-medium text-sm line-clamp-2">{group.itemTitle}</p>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <Badge variant="outline">{group.requests.length} interested</Badge>
+                                        {pending > 0 && (
+                                          <Badge variant="destructive">{pending} pending</Badge>
+                                        )}
+                                        {approved > 0 && (
+                                          <Badge variant="secondary">{approved} confirmed</Badge>
+                                        )}
+                                        {collected && (
+                                          <Badge variant="secondary" className="bg-green-600 text-white">Collected</Badge>
+                                        )}
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                )
+                              })}
+                            </div>
+                          </ScrollArea>
+                        </div>
+      
+                        <div className="flex-1 flex flex-col">
+                          {selectedRequestGroup ? (
+                            <ScrollArea className="flex-1">
+                              <div className="p-4 space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h3 className="text-h3">{selectedRequestGroup.itemTitle}</h3>
+                                    <p className="text-sm text-muted-foreground">
+                                      Select a collector to confirm the exchange.
+                                    </p>
+                                  </div>
+                                  <Badge variant="outline">Reward balance: {rewardBalance} GreenPoints</Badge>
                                 </div>
-                              )}
-                              <p className="text-small whitespace-pre-line">{message.content}</p>
-                              <div className="flex items-center justify-between mt-2 text-xs opacity-70">
-                                <span>{message.type !== 'system' ? message.senderName : 'System'}</span>
-                                <span>{formatRelativeTime(message.timestamp)}</span>
+      
+                                {selectedRequestGroup.requests.map(request => {
+                                  const requestChat = normalizedChats.find(chat => chat.linkedRequestId === request.id)
+                                  return (
+                                    <Card key={request.id} className="border-border/60">
+                                      <CardContent className="p-4 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-3">
+                                            <Avatar className="h-10 w-10">
+                                              {request.collectorAvatar ? (
+                                                <AvatarImage src={request.collectorAvatar} alt={request.collectorName} />
+                                              ) : (
+                                                <AvatarFallback>{request.collectorName[0]}</AvatarFallback>
+                                              )}
+                                            </Avatar>
+                                            <div>
+                                              <p className="font-medium">{request.collectorName}</p>
+                                              <p className="text-xs text-muted-foreground">
+                                                Requested {formatRelativeTime(request.createdAt)}
+                                              </p>
+                                            </div>
+                                          </div>
+                                          <Badge className={requestStatusStyles[request.status]}>
+                                            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                                          </Badge>
+                                        </div>
+      
+                                        <div className="flex flex-wrap gap-2 justify-between text-xs text-muted-foreground">
+                                          <span>Donor: {request.donorName}</span>
+                                          <span>Collector ID: {request.collectorId.slice(-6)}</span>
+                                        </div>
+      
+                                        <div className="flex flex-wrap gap-2">
+                                          {request.status === 'pending' && (
+                                            <Button size="sm" onClick={() => handleApproveRequest(request)}>
+                                              Confirm exchange
+                                            </Button>
+                                          )}
+                                          {request.status === 'approved' && requestChat && (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => handleOpenChatForRequest(request)}
+                                            >
+                                              Open chat
+                                            </Button>
+                                          )}
+                                          {request.status === 'approved' && !requestChat && (
+                                            <Button size="sm" variant="outline" disabled>
+                                              Chat pending activation
+                                            </Button>
+                                          )}
+                                          {request.status === 'completed' && (
+                                            <Badge variant="outline" className="bg-green-100 text-green-700">
+                                              Reward issued
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  )
+                                })}
+                              </div>
+                            </ScrollArea>
+                          ) : (
+                            <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                              Select an item to view interested collectors
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-1">
+                    <div className="w-1/3 border-r border-border flex flex-col">
+                      <ScrollArea className="flex-1">
+                        {normalizedChats.length === 0 ? (
+                          <div className="p-6 text-center text-sm text-muted-foreground space-y-2">
+                            <Package size={36} className="mx-auto text-muted-foreground" />
+                            <p>No conversations yet</p>
+                            <p>Start by requesting or listing an item.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1 p-2">
+                            {normalizedChats.map(chat => (
+                              <Card
+                                key={chat.id}
+                                className={`cursor-pointer transition-colors ${selectedChatId === chat.id ? 'bg-muted border-primary' : 'hover:bg-muted/50'}`}
+                                onClick={() => setSelectedChatId(chat.id)}
+                              >
+                                <CardContent className="p-3">
+                                  <div className="flex items-start space-x-3">
+                                    <Avatar className="w-10 h-10">
+                                      <AvatarImage src={currentUser.id === chat.donorId ? chat.collectorAvatar : chat.donorAvatar} />
+                                      <AvatarFallback>
+                                        {(currentUser.id === chat.donorId ? chat.collectorName : chat.donorName)[0]}
+                                      </AvatarFallback>
+                                    </Avatar>
+      
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between">
+                                        <p className="text-small font-medium truncate">
+                                          {currentUser.id === chat.donorId ? chat.collectorName : chat.donorName}
+                                        </p>
+                                        {chat.unreadCount > 0 && (
+                                          <Badge variant="destructive" className="text-xs">
+                                            {chat.unreadCount}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-muted-foreground truncate">
+                                        {chat.itemTitle}
+                                      </p>
+                                      {chat.lastMessage && (
+                                        <p className="text-xs text-muted-foreground truncate mt-1">
+                                          {chat.lastMessage.content}
+                                        </p>
+                                      )}
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        {chat.lastMessage
+                                          ? formatRelativeTime(chat.lastMessage.timestamp)
+                                          : formatRelativeTime(chat.createdAt)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        )}
+                      </ScrollArea>
+                    </div>
+      
+                    <div className="flex-1 flex flex-col">
+                      {selectedChat ? (
+                        <>
+                          <div className="p-4 border-b border-border flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Avatar>
+                                <AvatarImage src={currentUser.id === selectedChat.donorId ? selectedChat.collectorAvatar : selectedChat.donorAvatar} />
+                                <AvatarFallback>
+                                  {(currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName)[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <h3 className="font-medium">
+                                  {currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName}
+                                </h3>
+                                <p className="text-small text-muted-foreground">
+                                  About: {selectedChat.itemTitle}
+                                </p>
                               </div>
                             </div>
+                            <Badge variant={selectedChat.status === 'active' ? 'secondary' : 'outline'}>
+                              {selectedChat.status.replace('_', ' ')}
+                            </Badge>
                           </div>
-                        ))}
-                        <div ref={messagesEndRef} />
-                      </div>
-                    </ScrollArea>
-
-                    {quickActions.length > 0 && (
-                      <div className="p-3 border-t border-border flex flex-wrap gap-2">
-                        {quickActions.map(action => (
-                          <Button
-                            key={action.label}
-                            variant="outline"
-                            size="sm"
-                            onClick={action.action}
-                            className="flex items-center space-x-1"
-                          >
-                            <action.icon size={14} className={action.color} />
-                            <span className="text-xs">{action.label}</span>
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-
-                    {messageTemplates.length > 0 && (
-                      <div className="px-4 py-2 border-t border-border bg-muted/40 flex flex-wrap gap-2">
-                        {messageTemplates.map(template => (
-                          <Button
-                            key={template}
-                            variant="ghost"
-                            size="sm"
-                            className="text-left whitespace-normal"
-                            onClick={() => setNewMessage(template)}
-                          >
-                            {template}
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="p-4 border-t border-border">
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Type your message..."
-                          value={newMessage}
-                          onChange={(event) => setNewMessage(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' && !event.shiftKey) {
-                              event.preventDefault()
-                              handleSendMessage()
-                            }
-                          }}
-                          className="flex-1"
-                        />
-                        <Button onClick={handleSendMessage} disabled={!newMessage.trim()} size="icon">
-                          <PaperPlaneTilt size={16} />
-                        </Button>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="text-center space-y-2 text-muted-foreground">
-                      <Package size={48} className="mx-auto text-muted-foreground" />
-                      <p className="font-medium text-foreground">Select a conversation</p>
-                      <p className="text-sm">Choose a chat from the sidebar to start messaging</p>
+      
+                          <ScrollArea className="flex-1 p-4">
+                            <div className="space-y-4">
+                              {currentMessages.map(message => (
+                                <div
+                                  key={message.id}
+                                  className={`flex ${message.senderId === currentUser.id ? 'justify-end' : 'justify-start'}`}
+                                >
+                                  <div
+                                    className={`max-w-[70%] rounded-lg p-3 ${
+                                      message.senderId === currentUser.id
+                                        ? 'bg-primary text-primary-foreground'
+                                        : message.type === 'system'
+                                        ? 'bg-muted text-muted-foreground'
+                                        : 'bg-muted text-foreground'
+                                    } ${message.type === 'system' ? 'mx-auto text-center' : ''}`}
+                                  >
+                                    {message.type === 'location' && message.metadata?.location && (
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <MapPin size={16} />
+                                        <span className="text-small">Location shared</span>
+                                      </div>
+                                    )}
+                                    <p className="text-small whitespace-pre-line">{message.content}</p>
+                                    <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                                      <span>{message.type !== 'system' ? message.senderName : 'System'}</span>
+                                      <span>{formatRelativeTime(message.timestamp)}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                              <div ref={messagesEndRef} />
+                            </div>
+                          </ScrollArea>
+      
+                          {quickActions.length > 0 && (
+                            <div className="p-3 border-t border-border flex flex-wrap gap-2">
+                              {quickActions.map(action => (
+                                <Button
+                                  key={action.label}
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={action.action}
+                                  className="flex items-center space-x-1"
+                                >
+                                  <action.icon size={14} className={action.color} />
+                                  <span className="text-xs">{action.label}</span>
+                                </Button>
+                              ))}
+                            </div>
+                          )}
+      
+                          {messageTemplates.length > 0 && (
+                            <div className="px-4 py-2 border-t border-border bg-muted/40 flex flex-wrap gap-2">
+                              {messageTemplates.map(template => (
+                                <Button
+                                  key={template}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-left whitespace-normal"
+                                  onClick={() => setNewMessage(template)}
+                                >
+                                  {template}
+                                </Button>
+                              ))}
+                            </div>
+                          )}
+      
+                          <div className="p-4 border-t border-border">
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Type your message..."
+                                value={newMessage}
+                                onChange={(event) => setNewMessage(event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter' && !event.shiftKey) {
+                                    event.preventDefault()
+                                    handleSendMessage()
+                                  }
+                                }}
+                                className="flex-1"
+                              />
+                              <Button onClick={handleSendMessage} disabled={!newMessage.trim()} size="icon">
+                                <PaperPlaneTilt size={16} />
+                              </Button>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex-1 flex items-center justify-center">
+                          <div className="text-center space-y-2 text-muted-foreground">
+                            <Package size={48} className="mx-auto text-muted-foreground" />
+                            <p className="font-medium text-foreground">Select a conversation</p>
+                            <p className="text-sm">Choose a chat from the sidebar to start messaging</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
-            </div>
-          )}
-        </div>
-
-        {selectedDropOffLocation && selectedChat && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-background p-6 rounded-lg max-w-md w-full mx-4 space-y-4">
-              <div>
-                <h3 className="text-h3 mb-2">Generate QR Code</h3>
-                <p className="text-muted-foreground text-sm">
-                  Choose your role for this transaction to generate the right QR code.
-                </p>
-              </div>
-
-              {currentUser.id === selectedChat.donorId && (
-                <QRCodeGenerator
-                  itemId={selectedChat.itemId}
-                  itemTitle={selectedChat.itemTitle}
-                  category="general"
-                  condition="good"
-                  co2Impact={25}
-                  dropOffLocation={selectedDropOffLocation}
-                  type="donor"
-                  onGenerated={handleQRCodeGenerated}
+      
+              {selectedDropOffLocation && selectedChat && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                  <div className="bg-background p-6 rounded-lg max-w-md w-full mx-4 space-y-4">
+                    <div>
+                      <h3 className="text-h3 mb-2">Generate QR Code</h3>
+                      <p className="text-muted-foreground text-sm">
+                        Choose your role for this transaction to generate the right QR code.
+                      </p>
+                    </div>
+      
+                    {currentUser.id === selectedChat.donorId && (
+                      <QRCodeGenerator
+                        itemId={selectedChat.itemId}
+                        itemTitle={selectedChat.itemTitle}
+                        category="general"
+                        condition="good"
+                        co2Impact={25}
+                        dropOffLocation={selectedDropOffLocation}
+                        type="donor"
+                        onGenerated={handleQRCodeGenerated}
+                      />
+                    )}
+      
+                    {currentUser.id === selectedChat.collectorId && (
+                      <QRCodeGenerator
+                        itemId={selectedChat.itemId}
+                        itemTitle={selectedChat.itemTitle}
+                        category="general"
+                        condition="good"
+                        co2Impact={25}
+                        dropOffLocation={selectedDropOffLocation}
+                        type="collector"
+                        onGenerated={handleQRCodeGenerated}
+                      />
+                    )}
+      
+                    <Button variant="outline" onClick={() => setSelectedDropOffLocation('')} className="w-full">
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+      
+              {showQRCode && (
+                <QRCodeDisplay
+                  qrData={showQRCode}
+                  onClose={() => setShowQRCode(null)}
                 />
               )}
+    </>
+  )
 
-              {currentUser.id === selectedChat.collectorId && (
-                <QRCodeGenerator
-                  itemId={selectedChat.itemId}
-                  itemTitle={selectedChat.itemTitle}
-                  category="general"
-                  condition="good"
-                  co2Impact={25}
-                  dropOffLocation={selectedDropOffLocation}
-                  type="collector"
-                  onGenerated={handleQRCodeGenerated}
-                />
-              )}
+  if (isPage) {
+    return (
+      <div className="rounded-lg border border-border overflow-hidden shadow-sm bg-background">
+        {renderBody()}
+      </div>
+    )
+  }
 
-              <Button variant="outline" onClick={() => setSelectedDropOffLocation('')} className="w-full">
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {showQRCode && (
-          <QRCodeDisplay
-            qrData={showQRCode}
-            onClose={() => setShowQRCode(null)}
-          />
-        )}
+  return (
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+      <DialogContent className="max-w-5xl h-[640px] p-0 overflow-hidden">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Message Center</DialogTitle>
+        </DialogHeader>
+        {renderBody()}
       </DialogContent>
     </Dialog>
   )

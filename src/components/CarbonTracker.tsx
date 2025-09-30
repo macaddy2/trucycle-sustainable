@@ -1,6 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Leaf, Trophy, Recycle, ArrowsClockwise, TrendUp } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
@@ -34,29 +33,29 @@ export function CarbonTracker() {
       description: 'Complete your first item exchange',
       icon: <ArrowsClockwise size={24} />,
       earned: (carbonData?.itemsExchanged || 0) > 0,
-      color: 'bg-accent text-accent-foreground'
+      color: 'bg-accent text-accent-foreground',
     },
     {
       title: 'Generous Heart',
       description: 'Donate 5 items',
       icon: <Leaf size={24} />,
       earned: (carbonData?.itemsDonated || 0) >= 5,
-      color: 'bg-primary text-primary-foreground'
+      color: 'bg-primary text-primary-foreground',
     },
     {
       title: 'Carbon Saver',
-      description: 'Save 25kg of CO₂',
+      description: 'Save 25kg of CO2',
       icon: <Trophy size={24} />,
       earned: (carbonData?.totalCO2Saved || 0) >= 25,
-      color: 'bg-secondary text-secondary-foreground'
+      color: 'bg-secondary text-secondary-foreground',
     },
     {
       title: 'Eco Champion',
-      description: 'Save 100kg of CO₂',
+      description: 'Save 100kg of CO2',
       icon: <TrendUp size={24} />,
       earned: (carbonData?.totalCO2Saved || 0) >= 100,
-      color: 'bg-green-600 text-white'
-    }
+      color: 'bg-green-600 text-white',
+    },
   ]
 
   return (
@@ -80,7 +79,7 @@ export function CarbonTracker() {
                 <Leaf size={24} className="text-primary" />
               </div>
               <div>
-                <p className="text-small text-muted-foreground">Total CO₂ Saved</p>
+                <p className="text-small text-muted-foreground">Total CO2 Saved</p>
                 <p className="text-h2 font-bold text-primary">{carbonData?.totalCO2Saved || 0}kg</p>
               </div>
             </div>
@@ -119,7 +118,7 @@ export function CarbonTracker() {
       {/* Monthly Goal Progress */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-h3">Monthly CO₂ Savings Goal</CardTitle>
+          <CardTitle className="text-h3">Monthly CO2 Savings Goal</CardTitle>
           <CardDescription>
             Track your progress towards this month's environmental goal
           </CardDescription>
@@ -138,7 +137,7 @@ export function CarbonTracker() {
             <div className="text-center">
               {progressPercentage >= 100 ? (
                 <Badge className="bg-green-600 text-white">
-                  🎉 Goal Achieved!
+                  100% Goal Achieved!
                 </Badge>
               ) : (
                 <p className="text-small text-muted-foreground">
@@ -164,17 +163,13 @@ export function CarbonTracker() {
               <div
                 key={index}
                 className={`p-4 rounded-lg border-2 transition-all ${
-                  achievement.earned
-                    ? 'border-primary bg-primary/5'
-                    : 'border-muted bg-muted/20'
+                  achievement.earned ? 'border-primary bg-primary/5' : 'border-muted bg-muted/20'
                 }`}
               >
                 <div className="flex items-center space-x-4">
                   <div
                     className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                      achievement.earned
-                        ? achievement.color
-                        : 'bg-muted text-muted-foreground'
+                      achievement.earned ? achievement.color : 'bg-muted text-muted-foreground'
                     }`}
                   >
                     {achievement.icon}
@@ -186,7 +181,7 @@ export function CarbonTracker() {
                     </p>
                   </div>
                   {achievement.earned && (
-                    <Badge variant="secondary">✓ Earned</Badge>
+                    <Badge variant="secondary">Earned</Badge>
                   )}
                 </div>
               </div>
@@ -233,22 +228,6 @@ export function CarbonTracker() {
         </CardContent>
       </Card>
 
-      {/* Call to Action */}
-      <Card className="bg-primary/5 border-primary/20">
-        <CardContent className="p-6 text-center">
-          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Leaf size={32} className="text-primary" />
-          </div>
-          <h3 className="text-h3 mb-2">Ready to make a bigger impact?</h3>
-          <p className="text-body text-muted-foreground mb-4">
-            List an item or browse available exchanges to continue your sustainability journey
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button>Browse Items</Button>
-            <Button variant="outline">List an Item</Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

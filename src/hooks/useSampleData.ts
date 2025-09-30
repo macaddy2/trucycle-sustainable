@@ -38,6 +38,7 @@ interface UserProfile {
     identity: boolean
   }
   avatar?: string
+  partnerAccess?: boolean
 }
 
 interface Message {

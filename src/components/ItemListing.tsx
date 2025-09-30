@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -10,14 +11,11 @@ import {
   ArrowsClockwise,
   Clock,
   Package,
-  ChatCircle,
   Recycle,
-  Truck,
-  Storefront,
-  ArrowRight
+  MagnifyingGlass
 } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
-import { useExchangeManager, useMessaging } from '@/hooks'
+import { useExchangeManager } from '@/hooks'
 import { VerificationBadge } from './VerificationBadge'
 import type { VerificationLevel } from './verificationBadgeUtils'
 import { RatingDisplay } from './RatingSystem'
@@ -28,6 +26,7 @@ interface UserProfile {
   name: string
   userType: 'donor' | 'collector'
   avatar?: string
+  partnerAccess?: boolean
 }
 
 export interface ListingItem {
@@ -151,11 +150,12 @@ const actionIcon = {
 
 interface ItemListingProps {
   searchQuery: string
-  onStartDonationFlow?: (method: 'pickup' | 'dropoff') => void
+  onSearchChange?: (query: string) => void
+  onSearchSubmit?: () => void
   onOpenMessages?: (options?: { itemId?: string; chatId?: string; initialView?: 'chats' | 'requests' }) => void
 }
 
-export function ItemListing({ searchQuery, onStartDonationFlow, onOpenMessages }: ItemListingProps) {
+export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpenMessages }: ItemListingProps) {
   const [currentUser] = useKV<UserProfile | null>('current-user', null)
   const [globalListings] = useKV<ListingItem[]>('global-listings', [])
   const [items, setItems] = useState<ListingItem[]>([])
@@ -163,7 +163,6 @@ export function ItemListing({ searchQuery, onStartDonationFlow, onOpenMessages }
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [selectedCondition, setSelectedCondition] = useState('All')
   const [selectedType, setSelectedType] = useState<'All' | ListingItem['actionType']>('All')
-  const { createOrGetChat, getChatForItem } = useMessaging()
   const {
     submitClaimRequest,
     pendingRequestCountByItem,
@@ -207,6 +206,7 @@ export function ItemListing({ searchQuery, onStartDonationFlow, onOpenMessages }
   const activeItemPendingCount = activeItem ? pendingRequestCountByItem[activeItem.id] ?? 0 : 0
   const activeItemIsOwner = activeItem ? currentUser?.id === activeItem.ownerId : false
   const activeItemRequestLabel = activeItem?.actionType === 'recycle' ? 'Arrange recycling' : 'Request a Claim'
+  const activeItemOwnerLabel = activeItem?.actionType === 'donate' ? 'Pickup Shop' : 'Item owner'
 
   const formatTimeAgo = (createdAt: string) => {
     const created = new Date(createdAt)
@@ -218,38 +218,15 @@ export function ItemListing({ searchQuery, onStartDonationFlow, onOpenMessages }
     return `${days} day${days === 1 ? '' : 's'} ago`
   }
 
-  const handleContactOwner = async (item: ListingItem) => {
-    if (!currentUser) {
-      toast.error('Please sign in to contact item owners')
-      return
-    }
-
-    if (currentUser.id === item.ownerId) {
-      toast.error('This is your listing')
-      return
-    }
-
-    try {
-      const chatId = await createOrGetChat(
-        item.id,
-        item.title,
-        item.photos[0],
-        item.ownerId,
-        item.ownerName,
-        item.ownerAvatar,
-        currentUser.id,
-        currentUser.name,
-        currentUser.avatar,
-      )
-
-      toast.success(`Opened a chat with ${item.ownerName}`)
-      setActiveItem(null)
-      onOpenMessages?.({ itemId: item.id, chatId, initialView: 'chats' })
-    } catch (error) {
-      console.error('Failed to start conversation', error)
-      toast.error('Unable to start conversation right now')
-    }
+  const handleSearchInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onSearchChange?.(event.target.value)
   }
+
+  const handleFiltersSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    onSearchSubmit?.()
+  }
+
 
   const handleRequestClaim = (item: ListingItem) => {
     if (!currentUser) {
@@ -287,95 +264,75 @@ export function ItemListing({ searchQuery, onStartDonationFlow, onOpenMessages }
         </p>
       </div>
 
-      <Card className="border-primary/20 bg-primary/5">
-        <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-2">
-            <CardTitle className="text-h3 flex items-center gap-2">
-              <ArrowRight size={20} className="text-primary" />
-              <span>Start a donation in three easy steps</span>
-            </CardTitle>
-            <CardDescription className="max-w-2xl">
-              Decide how you want to hand over your item, pick a convenient drop-off partner if needed, then submit your
-              listing to generate a QR code for a smooth hand-off.
-            </CardDescription>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button
-              variant="outline"
-              className="flex-1 min-w-[180px]"
-              onClick={() => onStartDonationFlow?.('pickup')}
-            >
-              <Truck size={18} className="mr-2" />
-              <span>Arrange a pick up</span>
-            </Button>
-            <Button
-              className="flex-1 min-w-[180px]"
-              onClick={() => onStartDonationFlow?.('dropoff')}
-            >
-              <Storefront size={18} className="mr-2" />
-              <span>Drop off at a partner</span>
-            </Button>
-          </div>
-        </CardHeader>
-      </Card>
-
       <Card>
         <CardHeader>
-          <CardTitle className="text-h3">Filters</CardTitle>
-          <CardDescription>Refine the marketplace to match what you need</CardDescription>
+          <CardTitle className="text-h3">Find an Item</CardTitle>
+          <CardDescription>Search and filter the marketplace to match what you need</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                {['All', 'Electronics', 'Furniture', 'Clothing'].map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <form className="space-y-4" onSubmit={handleFiltersSubmit}>
+            <div className="relative">
+              <MagnifyingGlass size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={handleSearchInputChange}
+                placeholder="Search items..."
+                className="pl-10 w-full"
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {['All', 'Electronics', 'Furniture', 'Clothing'].map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select value={selectedCondition} onValueChange={setSelectedCondition}>
-              <SelectTrigger>
-                <SelectValue placeholder="Condition" />
-              </SelectTrigger>
-              <SelectContent>
-                {['All', 'excellent', 'good', 'fair', 'poor'].map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option === 'All' ? 'All' : option.charAt(0).toUpperCase() + option.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={selectedCondition} onValueChange={setSelectedCondition}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Condition" />
+                </SelectTrigger>
+                <SelectContent>
+                  {['All', 'excellent', 'good', 'fair', 'poor'].map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option === 'All' ? 'All' : option.charAt(0).toUpperCase() + option.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select value={selectedType} onValueChange={(value) => setSelectedType(value as typeof selectedType)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                {['All', 'exchange', 'donate', 'recycle'].map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option === 'All' ? 'All types' : option.charAt(0).toUpperCase() + option.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={selectedType} onValueChange={(value) => setSelectedType(value as typeof selectedType)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {['All', 'exchange', 'donate', 'recycle'].map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option === 'All' ? 'All types' : option.charAt(0).toUpperCase() + option.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Button
-              variant="outline"
-              onClick={() => {
-                setSelectedCategory('All')
-                setSelectedCondition('All')
-                setSelectedType('All')
-              }}
-            >
-              Clear filters
-            </Button>
-          </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setSelectedCategory('All')
+                  setSelectedCondition('All')
+                  setSelectedType('All')
+                }}
+              >
+                Clear filters
+              </Button>
+            </div>
+          </form>
         </CardContent>
       </Card>
 
@@ -459,13 +416,13 @@ export function ItemListing({ searchQuery, onStartDonationFlow, onOpenMessages }
                     <span><Clock size={12} className="inline mr-1" />{formatTimeAgo(item.createdAt)}</span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <Button variant="outline" className="flex-1" onClick={() => setActiveItem(item)}>
                       View details
                     </Button>
-                    {currentUser && currentUser.id !== item.ownerId && getChatForItem(item.id) && (
-                      <Button variant="ghost" size="icon" onClick={() => handleContactOwner(item)}>
-                        <ChatCircle size={16} />
+                    {!isOwner && !collectionStatus?.collected && (
+                      <Button className="flex-1" onClick={() => handleRequestClaim(item)}>
+                        {requestButtonLabel}
                       </Button>
                     )}
                   </div>
@@ -478,30 +435,19 @@ export function ItemListing({ searchQuery, onStartDonationFlow, onOpenMessages }
                       </Badge>
                     </div>
                   ) : (
-                    <>
-                      {isOwner ? (
-                        <Button
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => onOpenMessages?.({ itemId: item.id, initialView: 'requests' })}
-                        >
-                          {pendingRequests > 0
-                            ? `Review ${pendingRequests} interested collector${pendingRequests > 1 ? 's' : ''}`
-                            : itemRequests.length > 0
-                            ? 'View interested collectors'
-                            : 'No requests yet'}
-                        </Button>
-                      ) : (
-                        <div className="flex flex-col gap-2 sm:flex-row">
-                          <Button variant="outline" className="flex-1" onClick={() => handleContactOwner(item)}>
-                            Contact donor
-                          </Button>
-                          <Button className="flex-1" onClick={() => handleRequestClaim(item)}>
-                            {requestButtonLabel}
-                          </Button>
-                        </div>
-                      )}
-                    </>
+                    isOwner ? (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => onOpenMessages?.({ itemId: item.id, initialView: 'requests' })}
+                      >
+                        {pendingRequests > 0
+                          ? `Review ${pendingRequests} interested collector${pendingRequests > 1 ? 's' : ''}`
+                          : itemRequests.length > 0
+                          ? 'View interested collectors'
+                          : 'No requests yet'}
+                      </Button>
+                    ) : null
                   )}
                 </CardContent>
               </Card>
@@ -555,7 +501,7 @@ export function ItemListing({ searchQuery, onStartDonationFlow, onOpenMessages }
                     </div>
 
                     <div className="space-y-2">
-                      <h4 className="font-medium">Item owner</h4>
+                      <h4 className="font-medium">{activeItemOwnerLabel}</h4>
                       <div className="p-3 bg-muted rounded-lg space-y-2">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-primary rounded-full overflow-hidden flex items-center justify-center text-primary-foreground">
@@ -611,21 +557,12 @@ export function ItemListing({ searchQuery, onStartDonationFlow, onOpenMessages }
                         </Button>
                       </div>
                     ) : (
-                      <div className="space-y-2 sm:space-y-0 sm:flex sm:items-center sm:gap-3">
-                        <Button
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => handleContactOwner(activeItem)}
-                        >
-                          Contact donor
-                        </Button>
-                        <Button
-                          className="flex-1"
-                          onClick={() => handleRequestClaim(activeItem)}
-                        >
-                          {activeItemRequestLabel}
-                        </Button>
-                      </div>
+                      <Button
+                        className="w-full"
+                        onClick={() => handleRequestClaim(activeItem)}
+                      >
+                        {activeItemRequestLabel}
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -637,3 +574,4 @@ export function ItemListing({ searchQuery, onStartDonationFlow, onOpenMessages }
     </div>
   )
 }
+
