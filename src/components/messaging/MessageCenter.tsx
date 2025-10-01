@@ -17,6 +17,8 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useMessaging, useExchangeManager } from '@/hooks'
+import { useKV } from '@/hooks/useKV'
+import type { ManagedListing } from '@/types/listings'
 import type { Chat as MessagingChat, Message as MessagingMessage } from '@/hooks/useMessaging'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import { QRCodeGenerator, QRCodeDisplay, QRCodeData } from '../QRCode'
@@ -84,6 +86,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   const [showQRCode, setShowQRCode] = useState<QRCodeData | null>(null)
   const [selectedDropOffLocation, setSelectedDropOffLocation] = useState('')
   const [selectedRequestItem, setSelectedRequestItem] = useState<string | null>(itemId ?? null)
+  const [globalListings] = useKV<ManagedListing[]>('global-listings', [])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -148,6 +151,25 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     if (!selectedChat?.linkedRequestId) return null
     return getClaimRequestById(selectedChat.linkedRequestId)
   }, [selectedChat, getClaimRequestById])
+
+  const listingForChat = useMemo(() => {
+    if (!selectedChat) return null
+    return globalListings.find(listing => listing.id === selectedChat.itemId) ?? null
+  }, [globalListings, selectedChat])
+
+  const generatorDropOffLocation = useMemo(() => {
+    if (selectedDropOffLocation) {
+      return selectedDropOffLocation
+    }
+
+    if (listingForChat?.dropOffLocation) {
+      const location = listingForChat.dropOffLocation
+      const postcode = 'postcode' in location ? location.postcode : undefined
+      return postcode ? `${location.name}, ${postcode}` : location.name
+    }
+
+    return undefined
+  }, [listingForChat, selectedDropOffLocation])
 
   const messageTemplates = useMemo(() => {
     if (!selectedChat || !currentUser) return [] as string[]
@@ -265,7 +287,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     markMessagesAsRead(chatIdentifier)
     sendSystemMessage(
       chatIdentifier,
-      `${approved.donorName} confirmed this exchange. Start chatting to arrange the hand-off!`,
+      'Donor accepts Collector claim',
       'exchange_confirmed'
     )
 
@@ -285,11 +307,21 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   }
 
   const handleConfirmCollection = useCallback(() => {
-    if (!selectedChat) return
+    if (!selectedChat || !currentUser) return
 
-    if (linkedRequest && currentUser && selectedChat.donorId === currentUser.id) {
+    if (linkedRequest) {
+      if (selectedChat.donorId !== currentUser.id && selectedChat.collectorId !== currentUser.id) {
+        toast.error('Only the donor or collector can complete this exchange.')
+        return
+      }
+
       const result = completeClaimRequest(linkedRequest.id)
       if (!result) return
+      if (result.alreadyCompleted) {
+        toast.info('This exchange has already been marked as collected.')
+        return
+      }
+
       updateChatStatus(selectedChat.id, 'completed')
       sendSystemMessage(
         selectedChat.id,
@@ -350,9 +382,15 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
       }
     ]
 
-    if (linkedRequest && currentUser && selectedChat?.donorId === currentUser.id && linkedRequest.status === 'approved') {
+    if (
+      linkedRequest &&
+      currentUser &&
+      selectedChat &&
+      linkedRequest.status === 'approved' &&
+      (selectedChat.donorId === currentUser.id || selectedChat.collectorId === currentUser.id)
+    ) {
       actions.push({
-        label: 'Confirm Collection',
+        label: 'Mark collected',
         icon: CheckCircle,
         action: handleConfirmCollection,
         color: 'text-green-600',
@@ -760,23 +798,29 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                       <QRCodeGenerator
                         itemId={selectedChat.itemId}
                         itemTitle={selectedChat.itemTitle}
-                        category="general"
-                        condition="good"
-                        co2Impact={25}
-                        dropOffLocation={selectedDropOffLocation}
+                        category={listingForChat?.category ?? 'general'}
+                        condition={listingForChat?.condition ?? 'good'}
+                        actionType={listingForChat?.actionType ?? 'donate'}
+                        co2Impact={listingForChat?.co2Impact ?? 25}
+                        description={listingForChat?.description}
+                        primaryImageUrl={listingForChat?.photos?.[0]}
+                        dropOffLocation={generatorDropOffLocation}
                         type="donor"
                         onGenerated={handleQRCodeGenerated}
                       />
                     )}
-      
+
                     {currentUser.id === selectedChat.collectorId && (
                       <QRCodeGenerator
                         itemId={selectedChat.itemId}
                         itemTitle={selectedChat.itemTitle}
-                        category="general"
-                        condition="good"
-                        co2Impact={25}
-                        dropOffLocation={selectedDropOffLocation}
+                        category={listingForChat?.category ?? 'general'}
+                        condition={listingForChat?.condition ?? 'good'}
+                        actionType={listingForChat?.actionType ?? 'donate'}
+                        co2Impact={listingForChat?.co2Impact ?? 25}
+                        description={listingForChat?.description}
+                        primaryImageUrl={listingForChat?.photos?.[0]}
+                        dropOffLocation={generatorDropOffLocation}
                         type="collector"
                         onGenerated={handleQRCodeGenerated}
                       />

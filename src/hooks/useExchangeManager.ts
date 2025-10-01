@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
+import type { ManagedListing } from '@/types/listings'
 
 export interface ClaimRequest {
   id: string
@@ -33,6 +34,8 @@ export function useExchangeManager() {
   const [claimRequests, setClaimRequests] = useKV<ClaimRequest[]>('claim-requests', [])
   const [donorRewards, setDonorRewards] = useKV<Record<string, number>>('donor-rewards', {})
   const [collectedItems, setCollectedItems] = useKV<Record<string, CollectedItemRecord>>('collected-items', {})
+  const [, setUserListings] = useKV<ManagedListing[]>('user-listings', [])
+  const [, setGlobalListings] = useKV<ManagedListing[]>('global-listings', [])
 
   const submitClaimRequest = useCallback((
     payload: Omit<ClaimRequest, 'id' | 'status' | 'createdAt' | 'decisionAt'>,
@@ -125,6 +128,18 @@ export function useExchangeManager() {
       [updatedRequest.donorId]: (prev[updatedRequest.donorId] ?? 0) + rewardPoints,
     }))
 
+    setUserListings(prev => prev.map(listing => (
+      listing.id === updatedRequest.itemId
+        ? { ...listing, status: 'collected' as const }
+        : listing
+    )))
+
+    setGlobalListings(prev => prev.map(listing => (
+      listing.id === updatedRequest.itemId
+        ? { ...listing, status: 'collected' as const }
+        : listing
+    )))
+
     toast.success(`Collection confirmed! ${rewardPoints} GreenPoints have been added to your rewards.`)
 
     window.dispatchEvent(
@@ -134,7 +149,7 @@ export function useExchangeManager() {
     )
 
     return { request: updatedRequest, rewardPoints }
-  }, [claimRequests, setClaimRequests, setCollectedItems, setDonorRewards])
+  }, [claimRequests, setClaimRequests, setCollectedItems, setDonorRewards, setGlobalListings, setUserListings])
 
   const getRequestsForItem = useCallback((itemId: string) => {
     return claimRequests.filter(request => request.itemId === itemId)
