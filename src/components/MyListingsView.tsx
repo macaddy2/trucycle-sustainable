@@ -108,7 +108,12 @@ export function MyListingsView({
   const [listings, setListings] = useKV<ManagedListing[]>('user-listings', [])
   const [, setGlobalListings] = useKV<ManagedListing[]>('global-listings', [])
   const { getChatForItem, updateChatStatus, createOrGetChat } = useMessaging()
-  const { getRequestsForItem, confirmClaimRequest, completeClaimRequest } = useExchangeManager()
+  const {
+    getRequestsForItem,
+    confirmClaimRequest,
+    completeClaimRequest,
+    pendingRequestCountByItem,
+  } = useExchangeManager()
   const { addNotification } = useNotifications()
   const initialView = variant === 'dashboard' ? 'card' : defaultView
   const [viewMode, setViewMode] = useState<'table' | 'card'>(initialView)
@@ -498,6 +503,8 @@ export function MyListingsView({
         const status = statusCopy[listing.status]
         const chat = getChatForItem(listing.id)
         const reward = listing.rewardPoints ?? listing.valuation?.rewardPoints
+        const requests = getRequestsForItem(listing.id)
+        const pendingRequestsCount = pendingRequestCountByItem[listing.id] ?? 0
         return (
           <Card key={listing.id} className="border-dashed">
             <CardHeader className="space-y-1">
@@ -571,7 +578,9 @@ export function MyListingsView({
                 <div className="flex items-center justify-between text-xs">
                   {requests.length > 0 ? (
                     <span className="text-muted-foreground">
-                      {pendingRequests.length > 0 ? `${pendingRequests.length} pending request${pendingRequests.length === 1 ? '' : 's'}` : 'All requests managed'}
+                      {pendingRequestsCount > 0
+                        ? `${pendingRequestsCount} pending request${pendingRequestsCount === 1 ? '' : 's'}`
+                        : 'All requests managed'}
                     </span>
                   ) : (
                     <span className="text-muted-foreground">No collector requests yet</span>
