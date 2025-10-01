@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
@@ -6,13 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ChatCircle, CheckCircle, Clock, Package, Plus, ShieldCheck } from '@phosphor-icons/react'
+import { ChatCircle, CheckCircle, Clock, Package, PencilSimpleLine, Plus, ShieldCheck, X } from '@phosphor-icons/react'
+import { Textarea } from '@/components/ui/textarea'
 import { useMessaging, useExchangeManager, useNotifications } from '@/hooks'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
-import type { ListingClassificationResult } from '@/lib/ai/classifier'
-import type { ModerationResult } from '@/lib/ai/moderation'
+import type { ManagedListing } from '@/types/listings'
 
 interface UserProfile {
   id: string
@@ -20,29 +23,6 @@ interface UserProfile {
   userType: 'donor' | 'collector'
   rewardsBalance?: number
   partnerAccess?: boolean
-}
-
-export interface ListingValuation {
-  estimatedValue?: number
-  rewardPoints?: number
-  recommendedPriceRange?: [number, number]
-  confidence?: 'high' | 'medium' | 'low'
-}
-
-export interface ManagedListing {
-  id: string
-  title: string
-  status: 'active' | 'pending_dropoff' | 'claimed' | 'collected' | 'expired'
-  category: string
-  createdAt: string
-  actionType: 'exchange' | 'donate' | 'recycle'
-  fulfillmentMethod?: 'pickup' | 'dropoff'
-  dropOffLocation?: { name: string; postcode: string }
-  valuation?: ListingValuation
-  rewardPoints?: number
-  co2Impact?: number
-  aiClassification?: ListingClassificationResult
-  moderation?: ModerationResult
 }
 
 interface MyListingsViewProps {
@@ -71,6 +51,33 @@ const REQUEST_STATUS_BADGE: Record<ClaimRequest['status'], { label: string; vari
   approved: { label: 'Approved', variant: 'secondary' },
   declined: { label: 'Declined', variant: 'destructive' },
   completed: { label: 'Collected', variant: 'default' },
+}
+
+const CATEGORY_OPTIONS = [
+  'Electronics',
+  'Furniture',
+  'Clothing',
+  'Books',
+  'Kitchen Items',
+  'Sports Equipment',
+  'Home Decor',
+  'Other',
+]
+
+const ACTION_OPTIONS: Array<{ value: ManagedListing['actionType']; label: string }> = [
+  { value: 'exchange', label: 'Exchange' },
+  { value: 'donate', label: 'Donate' },
+  { value: 'recycle', label: 'Recycle' },
+]
+
+type EditableListingFields = {
+  title: string
+  description?: string
+  category: string
+  actionType: ManagedListing['actionType']
+  fulfillmentMethod?: ManagedListing['fulfillmentMethod']
+  location?: string
+  dropOffLocation?: ManagedListing['dropOffLocation']
 }
 
 const formatDate = (value: string) => {
@@ -107,6 +114,8 @@ export function MyListingsView({
   const [viewMode, setViewMode] = useState<'table' | 'card'>(initialView)
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editForm, setEditForm] = useState<EditableListingFields | null>(null)
 
   const sortedListings = useMemo(() => {
     return [...listings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -117,12 +126,144 @@ export function MyListingsView({
   const selectedListing = useMemo(() => listings.find(listing => listing.id === selectedListingId) ?? null, [listings, selectedListingId])
   const listingRequests = useMemo(() => (selectedListing ? getRequestsForItem(selectedListing.id) : []), [selectedListing, getRequestsForItem])
 
+  useEffect(() => {
+    if (selectedListing) {
+      setEditForm({
+        title: selectedListing.title,
+        description: selectedListing.description ?? '',
+        category: selectedListing.category,
+        actionType: selectedListing.actionType,
+        fulfillmentMethod: selectedListing.fulfillmentMethod,
+        location: selectedListing.location ?? '',
+        dropOffLocation: selectedListing.dropOffLocation,
+      })
+      setIsEditing(false)
+    } else {
+      setEditForm(null)
+      setIsEditing(false)
+    }
+  }, [selectedListing])
+
   const openMessages = (options?: { itemId?: string; chatId?: string; initialView?: 'chats' | 'requests' }) => {
     if (onOpenMessages) {
       onOpenMessages(options)
     } else {
       toast.info('Open the message center from the header to continue your conversation.')
     }
+  }
+
+  const handleEditFieldChange = (field: keyof EditableListingFields, value: unknown) => {
+    setEditForm(prev => {
+      if (!prev) return prev
+      const next: EditableListingFields = { ...prev }
+
+      if (field === 'title' || field === 'description' || field === 'category' || field === 'location') {
+        next[field] = typeof value === 'string' ? value : ''
+      }
+
+      if (field === 'actionType') {
+        const actionValue = value as ManagedListing['actionType']
+        next.actionType = actionValue
+        if (actionValue === 'donate') {
+          next.fulfillmentMethod = 'dropoff'
+        } else if (next.fulfillmentMethod === 'dropoff') {
+          next.fulfillmentMethod = 'pickup'
+          next.dropOffLocation = undefined
+        }
+      }
+
+      if (field === 'fulfillmentMethod') {
+        const method = value as ManagedListing['fulfillmentMethod'] | undefined
+        next.fulfillmentMethod = method
+        if (method !== 'dropoff') {
+          next.dropOffLocation = undefined
+        }
+      }
+
+      return next
+    })
+  }
+
+  const handleDropOffFieldChange = (field: 'name' | 'postcode' | 'address', value: string) => {
+    setEditForm(prev => {
+      if (!prev) return prev
+      const currentLocation = prev.dropOffLocation ?? { name: '', postcode: '', address: '' }
+      return {
+        ...prev,
+        dropOffLocation: {
+          ...currentLocation,
+          [field]: value,
+        },
+      }
+    })
+  }
+
+  const handleCancelEdit = () => {
+    if (!selectedListing) {
+      setEditForm(null)
+      setIsEditing(false)
+      return
+    }
+
+    setEditForm({
+      title: selectedListing.title,
+      description: selectedListing.description ?? '',
+      category: selectedListing.category,
+      actionType: selectedListing.actionType,
+      fulfillmentMethod: selectedListing.fulfillmentMethod,
+      location: selectedListing.location ?? '',
+      dropOffLocation: selectedListing.dropOffLocation,
+    })
+    setIsEditing(false)
+  }
+
+  const handleSaveEdit = () => {
+    if (!selectedListing || !editForm) return
+
+    const trimmedTitle = editForm.title.trim()
+    if (!trimmedTitle) {
+      toast.error('Add a title before saving changes')
+      return
+    }
+
+    if (!editForm.category) {
+      toast.error('Select a category before saving changes')
+      return
+    }
+
+    const finalFulfillment = editForm.fulfillmentMethod ?? selectedListing.fulfillmentMethod
+    const trimmedDescription = (editForm.description ?? '').trim()
+    const trimmedLocation = (editForm.location ?? '').trim()
+    const updatedListing: Partial<ManagedListing> = {
+      title: trimmedTitle,
+      description: trimmedDescription,
+      category: editForm.category,
+      actionType: editForm.actionType,
+      fulfillmentMethod: finalFulfillment,
+    }
+
+    if (finalFulfillment === 'dropoff') {
+      updatedListing.location = undefined
+      updatedListing.dropOffLocation = editForm.dropOffLocation ?? selectedListing.dropOffLocation
+    } else {
+      updatedListing.location = trimmedLocation
+      updatedListing.dropOffLocation = undefined
+    }
+
+    setListings(prev => prev.map(item => (
+      item.id === selectedListing.id
+        ? { ...item, ...updatedListing }
+        : item
+    )))
+
+    setGlobalListings(prev => prev.map(item => (
+      item.id === selectedListing.id
+        ? { ...item, ...updatedListing }
+        : item
+    )))
+
+    toast.success('Listing updated successfully')
+    setIsEditing(false)
   }
 
   const heading = variant === 'dashboard' ? 'Manage your listings' : 'My listed items'
@@ -345,7 +486,7 @@ export function MyListingsView({
           })}
         </TableBody>
         <TableCaption>
-          You decide when to hand over each item—confirm collection only when the hand-off is complete to release rewards.
+          You decide when to hand over each itemâconfirm collection only when the hand-off is complete to release rewards.
         </TableCaption>
       </Table>
     </>
@@ -363,7 +504,7 @@ export function MyListingsView({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <CardTitle className="text-base">{listing.title}</CardTitle>
-                  <CardDescription className="capitalize">{listing.category} • {listing.actionType}</CardDescription>
+                  <CardDescription className="capitalize">{listing.category} â¢ {listing.actionType}</CardDescription>
                 </div>
                 <Badge variant={status.tone === 'default' ? 'default' : status.tone} className="capitalize">
                   {status.label}
@@ -424,7 +565,7 @@ export function MyListingsView({
                   {typeof reward === 'number' ? <span className="font-medium text-primary">+{reward} pts</span> : 'Pending'}
                 </p>
                 {listing.valuation?.estimatedValue && (
-                  <p>Estimated value: �{listing.valuation.estimatedValue.toFixed(2)}</p>
+                  <p>Estimated value: £{listing.valuation.estimatedValue.toFixed(2)}</p>
                 )}
                 <p>You confirm the collector before sharing hand-off details.</p>
                 <div className="flex items-center justify-between text-xs">
@@ -528,12 +669,178 @@ export function MyListingsView({
       >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{selectedListing?.title ?? 'Listing details'}</DialogTitle>
-            <DialogDescription>Manage collector requests and mark this listing once collected.</DialogDescription>
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <DialogTitle>{selectedListing?.title ?? 'Listing details'}</DialogTitle>
+                <DialogDescription>Manage collector requests, update listing details, and mark this listing once collected.</DialogDescription>
+              </div>
+              {selectedListing && (
+                <Button
+                  variant={isEditing ? 'ghost' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    if (isEditing) {
+                      handleCancelEdit()
+                    } else {
+                      setIsEditing(true)
+                    }
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  {isEditing ? (
+                    <>
+                      <X size={14} />
+                      Cancel edit
+                    </>
+                  ) : (
+                    <>
+                      <PencilSimpleLine size={14} />
+                      Edit listing
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </DialogHeader>
 
           {selectedListing ? (
             <div className="space-y-4">
+              {isEditing && editForm && (
+                <div className="space-y-4 rounded-lg border border-dashed border-primary/40 bg-muted/30 p-4">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-primary">Edit listing</p>
+                    <p className="text-sm text-muted-foreground">Adjust the summary details collectors see. Changes apply instantly once saved.</p>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-title">Title</Label>
+                      <Input
+                        id="edit-title"
+                        value={editForm.title}
+                        onChange={(event) => handleEditFieldChange('title', event.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-category">Category</Label>
+                      <Select
+                        value={editForm.category}
+                        onValueChange={(value) => handleEditFieldChange('category', value)}
+                      >
+                        <SelectTrigger id="edit-category">
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATEGORY_OPTIONS.map(category => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-description">Description</Label>
+                    <Textarea
+                      id="edit-description"
+                      value={editForm.description ?? ''}
+                      onChange={(event) => handleEditFieldChange('description', event.target.value)}
+                      rows={3}
+                    />
+                    <p className="text-xs text-muted-foreground">Keep it friendly and clear—highlight any changes since first listing.</p>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Action type</Label>
+                      <Select
+                        value={editForm.actionType}
+                        onValueChange={(value) => handleEditFieldChange('actionType', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ACTION_OPTIONS.map(option => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Hand-off method</Label>
+                      <Select
+                        value={(editForm.fulfillmentMethod ?? selectedListing.fulfillmentMethod ?? (editForm.actionType === 'donate' ? 'dropoff' : 'pickup')) ?? 'pickup'}
+                        onValueChange={(value) => handleEditFieldChange('fulfillmentMethod', value)}
+                        disabled={editForm.actionType === 'donate'}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pickup">Pickup</SelectItem>
+                          <SelectItem value="dropoff">Partner shop drop-off</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {editForm.actionType === 'donate' && (
+                        <p className="text-xs text-muted-foreground">Donations route through partner shops for verified hand-off.</p>
+                      )}
+                    </div>
+                  </div>
+                  {(editForm.fulfillmentMethod ?? selectedListing.fulfillmentMethod) === 'pickup' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-location">Pickup area</Label>
+                      <Input
+                        id="edit-location"
+                        placeholder="e.g., Camden, London NW1"
+                        value={editForm.location ?? ''}
+                        onChange={(event) => handleEditFieldChange('location', event.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">Share only broad area information. Exact addresses are exchanged privately.</p>
+                    </div>
+                  )}
+                  {(editForm.fulfillmentMethod ?? selectedListing.fulfillmentMethod) === 'dropoff' && (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-partner-name">Partner shop name</Label>
+                        <Input
+                          id="edit-partner-name"
+                          value={editForm.dropOffLocation?.name ?? ''}
+                          onChange={(event) => handleDropOffFieldChange('name', event.target.value)}
+                          placeholder="TruCycle Partner Shop"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-partner-postcode">Postcode</Label>
+                        <Input
+                          id="edit-partner-postcode"
+                          value={editForm.dropOffLocation?.postcode ?? ''}
+                          onChange={(event) => handleDropOffFieldChange('postcode', event.target.value)}
+                          placeholder="NW1 8AH"
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="edit-partner-address">Partner shop address</Label>
+                        <Textarea
+                          id="edit-partner-address"
+                          value={editForm.dropOffLocation?.address ?? ''}
+                          onChange={(event) => handleDropOffFieldChange('address', event.target.value)}
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-end gap-2">
+                    <Button variant="ghost" onClick={handleCancelEdit}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveEdit}>
+                      Save changes
+                    </Button>
+                  </div>
+                </div>
+              )}
               <div className="grid gap-3 md:grid-cols-2 text-sm">
                 <div className="rounded-md border p-3 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase">Status</p>
@@ -550,6 +857,35 @@ export function MyListingsView({
                 <div className="rounded-md border p-3 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase">Listed</p>
                   <span>{formatDate(selectedListing.createdAt)}</span>
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-muted/20 p-4 space-y-3 text-sm">
+                <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                  <h3 className="font-semibold">Listing overview</h3>
+                  {selectedListing.co2Impact && (
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                      <span>Impact</span>
+                      <span>-{selectedListing.co2Impact}kg CO₂</span>
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-muted-foreground">
+                  {selectedListing.description?.trim() || 'No description added yet. Share a few highlights to attract collectors.'}
+                </p>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase">Category</p>
+                    <p className="capitalize">{selectedListing.category}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase">Hand-off location</p>
+                    {selectedListing.fulfillmentMethod === 'dropoff' && selectedListing.dropOffLocation ? (
+                      <p>{selectedListing.dropOffLocation.name}{selectedListing.dropOffLocation.postcode ? `, ${selectedListing.dropOffLocation.postcode}` : ''}</p>
+                    ) : (
+                      <p>{selectedListing.location || 'Pickup location to be confirmed in chat'}</p>
+                    )}
+                  </div>
                 </div>
               </div>
 

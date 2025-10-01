@@ -63,7 +63,10 @@ export function QRTestInterface() {
                     itemTitle={testItemTitle}
                     category="furniture"
                     condition="good"
+                    actionType="donate"
                     co2Impact={15}
+                    description="Vintage furniture piece used for testing QR flows."
+                    primaryImageUrl="https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=320"
                     dropOffLocation="TruCycle Test Shop - Camden Market, London NW1 8AH"
                     type="donor"
                     onGenerated={handleQRGenerated}
@@ -77,7 +80,10 @@ export function QRTestInterface() {
                     itemTitle={testItemTitle}
                     category="furniture"
                     condition="good"
+                    actionType="donate"
                     co2Impact={15}
+                    description="Vintage furniture piece used for testing QR flows."
+                    primaryImageUrl="https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=320"
                     dropOffLocation="TruCycle Test Shop - Camden Market, London NW1 8AH"
                     type="collector"
                     onGenerated={handleQRGenerated}

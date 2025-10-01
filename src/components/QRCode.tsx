@@ -13,6 +13,8 @@ interface QRCodeData {
   type: 'donor' | 'collector'
   itemId: string
   itemTitle: string
+  itemDescription?: string
+  itemImage?: string
   userId: string
   userName: string
   transactionId: string
@@ -24,6 +26,7 @@ interface QRCodeData {
     co2Impact: number
     createdAt: string
     expiresAt: string
+    actionType: 'donate' | 'exchange' | 'recycle'
   }
   status: 'active' | 'scanned' | 'expired' | 'completed'
 }
@@ -40,7 +43,10 @@ interface QRCodeGeneratorProps {
   itemTitle: string
   category: string
   condition: string
+  actionType: 'donate' | 'exchange' | 'recycle'
   co2Impact: number
+  description?: string
+  primaryImageUrl?: string
   dropOffLocation?: string
   type: 'donor' | 'collector'
   onGenerated?: (qrCode: QRCodeData) => void
@@ -67,6 +73,8 @@ export function QRCodeDisplay({ qrData, onClose }: QRCodeDisplayProps) {
       type: qrData.type,
       itemId: qrData.itemId,
       itemTitle: qrData.itemTitle,
+      itemDescription: qrData.itemDescription,
+      itemImage: qrData.itemImage,
       userId: qrData.userId,
       userName: qrData.userName,
       metadata: qrData.metadata,
@@ -102,7 +110,7 @@ export function QRCodeDisplay({ qrData, onClose }: QRCodeDisplayProps) {
         const response = await fetch(qrImageUrl)
         const blob = await response.blob()
         const file = new File([blob], `trucycle-qr-${qrData.transactionId}.png`, { type: 'image/png' })
-        
+
         await navigator.share({
           title: `TruCycle ${qrData.type === 'donor' ? 'Drop-off' : 'Pickup'} QR Code`,
           text: `QR code for ${qrData.itemTitle}`,
@@ -110,12 +118,10 @@ export function QRCodeDisplay({ qrData, onClose }: QRCodeDisplayProps) {
         })
       } catch (error) {
         console.error('Failed to share QR code via Web Share API', error)
-        // Fallback to clipboard
         await navigator.clipboard.writeText(qrImageUrl)
         toast.success('QR code URL copied to clipboard')
       }
     } else {
-      // Fallback to clipboard
       await navigator.clipboard.writeText(qrImageUrl)
       toast.success('QR code URL copied to clipboard')
     }
@@ -126,9 +132,29 @@ export function QRCodeDisplay({ qrData, onClose }: QRCodeDisplayProps) {
   const timeUntilExpiry = expiryDate.getTime() - Date.now()
   const hoursUntilExpiry = Math.floor(timeUntilExpiry / (1000 * 60 * 60))
 
+  const resolveInstructionCopy = () => {
+    const action = qrData.metadata.actionType || 'donate'
+    if (action === 'exchange') {
+      return qrData.type === 'donor'
+        ? 'Share this code with the collector when you meet. It confirms the exchange and releases your rewards.'
+        : 'Show this code to the donor or shop assistant at pickup so the exchange can be logged instantly.'
+    }
+    if (action === 'recycle') {
+      return qrData.type === 'donor'
+        ? 'Present this code at the Partner Shop so the recycling team can record the materials drop-off.'
+        : 'Display this code to confirm you are collecting the recycling bundle on behalf of the shop.'
+    }
+    return qrData.type === 'donor'
+      ? 'Bring this code to the Partner Shop counter. Staff will scan it to confirm your donation and add your points.'
+      : 'Show this code at the Partner Shop to collect the donated item. Staff will scan and release it to you.'
+  }
+
+  const instructionCopy = resolveInstructionCopy()
+  const displayLocation = qrData.dropOffLocation ?? 'Shared privately once a hand-off is arranged.'
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <QrCode size={24} />
@@ -136,140 +162,123 @@ export function QRCodeDisplay({ qrData, onClose }: QRCodeDisplayProps) {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* QR Code Display */}
-          <div className="flex justify-center">
-            <div className="p-4 bg-white rounded-lg border-2 border-gray-200">
-              {qrImageUrl ? (
-                <img 
-                  src={qrImageUrl} 
-                  alt="QR Code"
-                  className="w-64 h-64"
-                  onError={() => toast.error('Failed to load QR code')}
-                />
-              ) : (
-                <div className="w-64 h-64 bg-muted rounded-lg flex items-center justify-center">
-                  <QrCode size={64} className="text-muted-foreground animate-pulse" />
+        <div className="grid gap-6 md:grid-cols-[5fr_2fr]">
+          <div className="space-y-6">
+            <div className="flex flex-col gap-4 md:flex-row">
+              <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-lg border bg-muted/40">
+                {qrData.itemImage ? (
+                  <img src={qrData.itemImage} alt={qrData.itemTitle} className="h-full w-full object-cover" />
+                ) : (
+                  <Package size={28} className="text-muted-foreground" />
+                )}
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-xl font-semibold leading-tight">{qrData.itemTitle}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {qrData.itemDescription?.trim() || 'No additional description provided.'}
+                </p>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Badge variant="outline" className="capitalize">Category: {qrData.metadata.category}</Badge>
+                  <Badge variant="outline" className="capitalize">Condition: {qrData.metadata.condition}</Badge>
+                  <Badge variant="outline" className="text-green-700 border-green-200 bg-green-50">
+                    -{qrData.metadata.co2Impact}kg CO₂ saved
+                  </Badge>
                 </div>
-              )}
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border bg-background/60 p-3 space-y-1">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+                  <MapPin size={14} /> {qrData.dropOffLocation ? 'Partner shop' : 'Pickup location'}
+                </div>
+                <p className="text-sm text-foreground">{displayLocation}</p>
+              </div>
+              <div className="rounded-lg border bg-background/60 p-3 space-y-1">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+                  <Clock size={14} /> Expiry
+                </div>
+                <p className={`text-sm ${isExpired ? 'text-destructive' : 'text-foreground'}`}>
+                  {isExpired
+                    ? 'Expired'
+                    : hoursUntilExpiry < 1
+                      ? 'Expires in <1 hour'
+                      : `Expires in ${hoursUntilExpiry}h`}
+                </p>
+              </div>
+            </div>
+
+            <div className="text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Package size={12} /> Transaction {qrData.transactionId}
+              </span>
+            </div>
+
+            <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
+              <h4 className="font-semibold text-sm">Instructions</h4>
+              <p className="text-sm text-muted-foreground">{instructionCopy}</p>
             </div>
           </div>
 
-          {/* Status Badge */}
-          <div className="flex justify-center">
-            <Badge 
+          <div className="flex flex-col items-center gap-4 md:items-stretch">
+            <div className="flex justify-center">
+              <div className="p-4 bg-white rounded-lg border-2 border-gray-200">
+                {qrImageUrl ? (
+                  <img
+                    src={qrImageUrl}
+                    alt="QR Code"
+                    className="h-60 w-60"
+                    onError={() => toast.error('Failed to load QR code')}
+                  />
+                ) : (
+                  <div className="h-60 w-60 bg-muted rounded-lg flex items-center justify-center">
+                    <QrCode size={64} className="text-muted-foreground animate-pulse" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Badge
               variant={isExpired ? 'destructive' : qrData.status === 'active' ? 'default' : 'secondary'}
-              className="text-sm"
+              className="w-full justify-center text-sm"
             >
               {isExpired ? 'Expired' : qrData.status.charAt(0).toUpperCase() + qrData.status.slice(1)}
             </Badge>
-          </div>
 
-          {/* Item Information */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center space-x-2">
-                <Package size={20} />
-                <span>{qrData.itemTitle}</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Transaction ID:</span>
-                <span className="font-mono">{qrData.transactionId}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Category:</span>
-                <span className="capitalize">{qrData.metadata.category}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Condition:</span>
-                <span className="capitalize">{qrData.metadata.condition}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">CO₂ Impact:</span>
-                <span className="text-green-600 font-medium">-{qrData.metadata.co2Impact}kg</span>
-              </div>
-              {qrData.dropOffLocation && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground flex items-center space-x-1">
-                    <MapPin size={14} />
-                    <span>Location:</span>
-                  </span>
-                  <span>{qrData.dropOffLocation}</span>
-                </div>
-              )}
-              {!isExpired && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground flex items-center space-x-1">
-                    <Clock size={14} />
-                    <span>Expires:</span>
-                  </span>
-                  <span className={hoursUntilExpiry < 2 ? 'text-red-600' : 'text-muted-foreground'}>
-                    {hoursUntilExpiry < 1 ? 'Soon' : `${hoursUntilExpiry}h`}
-                  </span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Instructions */}
-          <Card className="bg-muted/50">
-            <CardContent className="p-4">
-              <h4 className="font-medium mb-2">Instructions</h4>
-              <p className="text-sm text-muted-foreground">
-                {qrData.type === 'donor' 
-                  ? "Show this QR code to the shop attendant when dropping off your item. They will scan it to confirm receipt."
-                  : "Show this QR code to the shop attendant to collect your item. They will verify the code and release the item to you."
-                }
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Action Buttons */}
-          <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
-              className="flex-1" 
-              onClick={handleDownload}
-              disabled={!qrImageUrl}
-            >
-              <Download size={16} className="mr-2" />
-              Download
-            </Button>
-            <Button 
-              variant="outline" 
-              className="flex-1" 
-              onClick={handleShare}
-              disabled={!qrImageUrl}
-            >
-              <Share size={16} className="mr-2" />
-              Share
-            </Button>
-          </div>
-
-          {isExpired && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-red-800 text-sm">
-                This QR code has expired. Please generate a new one to proceed with the transaction.
-              </p>
+            <div className="flex w-full flex-col gap-2">
+              <Button onClick={handleDownload} disabled={!qrImageUrl}>
+                <Download size={16} className="mr-2" />
+                Download
+              </Button>
+              <Button variant="outline" onClick={handleShare} disabled={!qrImageUrl}>
+                <Share size={16} className="mr-2" />
+                Share
+              </Button>
             </div>
-          )}
+
+            {isExpired && (
+              <div className="w-full rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                This QR code has expired. Generate a new code to continue the hand-off.
+              </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
   )
 }
-
-export function QRCodeGenerator({ 
-  itemId, 
-  itemTitle, 
-  category, 
-  condition, 
-  co2Impact, 
-  dropOffLocation, 
-  type, 
-  onGenerated 
+export function QRCodeGenerator({
+  itemId,
+  itemTitle,
+  category,
+  condition,
+  actionType,
+  co2Impact,
+  description,
+  primaryImageUrl,
+  dropOffLocation,
+  type,
+  onGenerated
 }: QRCodeGeneratorProps) {
   const [currentUser] = useKV('current-user', null)
   const [generatedQRCodes, setGeneratedQRCodes] = useKV<QRCodeData[]>('user-qr-codes', [])
@@ -289,6 +298,8 @@ export function QRCodeGenerator({
         type,
         itemId,
         itemTitle,
+        itemDescription: description,
+        itemImage: primaryImageUrl,
         userId: currentUser.id,
         userName: currentUser.name,
         transactionId: generateTransactionId(),
@@ -299,6 +310,7 @@ export function QRCodeGenerator({
           co2Impact,
           createdAt: new Date().toISOString(),
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+          actionType,
         },
         status: 'active'
       }

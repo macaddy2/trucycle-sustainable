@@ -81,14 +81,14 @@ function RecenterMap({ center }: { center: [number, number] }) {
     <div className="space-y-6">
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <MapPin size={32} className="text-primary" />
-          <h1 className="text-h1 text-foreground">Drop-off Locations</h1>
+          <Storefront size={32} className="text-primary" />
+          <h1 className="text-h1 text-foreground">Partner Shops</h1>
           {highlightGuidedFlow && (
             <Badge variant="secondary" className="uppercase tracking-wide">Guided flow</Badge>
           )}
         </div>
         <p className="text-body text-muted-foreground">
-          Explore our partner network, confirm a convenient location, and continue to your listing with everything pre-filled.
+          Explore our Partner Shop network, confirm a convenient location, and continue to your listing with everything pre-filled.
         </p>
       </div>
 
@@ -97,10 +97,10 @@ function RecenterMap({ center }: { center: [number, number] }) {
           <div className="space-y-1">
             <CardTitle className="text-h3 flex items-center gap-2">
               <Storefront size={22} className="text-primary" />
-              Choose a TruCycle partner
+              Choose a TruCycle Partner Shop
             </CardTitle>
             <CardDescription>
-              Tap a location pin to preview opening hours, accepted items, and services. Confirm the partner to continue your donation.
+              Tap a location pin to preview opening hours, accepted items, and services. Confirm the Partner Shop to continue your donation.
             </CardDescription>
           </div>
           <Badge variant="outline" className="w-max">
@@ -124,10 +124,10 @@ function RecenterMap({ center }: { center: [number, number] }) {
                   <div className="flex flex-col gap-2 border-b border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-primary/90">
-                        Interactive map
+                        Interactive Partner Shop map
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Select a pin to preview partner details and confirm a drop-off location.
+                        Select a pin to preview partner details and confirm your preferred shop.
                       </p>
                     </div>
                     {activeLocation && (
@@ -165,7 +165,7 @@ function RecenterMap({ center }: { center: [number, number] }) {
                               <span>{location.openHours}</span>
                             </div>
                             <Button size="sm" className="w-full" onClick={() => onPlanDropOff?.(location)}>
-                              Use this location
+                              Choose this Partner Shop
                             </Button>
                           </div>
                         </Popup>
@@ -273,7 +273,7 @@ function RecenterMap({ center }: { center: [number, number] }) {
                           Get directions
                         </Button>
                         <Button onClick={() => onPlanDropOff?.(location)}>
-                          Plan drop-off here
+                          Plan hand-off here
                         </Button>
                       </div>
                     </div>
@@ -287,7 +287,7 @@ function RecenterMap({ center }: { center: [number, number] }) {
 
       <Card className="border-accent/20 bg-accent/5">
         <CardHeader>
-          <CardTitle className="text-h3">How the drop-off flow works</CardTitle>
+          <CardTitle className="text-h3">How the Partner Shop flow works</CardTitle>
           <CardDescription>
             Follow these quick steps to finish your donation with a QR hand-off.
           </CardDescription>
@@ -296,11 +296,11 @@ function RecenterMap({ center }: { center: [number, number] }) {
           <div className="grid gap-6 md:grid-cols-3">
             <div className="space-y-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-foreground font-semibold">1</div>
-              <p className="text-body font-medium">Pick a partner location that accepts your item type.</p>
+              <p className="text-body font-medium">Pick a Partner Shop that accepts your item type.</p>
             </div>
             <div className="space-y-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-foreground font-semibold">2</div>
-              <p className="text-body font-medium">Continue to the listing form with drop-off details pre-filled.</p>
+              <p className="text-body font-medium">Continue to the listing form with Partner Shop details pre-filled.</p>
             </div>
             <div className="space-y-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-foreground font-semibold">3</div>
