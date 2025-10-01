@@ -92,12 +92,12 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
 
     if (currentStep === 2) {
       if (!profileData.postcode.trim()) {
-        toast.error('Enter IG11 7FR to continue')
+        toast.error(`Enter ${ALLOWED_POSTCODE_DISPLAY} to continue`)
         return
       }
 
       if (!validatePostcode(profileData.postcode)) {
-        toast.error('TruCycle is onboarding in IG11 7FR only right now')
+        toast.error(`TruCycle is onboarding in ${ALLOWED_POSTCODE_DISPLAY} only right now`)
         return
       }
 
@@ -115,7 +115,6 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
     }
   }
 
-  const ALLOWED_POSTCODE = 'IG117FR'
   const normalizePostcode = (value: string) => value.replace(/\s+/g, '').toUpperCase()
   const formatPostcode = (value: string) => {
     const normalized = normalizePostcode(value)
@@ -125,14 +124,18 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
     return normalized.replace(/^(\w{2,4})(\w{3})$/, '$1 $2')
   }
 
+  const ALLOWED_POSTCODE = 'IG11 7FR'
+  const NORMALIZED_ALLOWED_POSTCODE = normalizePostcode(ALLOWED_POSTCODE)
+  const ALLOWED_POSTCODE_DISPLAY = formatPostcode(ALLOWED_POSTCODE)
+
   const handlePostcodeChange = (value: string) => {
     const sanitized = value.toUpperCase().replace(/[^A-Z0-9\s]/g, '')
-    const normalized = normalizePostcode(sanitized).slice(0, ALLOWED_POSTCODE.length)
+    const normalized = normalizePostcode(sanitized).slice(0, NORMALIZED_ALLOWED_POSTCODE.length)
     const formatted = formatPostcode(normalized)
     setProfileData((prev) => ({ ...prev, postcode: formatted }))
   }
 
-  const validatePostcode = (postcode: string) => normalizePostcode(postcode) === ALLOWED_POSTCODE
+  const validatePostcode = (postcode: string) => normalizePostcode(postcode) === NORMALIZED_ALLOWED_POSTCODE
 
   const deriveAreaDetails = (postcode: string) => {
     if (validatePostcode(postcode)) {
@@ -149,7 +152,7 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
 
   const handleComplete = async () => {
     if (!profileData.postcode || !validatePostcode(profileData.postcode)) {
-      toast.error('TruCycle is onboarding in IG11 7FR only right now')
+      toast.error(`TruCycle is onboarding in ${ALLOWED_POSTCODE_DISPLAY} only right now`)
       return
     }
 
@@ -159,7 +162,7 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
       const verificationData = await verifyPostcodeDetails(profileData.postcode)
 
       if (!verificationData.isValid) {
-        toast.error('Please use postcode IG11 7FR to continue onboarding')
+        toast.error(`Please use postcode ${ALLOWED_POSTCODE_DISPLAY} to continue onboarding`)
         return
       }
 
@@ -170,7 +173,7 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
         email: user?.email || '',
         name: user?.name || '',
         userType: profileData.userType as 'donor' | 'collector',
-        postcode: formatPostcode(profileData.postcode) || 'IG11 7FR',
+        postcode: formatPostcode(profileData.postcode) || ALLOWED_POSTCODE_DISPLAY,
         area: verificationData.area,
         district: verificationData.district,
         serviceArea: verificationData.serviceArea,
@@ -348,7 +351,7 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
               </div>
               <h3 className="text-h3">Verify Your Location</h3>
               <p className="text-muted-foreground">
-                We're currently onboarding Barking households in IG11 7FR.
+                We're currently onboarding Barking households in {ALLOWED_POSTCODE_DISPLAY}.
               </p>
             </div>
 
@@ -358,13 +361,13 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
                 <Input
                   id="postcode"
                   type="text"
-                  placeholder="IG11 7FR"
+                  placeholder={ALLOWED_POSTCODE_DISPLAY}
                   value={profileData.postcode}
                   onChange={(event) => handlePostcodeChange(event.target.value)}
                   className="text-center text-lg font-medium"
                 />
                 <p className="text-xs text-muted-foreground text-center">
-                  Use IG11 7FR (case-insensitive) to unlock the full onboarding demo.
+                  Use {ALLOWED_POSTCODE_DISPLAY} (case-insensitive) to unlock the full onboarding demo.
                 </p>
                 {!validatePostcode(profileData.postcode) && profileData.postcode.trim() !== '' && (
                   <p className="text-xs text-destructive text-center">
