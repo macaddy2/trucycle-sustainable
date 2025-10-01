@@ -20,13 +20,28 @@ const defaultCoordinateFallback = (index: number): { lat: number; lng: number } 
   lng: -0.142 + Math.floor(index / 3) * 0.01
 })
 
-const activeMarkerIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+const defaultMarkerIcon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
   iconSize: [25, 41],
   iconAnchor: [12, 41],
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  popupAnchor: [1, -34],
+  tooltipAnchor: [16, -28],
   shadowSize: [41, 41],
   shadowAnchor: [12, 41],
+})
+
+const activeMarkerIcon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [27, 44],
+  iconAnchor: [13, 44],
+  popupAnchor: [1, -36],
+  tooltipAnchor: [18, -30],
+  shadowSize: [45, 45],
+  shadowAnchor: [13, 44],
 })
 
 export function DropOffMap({ onPlanDropOff, highlightGuidedFlow }: DropOffMapProps) {
@@ -154,7 +169,7 @@ function RecenterMap({ center }: { center: [number, number] }) {
                         eventHandlers={{
                           click: () => setActiveLocationId(location.id),
                         }}
-                        icon={activeLocationId === location.id ? activeMarkerIcon : undefined}
+                        icon={activeLocationId === location.id ? activeMarkerIcon : defaultMarkerIcon}
                       >
                         <Popup minWidth={240}>
                           <div className="space-y-2">
