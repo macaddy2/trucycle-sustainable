@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
 import {
   Recycle,
@@ -73,6 +74,7 @@ function App() {
   const [showDemoGuide, setShowDemoGuide] = useKV<boolean>('show-demo-guide', true)
   const [pendingFulfillmentMethod, setPendingFulfillmentMethod] = useState<'pickup' | 'dropoff' | null>(null)
   const [pendingDropOffLocation, setPendingDropOffLocation] = useState<DropOffLocation | null>(null)
+  const [pendingListingIntent, setPendingListingIntent] = useState<'exchange' | 'donate' | 'recycle' | null>(null)
   const [messageCenterView, setMessageCenterView] = useState<'chats' | 'requests'>('chats')
   const [messageCenterItemId, setMessageCenterItemId] = useState<string | undefined>()
   const [messageCenterChatId, setMessageCenterChatId] = useState<string | undefined>()
@@ -137,6 +139,8 @@ function App() {
   const hasDismissedOnboarding = user ? Boolean(onboardingDismissals[user.id]) : false
 
   const canNavigateBack = navigationHistory.length > 0
+  const showBackButton = currentTab !== 'home'
+  const userFirstName = user?.name && typeof user.name === 'string' ? user.name.split(' ')[0] : undefined
 
   useEffect(() => {
     const availableTabs = new Set(navTabs.map(tab => tab.value))
@@ -426,6 +430,7 @@ function App() {
   const handleDropOffPlanned = (location: DropOffLocation) => {
     setPendingFulfillmentMethod('dropoff')
     setPendingDropOffLocation(location)
+    setPendingListingIntent('donate')
     navigateToTab('list')
   }
 
@@ -441,6 +446,12 @@ function App() {
     })
   }, [navigateToTab])
 
+  const handleStartListing = useCallback((intent?: 'exchange' | 'donate' | 'recycle') => {
+    const fallbackIntent: 'exchange' | 'donate' | 'recycle' = intent ?? (user?.userType === 'collector' ? 'exchange' : 'donate')
+    setPendingListingIntent(fallbackIntent)
+    navigateToTab('list')
+  }, [navigateToTab, user?.userType])
+
   // If in shop scanner mode, render only the scanner
   if (showShopScanner) {
     return <ShopScanner />
@@ -453,17 +464,19 @@ function App() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleNavigateBack}
-                disabled={!canNavigateBack}
-                title={canNavigateBack ? 'Go back to the previous view' : 'No previous view'}
-                className="px-2"
-              >
-                <ArrowLeft size={16} />
-                <span className="hidden sm:inline">Back</span>
-              </Button>
+              {showBackButton && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleNavigateBack}
+                  disabled={!canNavigateBack}
+                  title={canNavigateBack ? 'Go back to the previous view' : 'No previous view'}
+                  className="px-2"
+                >
+                  <ArrowLeft size={16} />
+                  <span className="hidden sm:inline">Back</span>
+                </Button>
+              )}
               <button
                 type="button"
                 onClick={handleLogoClick}
@@ -522,14 +535,26 @@ function App() {
                     </Button>
                   )}
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigateToTab('profile')}
-                  >
-                    <User size={16} className="mr-2" />
-                    {user?.name && typeof user.name === 'string' ? user.name.split(' ')[0] : 'User'}
-                  </Button>
+                  <div className="flex items-center space-x-2">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => navigateToTab('profile')}
+                          aria-label="Open profile"
+                        >
+                          <User size={18} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        <span>{userFirstName ? `Open profile (${userFirstName})` : 'Open profile'}</span>
+                      </TooltipContent>
+                    </Tooltip>
+                    {userFirstName && (
+                      <span className="hidden sm:inline text-sm text-muted-foreground">{userFirstName}</span>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center space-x-2">
@@ -570,15 +595,21 @@ function App() {
             <TabsContent value="home">
               <Homepage
                 onExploreBrowse={() => navigateToTab(hasBrowseTab ? 'browse' : 'listings')}
-                onStartListing={() => navigateToTab('list')}
+                onStartListing={() => handleStartListing()}
                 onViewImpact={() => navigateToTab('impact')}
-                onViewPartners={() => navigateToTab(hasDropOffTab ? 'dropoff' : 'list')}
+                onViewPartners={() => {
+                  if (hasDropOffTab) {
+                    navigateToTab('dropoff')
+                  } else {
+                    handleStartListing('donate')
+                  }
+                }}
                 onOpenMessages={handleOpenMessages}
                 onSearch={handleSearch}
                 onSearchChange={setSearchQuery}
                 searchQuery={searchQuery}
                 isAuthenticated={Boolean(user)}
-                userName={user?.name && typeof user.name === 'string' ? user.name.split(' ')[0] : undefined}
+                userName={userFirstName}
                 onSignIn={handleSignIn}
                 onSignUp={handleSignUp}
               />
@@ -600,7 +631,7 @@ function App() {
 
           <TabsContent value="listings">
             <MyListingsView
-              onAddNewItem={() => navigateToTab('list')}
+              onAddNewItem={() => handleStartListing()}
               onOpenMessages={handleOpenMessages}
             />
           </TabsContent>
@@ -623,6 +654,8 @@ function App() {
               prefillDropOffLocation={pendingDropOffLocation}
               onFulfillmentPrefillHandled={() => setPendingFulfillmentMethod(null)}
               onDropOffPrefillHandled={() => setPendingDropOffLocation(null)}
+              initialIntent={pendingListingIntent}
+              onIntentHandled={() => setPendingListingIntent(null)}
             />
           </TabsContent>
 
@@ -644,12 +677,12 @@ function App() {
               <DemoGuide
                 onSwitchProfile={handleToggleUserType}
                 currentUserType={user.userType}
-                userName={user?.name && typeof user.name === 'string' ? user.name.split(' ')[0] : 'User'}
+                userName={userFirstName ?? 'User'}
                 onComplete={handleDemoGuideComplete}
               />
             )}
             <ProfileDashboard
-              onCreateListing={() => navigateToTab('list')}
+              onCreateListing={() => handleStartListing()}
               onOpenMessages={handleOpenMessages}
             />
           </TabsContent>
