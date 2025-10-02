@@ -171,6 +171,19 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     return undefined
   }, [listingForChat, selectedDropOffLocation])
 
+  const hasSharedLocation = useMemo(() => {
+    return currentMessages.some(message =>
+      message.type === 'location' || message.metadata?.systemAction === 'location_shared'
+    )
+  }, [currentMessages])
+
+  const hasScheduledExchange = useMemo(() => {
+    return currentMessages.some(message => {
+      const action = message.metadata?.systemAction
+      return action === 'pickup_scheduled' || action === 'dropoff_scheduled'
+    })
+  }, [currentMessages])
+
   const messageTemplates = useMemo(() => {
     if (!selectedChat || !currentUser) return [] as string[]
     const otherName = currentUser.id === selectedChat.donorId
@@ -363,7 +376,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
           setSelectedDropOffLocation('TruCycle Partner Shop - Camden Market, London NW1 8AH')
         },
         color: 'text-purple-600',
-        visible: Boolean(selectedChat)
+        visible: Boolean(selectedChat) && hasSharedLocation && hasScheduledExchange
       },
       {
         label: 'Schedule Pickup',
@@ -399,7 +412,16 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     }
 
     return actions.filter(action => action.visible)
-  }, [currentUser, handleConfirmCollection, linkedRequest, selectedChat, sendSystemMessage, shareLocation])
+  }, [
+    currentUser,
+    handleConfirmCollection,
+    hasScheduledExchange,
+    hasSharedLocation,
+    linkedRequest,
+    selectedChat,
+    sendSystemMessage,
+    shareLocation
+  ])
 
   if (!currentUser) {
     if (isPage) {
@@ -436,7 +458,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
 
   const renderBody = () => (
     <>
-              <div className={`flex flex-col ${isPage ? 'h-[min(80vh,640px)]' : 'h-full'}`}>
+              <div className={`flex flex-col min-h-0 ${isPage ? 'h-[min(80vh,640px)]' : 'h-full'}`}>
                 <div className="flex items-center justify-between border-b border-border p-4">
                   <div>
                     <h2 className="text-h3 font-medium">Messages</h2>
@@ -463,7 +485,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                 </div>
       
                 {activePanel === 'requests' && currentUser.userType === 'donor' ? (
-                  <div className="flex flex-1">
+                  <div className="flex flex-1 min-h-0">
                     {groupedRequests.length === 0 ? (
                       <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground space-y-4">
                         <Package size={48} className="mx-auto text-muted-foreground" />
@@ -476,8 +498,8 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                       </div>
                     ) : (
                       <>
-                        <div className="w-1/3 border-r border-border">
-                          <ScrollArea className="h-full">
+                        <div className="w-1/3 border-r border-border flex flex-col min-h-0">
+                          <ScrollArea className="flex-1">
                             <div className="p-3 space-y-2">
                               {groupedRequests.map(group => {
                                 const pending = group.requests.filter(request => request.status === 'pending').length
@@ -511,7 +533,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                           </ScrollArea>
                         </div>
       
-                        <div className="flex-1 flex flex-col">
+                        <div className="flex-1 flex flex-col min-h-0">
                           {selectedRequestGroup ? (
                             <ScrollArea className="flex-1">
                               <div className="p-4 space-y-4">
@@ -599,7 +621,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                   </div>
                 ) : (
                   <div className="flex flex-1">
-                    <div className="w-1/3 border-r border-border flex flex-col">
+                    <div className="w-1/3 border-r border-border flex flex-col min-h-0">
                       <ScrollArea className="flex-1">
                         {normalizedChats.length === 0 ? (
                           <div className="p-6 text-center text-sm text-muted-foreground space-y-2">
@@ -658,7 +680,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                       </ScrollArea>
                     </div>
       
-                    <div className="flex-1 flex flex-col">
+                    <div className="flex-1 flex flex-col min-h-0">
                       {selectedChat ? (
                         <>
                           <div className="p-4 border-b border-border flex items-center justify-between">

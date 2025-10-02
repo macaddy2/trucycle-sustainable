@@ -4,7 +4,19 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Toaster } from '@/components/ui/sonner'
-import { Recycle, ArrowsClockwise, Leaf, Question as Search, User, QrCode, Bell, Package, Storefront, ChatCircle } from '@phosphor-icons/react'
+import {
+  Recycle,
+  ArrowsClockwise,
+  Leaf,
+  Question as Search,
+  User,
+  QrCode,
+  Bell,
+  Package,
+  Storefront,
+  ChatCircle,
+  ArrowLeft
+} from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import { ItemListing, ItemListingForm, MyListingsView, ProfileDashboard, DropOffMap, CarbonTracker, ShopScanner, DemoGuide } from './components'
@@ -37,7 +49,8 @@ interface UserProfile {
 }
 
 function App() {
-  const [currentTab, setCurrentTab] = useState('browse')
+  const [currentTab, setCurrentTabState] = useState('browse')
+  const [navigationHistory, setNavigationHistory] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [user, setUser] = useKV<UserProfile | null>('current-user', null)
   const [onboardingDismissals, setOnboardingDismissals] = useKV<Record<string, boolean>>('onboarding-dismissals', {})
@@ -69,6 +82,30 @@ function App() {
     triggerUrgentNotifications,
   } = useRecommendationNotifications(user ?? null)
 
+  const navigateToTab = useCallback((nextTab: string) => {
+    setCurrentTabState(prevTab => {
+      if (prevTab === nextTab) {
+        return prevTab
+      }
+
+      setNavigationHistory(history => [...history, prevTab])
+      return nextTab
+    })
+  }, [])
+
+  const handleNavigateBack = useCallback(() => {
+    setNavigationHistory(history => {
+      if (history.length === 0) {
+        return history
+      }
+
+      const updatedHistory = [...history]
+      const previousTab = updatedHistory.pop()!
+      setCurrentTabState(previousTab)
+      return updatedHistory
+    })
+  }, [])
+
   const navTabs = useMemo(() => {
     const isCollector = user?.userType === 'collector'
     const isDonor = user?.userType === 'donor'
@@ -87,11 +124,20 @@ function App() {
   const hasDropOffTab = navTabs.some((tab) => tab.value === 'dropoff')
   const hasDismissedOnboarding = user ? Boolean(onboardingDismissals[user.id]) : false
 
+  const canNavigateBack = navigationHistory.length > 0
+
   useEffect(() => {
-    if (!navTabs.some((tab) => tab.value === currentTab)) {
+    const availableTabs = new Set(navTabs.map(tab => tab.value))
+
+    setNavigationHistory(history => {
+      const filteredHistory = history.filter(tab => availableTabs.has(tab))
+      return filteredHistory.length === history.length ? history : filteredHistory
+    })
+
+    if (!availableTabs.has(currentTab)) {
       const fallbackTab = navTabs[0]?.value ?? currentTab
-      if (fallbackTab !== currentTab) {
-        setCurrentTab(fallbackTab)
+      if (fallbackTab && fallbackTab !== currentTab) {
+        setCurrentTabState(fallbackTab)
       }
     }
   }, [navTabs, currentTab])
@@ -106,8 +152,8 @@ function App() {
     setMessageCenterItemId(options?.itemId)
     setMessageCenterChatId(options?.chatId)
     setNotificationsOpen(false)
-    setCurrentTab('messages')
-  }, [setNotificationsOpen])
+    navigateToTab('messages')
+  }, [navigateToTab, setNotificationsOpen])
 
   const handleDemoGuideComplete = useCallback(() => {
     setShowDemoGuide(false)
@@ -337,9 +383,9 @@ function App() {
         label: newUserType === 'collector' ? 'View Items' : 'See Needs',
         onClick: () => {
           if (newUserType === 'collector') {
-            setCurrentTab('browse')
+            navigateToTab('browse')
           } else {
-            setCurrentTab('profile')
+            navigateToTab('profile')
           }
         }
       }
@@ -349,7 +395,7 @@ function App() {
 
   const handleSearch = () => {
     const targetTab = hasBrowseTab ? 'browse' : navTabs[0]?.value ?? currentTab
-    setCurrentTab(targetTab)
+    navigateToTab(targetTab)
     if (targetTab === 'browse') {
       document.getElementById('item-listing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
@@ -359,15 +405,15 @@ function App() {
   const handleDropOffPlanned = (location: DropOffLocation) => {
     setPendingFulfillmentMethod('dropoff')
     setPendingDropOffLocation(location)
-    setCurrentTab('list')
+    navigateToTab('list')
   }
 
   const handleListingComplete = useCallback(({ listing }: ListingCompletionDetails) => {
-    setCurrentTab('profile')
+    navigateToTab('profile')
     toast.success('Drop-off planned!', {
       description: `"${listing.title}" is now listed under My Listed Items.`
     })
-  }, [])
+  }, [navigateToTab])
 
   // If in shop scanner mode, render only the scanner
   if (showShopScanner) {
@@ -380,7 +426,18 @@ function App() {
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleNavigateBack}
+                disabled={!canNavigateBack}
+                title={canNavigateBack ? 'Go back to the previous view' : 'No previous view'}
+                className="px-2"
+              >
+                <ArrowLeft size={16} />
+                <span className="hidden sm:inline">Back</span>
+              </Button>
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <Recycle size={20} className="text-primary-foreground" />
               </div>
@@ -449,7 +506,7 @@ function App() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentTab('profile')}
+                    onClick={() => navigateToTab('profile')}
                   >
                     <User size={16} className="mr-2" />
                     {user?.name && typeof user.name === 'string' ? user.name.split(' ')[0] : 'User'}
@@ -474,7 +531,7 @@ function App() {
       {/* Navigation Tabs */}
       <nav className="border-b border-border bg-background">
         <div className="container mx-auto px-4">
-          <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
+          <Tabs value={currentTab} onValueChange={navigateToTab} className="w-full">
             <TabsList className="grid w-full grid-flow-col auto-cols-fr md:flex md:w-auto md:gap-2">
               {navTabs.map(({ value, label, Icon }) => (
                 <TabsTrigger key={value} value={value} className="flex items-center space-x-2">
@@ -489,7 +546,7 @@ function App() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <Tabs value={currentTab} onValueChange={setCurrentTab}>
+        <Tabs value={currentTab} onValueChange={navigateToTab}>
           {hasBrowseTab && (
             <TabsContent value="browse">
               <section id="item-listing-section">
@@ -505,7 +562,7 @@ function App() {
 
           <TabsContent value="listings">
             <MyListingsView
-              onAddNewItem={() => setCurrentTab('list')}
+              onAddNewItem={() => navigateToTab('list')}
               onOpenMessages={handleOpenMessages}
             />
           </TabsContent>
@@ -554,7 +611,7 @@ function App() {
               />
             )}
             <ProfileDashboard
-              onCreateListing={() => setCurrentTab('list')}
+              onCreateListing={() => navigateToTab('list')}
               onOpenMessages={handleOpenMessages}
             />
           </TabsContent>
