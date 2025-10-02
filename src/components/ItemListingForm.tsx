@@ -94,6 +94,17 @@ const ACTION_REWARD_MULTIPLIER: Record<string, number> = {
 
 type ValuationSummary = (ListingValuation & { narrative: string }) | null
 
+type QuickStartPreset = {
+  id: string
+  title: string
+  description: string
+  actionType: 'exchange' | 'donate' | 'recycle'
+  category?: typeof CATEGORIES[number]
+  condition?: (typeof CONDITIONS)[number]['value']
+  Icon: typeof Heart
+  accentClass: string
+}
+
 const calculateListingValuation = (
   category: string,
   condition: string,
@@ -156,6 +167,8 @@ interface ItemListingFormProps {
   prefillDropOffLocation?: DropOffLocation | null
   onFulfillmentPrefillHandled?: () => void
   onDropOffPrefillHandled?: () => void
+  initialIntent?: 'exchange' | 'donate' | 'recycle' | null
+  onIntentHandled?: () => void
 }
 
 export function ItemListingForm({
@@ -163,13 +176,65 @@ export function ItemListingForm({
   prefillFulfillmentMethod,
   prefillDropOffLocation,
   onFulfillmentPrefillHandled,
-  onDropOffPrefillHandled
+  onDropOffPrefillHandled,
+  initialIntent,
+  onIntentHandled
 }: ItemListingFormProps) {
   const [user] = useKV('current-user', null)
   const [, setListings] = useKV<ManagedListing[]>('user-listings', [])
   const [currentStep, setCurrentStep] = useState(1)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  
+  const formContainerRef = useRef<HTMLDivElement>(null)
+
+  const quickStartPresets = useMemo<QuickStartPreset[]>(() => [
+    {
+      id: 'donate',
+      title: 'Donate household items',
+      description: 'Clothing, kitchenware, toys and more ready for a new home.',
+      actionType: 'donate',
+      category: 'Home Decor',
+      condition: 'good',
+      Icon: Heart,
+      accentClass: 'bg-emerald-500/15 text-emerald-600',
+    },
+    {
+      id: 'exchange',
+      title: 'Share furniture with neighbours',
+      description: 'List desks, chairs or storage pieces for someone nearby.',
+      actionType: 'exchange',
+      category: 'Furniture',
+      condition: 'good',
+      Icon: ArrowsClockwise,
+      accentClass: 'bg-blue-500/15 text-blue-600',
+    },
+    {
+      id: 'recycle',
+      title: 'Recycle electronics responsibly',
+      description: 'Pass on tech, cables or gadgets that need safe recycling.',
+      actionType: 'recycle',
+      category: 'Electronics',
+      condition: 'fair',
+      Icon: Recycle,
+      accentClass: 'bg-amber-500/15 text-amber-600',
+    },
+  ], [])
+
+  useEffect(() => {
+    if (!formContainerRef.current) {
+      return
+    }
+
+    formContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const firstField = formContainerRef.current.querySelector<HTMLElement>('input, textarea, select')
+    if (
+      firstField instanceof HTMLInputElement ||
+      firstField instanceof HTMLTextAreaElement ||
+      firstField instanceof HTMLSelectElement
+    ) {
+      firstField.focus()
+    }
+  }, [])
+
   // Form state
   const [formData, setFormData] = useState({
     title: '',
@@ -372,6 +437,32 @@ export function ItemListingForm({
       setShowDropOffSelector(true)
     }
   }, [])
+
+  useEffect(() => {
+    if (!initialIntent) {
+      return
+    }
+
+    setCurrentStep(1)
+    setFormData(prev => ({
+      ...prev,
+      actionType: initialIntent,
+    }))
+    handleFulfillmentSelect(initialIntent === 'donate' ? 'dropoff' : 'pickup')
+    onIntentHandled?.()
+  }, [initialIntent, handleFulfillmentSelect, onIntentHandled])
+
+  const handleQuickStartPreset = useCallback((preset: QuickStartPreset) => {
+    setCurrentStep(1)
+    setFormData(prev => ({
+      ...prev,
+      actionType: preset.actionType,
+      category: preset.category ?? prev.category,
+      condition: preset.condition ?? prev.condition,
+    }))
+    handleFulfillmentSelect(preset.actionType === 'donate' ? 'dropoff' : 'pickup')
+    toast.info('Quick start applied! Continue below to add the details.')
+  }, [handleFulfillmentSelect])
 
   const handleDropOffSelection = (location: DropOffLocation) => {
     setFormData(prev => ({
@@ -672,21 +763,60 @@ export function ItemListingForm({
           onClose={() => setShowDropOffSelector(false)}
         />
       )}
-      <Card>
-      <CardHeader>
-        <CardTitle className="text-h2 flex items-center space-x-2">
-          <Plus size={24} className="text-primary" />
-          <span>List Your Item</span>
-        </CardTitle>
-        <CardDescription>
-          Step {currentStep} of {totalSteps}: Help reduce waste by listing your item
-        </CardDescription>
-        <Progress value={progress} className="mt-2" />
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Step 1: Basic Information */}
-        {currentStep === 1 && (
-          <div className="space-y-4">
+      <div ref={formContainerRef} id="listing-form-start" className="space-y-8">
+        <section className="rounded-3xl border border-border/60 bg-card/60 p-6 shadow-sm">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-2">
+              <Badge variant="secondary" className="w-fit">Quick start</Badge>
+              <h2 className="text-h4 text-foreground">Share an item in just a few taps</h2>
+              <p className="text-sm text-muted-foreground">
+                Pick the outcome that matches your item and we&apos;ll pre-fill the form below so you can list or donate quickly.
+              </p>
+            </div>
+            <div className="grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {quickStartPresets.map((preset) => {
+                const Icon = preset.Icon
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleQuickStartPreset(preset)}
+                    className="group flex h-full flex-col justify-between rounded-2xl border border-border/60 bg-background/70 p-4 text-left transition hover:border-primary/40 hover:shadow-md"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`flex h-10 w-10 items-center justify-center rounded-full ${preset.accentClass}`}>
+                        <Icon size={20} />
+                      </span>
+                      <h3 className="text-sm font-semibold text-foreground">{preset.title}</h3>
+                    </div>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      {preset.description}
+                    </p>
+                    <span className="mt-4 inline-flex items-center text-xs font-semibold text-primary group-hover:underline">
+                      Start now
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-h2 flex items-center space-x-2">
+              <Plus size={24} className="text-primary" />
+              <span>List Your Item</span>
+            </CardTitle>
+            <CardDescription>
+              Step {currentStep} of {totalSteps}: Help reduce waste by listing your item
+            </CardDescription>
+            <Progress value={progress} className="mt-2" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Step 1: Basic Information */}
+            {currentStep === 1 && (
+              <div className="space-y-4">
             <div>
               <Label htmlFor="title">Item Title *</Label>
               <Input
@@ -753,8 +883,8 @@ export function ItemListingForm({
                 )}
               </div>
             </div>
-          </div>
-        )}
+              </div>
+            )}
             {(classificationLoading || classificationResult || moderationLoading || moderationResult) && (
               <div className="grid gap-4 md:grid-cols-2">
                 {(classificationLoading || classificationResult) && (
@@ -1104,8 +1234,9 @@ export function ItemListingForm({
             </Button>
           )}
         </div>
-      </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </>
   )
 }

@@ -272,6 +272,8 @@ export function MyListingsView({
   }
 
   const isCollector = currentUser?.userType === 'collector'
+  const addFirstItemLabel = isCollector ? 'Add an item' : 'List or donate your first item'
+  const addNewItemLabel = isCollector ? 'Add an item' : 'List or donate new item'
   const heading = variant === 'dashboard'
     ? 'Manage your listings'
     : isCollector
@@ -420,7 +422,7 @@ export function MyListingsView({
       {onAddNewItem && (
         <Button className="mt-4" onClick={onAddNewItem}>
           <Plus size={16} className="mr-2" />
-          {isCollector ? 'Add an item' : 'Add your first item'}
+          {addFirstItemLabel}
         </Button>
       )}
     </div>
@@ -633,7 +635,7 @@ export function MyListingsView({
       {onAddNewItem && (
         <Button onClick={onAddNewItem}>
           <Plus size={16} className="mr-2" />
-          {isCollector ? 'Add an item' : 'Add new item'}
+          {addNewItemLabel}
         </Button>
       )}
     </div>

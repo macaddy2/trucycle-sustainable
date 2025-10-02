@@ -105,7 +105,7 @@ export function Homepage({
             </p>
             <div className="flex flex-wrap gap-3">
               <Button size="lg" onClick={onStartListing}>
-                List an item now
+                List or donate now
               </Button>
             </div>
           </div>
@@ -227,7 +227,7 @@ export function Homepage({
             icon={<ArrowsClockwise size={24} className="text-blue-600" />}
             title="Create listings in seconds"
             description="Guided forms, smart fulfilment suggestions, and rich item previews help you share what you no longer need with zero friction."
-            action={{ label: 'List an item', onClick: onStartListing }}
+            action={{ label: 'List or donate an item', onClick: onStartListing }}
             accent="secondary"
           />
 
@@ -319,7 +319,7 @@ export function Homepage({
               Join thousands of Londoners extending the life of items. Every exchange keeps resources in circulation.
             </p>
             <Button className="mt-4" variant="secondary" onClick={onStartListing}>
-              Start your next listing
+              Start your next listing or donation
             </Button>
           </div>
         </div>
