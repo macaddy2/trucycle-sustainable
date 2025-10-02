@@ -90,7 +90,6 @@ function App() {
     notifications: recommendationNotifications,
     unreadCount: recommendationUnreadCount,
     markAsRead: markRecommendationAsRead,
-    triggerUrgentNotifications,
   } = useRecommendationNotifications(user ?? null)
 
   const navigateToTab = useCallback((nextTab: string) => {
@@ -430,10 +429,15 @@ function App() {
     navigateToTab('list')
   }
 
-  const handleListingComplete = useCallback(({ listing }: ListingCompletionDetails) => {
-    navigateToTab('profile')
-    toast.success('Drop-off planned!', {
-      description: `"${listing.title}" is now listed under My Listed Items.`
+  const handleListingComplete = useCallback(({ listing, qrCode }: ListingCompletionDetails) => {
+    const fulfillment = listing.fulfillmentMethod ?? 'pickup'
+    const isDropOff = fulfillment === 'dropoff'
+
+    navigateToTab('listings')
+    toast.success(isDropOff ? 'Drop-off QR ready!' : 'Pickup QR ready!', {
+      description: `Transaction ${qrCode.transactionId} for "${listing.title}" is saved under your ${
+        isDropOff ? 'partner shop drop-offs' : 'collection pickups'
+      }.`
     })
   }, [navigateToTab])
 
@@ -506,20 +510,6 @@ function App() {
                       />
                     </PopoverContent>
                   </Popover>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (triggerUrgentNotifications) {
-                        triggerUrgentNotifications()
-                      }
-                    }}
-                    className="text-orange-600 border-orange-200 hover:bg-orange-50"
-                    title="Demo: Experience urgent alerts"
-                  >
-                    <Bell size={16} className="animate-pulse" />
-                  </Button>
 
                   {user?.partnerAccess && (
                     <Button
