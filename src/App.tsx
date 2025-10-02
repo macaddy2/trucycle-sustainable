@@ -15,11 +15,22 @@ import {
   Package,
   Storefront,
   ChatCircle,
-  ArrowLeft
+  ArrowLeft,
+  House
 } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
-import { ItemListing, ItemListingForm, MyListingsView, ProfileDashboard, DropOffMap, CarbonTracker, ShopScanner, DemoGuide } from './components'
+import {
+  ItemListing,
+  ItemListingForm,
+  MyListingsView,
+  ProfileDashboard,
+  DropOffMap,
+  CarbonTracker,
+  ShopScanner,
+  DemoGuide,
+  Homepage,
+} from './components'
 import { NotificationList, type Notification } from './components/NotificationList'
 import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
@@ -49,7 +60,7 @@ interface UserProfile {
 }
 
 function App() {
-  const [currentTab, setCurrentTabState] = useState('browse')
+  const [currentTab, setCurrentTabState] = useState('home')
   const [navigationHistory, setNavigationHistory] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [user, setUser] = useKV<UserProfile | null>('current-user', null)
@@ -111,6 +122,7 @@ function App() {
     const isDonor = user?.userType === 'donor'
 
     return [
+      { value: 'home', label: 'Home', Icon: House, show: true },
       { value: 'browse', label: 'Browse', Icon: Search, show: !isDonor },
       { value: 'listings', label: isCollector ? 'My Collected Items' : 'My Listed Items', Icon: Package, show: true },
       { value: 'messages', label: 'Messages', Icon: ChatCircle, show: Boolean(user) },
@@ -120,6 +132,7 @@ function App() {
     ].filter((tab) => tab.show)
   }, [user])
 
+  const hasHomeTab = navTabs.some((tab) => tab.value === 'home')
   const hasBrowseTab = navTabs.some((tab) => tab.value === 'browse')
   const hasDropOffTab = navTabs.some((tab) => tab.value === 'dropoff')
   const hasDismissedOnboarding = user ? Boolean(onboardingDismissals[user.id]) : false
@@ -394,12 +407,21 @@ function App() {
 
 
   const handleSearch = () => {
-    const targetTab = hasBrowseTab ? 'browse' : navTabs[0]?.value ?? currentTab
-    navigateToTab(targetTab)
-    if (targetTab === 'browse') {
+    const fallbackTab = hasBrowseTab
+      ? 'browse'
+      : navTabs.find((tab) => tab.value === 'listings')?.value ?? navTabs[0]?.value ?? currentTab
+    navigateToTab(fallbackTab)
+    if (fallbackTab === 'browse') {
       document.getElementById('item-listing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
+
+  const handleLogoClick = useCallback(() => {
+    if (hasHomeTab) {
+      navigateToTab('home')
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [hasHomeTab, navigateToTab])
 
 
   const handleDropOffPlanned = (location: DropOffLocation) => {
@@ -438,10 +460,17 @@ function App() {
                 <ArrowLeft size={16} />
                 <span className="hidden sm:inline">Back</span>
               </Button>
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <Recycle size={20} className="text-primary-foreground" />
-              </div>
-              <h1 className="text-h2 text-foreground">TruCycle</h1>
+              <button
+                type="button"
+                onClick={handleLogoClick}
+                className="group flex items-center space-x-3 rounded-full border border-transparent px-2 py-1 transition hover:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                title="Go to homepage"
+              >
+                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center transition-transform group-hover:scale-105">
+                  <Recycle size={20} className="text-primary-foreground" />
+                </div>
+                <h1 className="text-h2 text-foreground">TruCycle</h1>
+              </button>
             </div>
 
             <div className="hidden md:flex items-center space-x-6">
@@ -547,6 +576,25 @@ function App() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs value={currentTab} onValueChange={navigateToTab}>
+          {hasHomeTab && (
+            <TabsContent value="home">
+              <Homepage
+                onExploreBrowse={() => navigateToTab(hasBrowseTab ? 'browse' : 'listings')}
+                onStartListing={() => navigateToTab('list')}
+                onViewImpact={() => navigateToTab('impact')}
+                onViewPartners={() => navigateToTab(hasDropOffTab ? 'dropoff' : 'list')}
+                onOpenMessages={handleOpenMessages}
+                onSearch={handleSearch}
+                onSearchChange={setSearchQuery}
+                searchQuery={searchQuery}
+                isAuthenticated={Boolean(user)}
+                userName={user?.name && typeof user.name === 'string' ? user.name.split(' ')[0] : undefined}
+                onSignIn={handleSignIn}
+                onSignUp={handleSignUp}
+              />
+            </TabsContent>
+          )}
+
           {hasBrowseTab && (
             <TabsContent value="browse">
               <section id="item-listing-section">
