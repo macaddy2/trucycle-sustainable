@@ -271,10 +271,17 @@ export function MyListingsView({
     setIsEditing(false)
   }
 
-  const heading = variant === 'dashboard' ? 'Manage your listings' : 'My listed items'
+  const isCollector = currentUser?.userType === 'collector'
+  const heading = variant === 'dashboard'
+    ? 'Manage your listings'
+    : isCollector
+      ? 'My collected items'
+      : 'My listed items'
   const description = variant === 'dashboard'
     ? `Track the status of your ${sortedListings.length ? '' : 'future '}donations and exchanges.`
-    : `You currently have ${sortedListings.length} listing${sortedListings.length === 1 ? '' : 's'} (${activeCount} active).`
+    : isCollector
+      ? `Plan pickups and drop-offs for the ${sortedListings.length} item${sortedListings.length === 1 ? '' : 's'} in your care (${activeCount} ready to action).`
+      : `You currently have ${sortedListings.length} listing${sortedListings.length === 1 ? '' : 's'} (${activeCount} active).`
 
   const handleMarkCollected = (listingId: string) => {
     const listing = listings.find(item => item.id === listingId)
@@ -405,11 +412,15 @@ export function MyListingsView({
   const EmptyState = (
     <div className="text-center py-12 text-sm text-muted-foreground">
       <Package size={48} className="mx-auto mb-4 text-muted-foreground" />
-      <p>You have not listed any items yet.</p>
+      <p>
+        {isCollector
+          ? 'You have not added any items to your collection yet.'
+          : 'You have not listed any items yet.'}
+      </p>
       {onAddNewItem && (
         <Button className="mt-4" onClick={onAddNewItem}>
           <Plus size={16} className="mr-2" />
-          Add your first item
+          {isCollector ? 'Add an item' : 'Add your first item'}
         </Button>
       )}
     </div>
@@ -622,7 +633,7 @@ export function MyListingsView({
       {onAddNewItem && (
         <Button onClick={onAddNewItem}>
           <Plus size={16} className="mr-2" />
-          Add New Item
+          {isCollector ? 'Add an item' : 'Add new item'}
         </Button>
       )}
     </div>

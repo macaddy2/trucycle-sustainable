@@ -104,10 +104,7 @@ export function Homepage({
               TruCycle brings together donors, collectors, and partner shops. Browse local treasures, list pre-loved items in seconds, plan sustainable drop-offs, and see the carbon you save along the way.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button size="lg" onClick={onExploreBrowse}>
-                Explore marketplace
-              </Button>
-              <Button size="lg" variant="outline" onClick={onStartListing}>
+              <Button size="lg" onClick={onStartListing}>
                 List an item now
               </Button>
             </div>
