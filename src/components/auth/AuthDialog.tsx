@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +39,21 @@ interface UserProfile {
   partnerAccess?: boolean
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const UK_POSTCODE_REGEX = /^[A-Z]{1,2}\d[A-Z\d]?\d?[A-Z]{2}$/
+
+const normalizePostcode = (value: string) => value.replace(/\s+/g, '').toUpperCase()
+
+const formatPostcode = (value: string) => {
+  const normalized = normalizePostcode(value)
+  if (normalized.length <= 3) {
+    return normalized
+  }
+  const main = normalized.slice(0, normalized.length - 3)
+  const tail = normalized.slice(-3)
+  return `${main} ${tail}`
+}
+
 export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthDialogProps) {
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode)
   const [showPassword, setShowPassword] = useState(false)
@@ -47,10 +62,15 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
     email: '',
     password: '',
     name: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    postcode: ''
   })
 
   const [, setUser] = useKV('current-user', null)
+
+  useEffect(() => {
+    setMode(initialMode)
+  }, [initialMode])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -67,6 +87,14 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
         toast.error('Please enter your full name')
         return false
       }
+      if (!formData.postcode) {
+        toast.error('Please enter your postcode')
+        return false
+      }
+      if (!UK_POSTCODE_REGEX.test(normalizePostcode(formData.postcode))) {
+        toast.error('Enter a valid UK postcode')
+        return false
+      }
       if (formData.password !== formData.confirmPassword) {
         toast.error('Passwords do not match')
         return false
@@ -77,8 +105,7 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
       }
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(formData.email)) {
+    if (!EMAIL_REGEX.test(formData.email.trim())) {
       toast.error('Please enter a valid email address')
       return false
     }
@@ -96,13 +123,24 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1500))
 
+      const normalizedEmail = formData.email.trim().toLowerCase()
+      const credentials = await kvGet<Record<string, { userId: string; password: string }>>('user-credentials') || {}
+
       if (mode === 'signup') {
+        if (credentials[normalizedEmail]) {
+          toast.error('An account with this email already exists')
+          return
+        }
+
+        const formattedPostcode = formatPostcode(formData.postcode)
+
         // Create new user profile
         const newUser: UserProfile = {
           id: Date.now().toString(),
-          email: formData.email,
-          name: formData.name,
+          email: normalizedEmail,
+          name: formData.name.trim(),
           userType: 'donor', // Default type, will be set in onboarding
+          postcode: formattedPostcode,
           createdAt: new Date().toISOString(),
           onboardingCompleted: false,
           verified: true,
@@ -120,44 +158,46 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
         }
 
         // Store user profile
-        const userProfiles = await kvGet('user-profiles') || {}
+        const userProfiles = await kvGet<Record<string, UserProfile>>('user-profiles') || {}
         await kvSet('user-profiles', {
           ...userProfiles,
           [newUser.id]: newUser
         })
 
+        await kvSet('user-credentials', {
+          ...credentials,
+          [normalizedEmail]: { userId: newUser.id, password: formData.password }
+        })
+
         setUser(newUser)
         toast.success(`Welcome to TruCycle, ${newUser.name}!`)
       } else {
-        // Sign in existing user (for demo, create a mock user)
-        const mockUser: UserProfile = {
-          id: 'demo-user',
-          email: formData.email,
-          name: 'Demo User',
-          userType: 'donor',
-          postcode: 'SW1A 1AA',
-          createdAt: new Date().toISOString(),
-          onboardingCompleted: true,
-          verified: true,
-          rating: 4.7,
-          verificationLevel: {
-            email: true,
-            phone: true,
-            identity: true,
-            address: true,
-            payment: true,
-            community: true
-          },
-          rewardsBalance: 120
+        const credentialRecord = credentials[normalizedEmail]
+        if (!credentialRecord) {
+          toast.error('No account found with that email address')
+          return
         }
 
-        setUser(mockUser)
-        toast.success('Welcome back!')
+        if (credentialRecord.password !== formData.password) {
+          toast.error('Incorrect password')
+          return
+        }
+
+        const userProfiles = await kvGet<Record<string, UserProfile>>('user-profiles') || {}
+        const existingUser = userProfiles[credentialRecord.userId]
+
+        if (!existingUser) {
+          toast.error('We could not load your profile. Please sign up again.')
+          return
+        }
+
+        setUser(existingUser)
+        toast.success(`Welcome back${existingUser.name ? `, ${existingUser.name.split(' ')[0]}` : ''}!`)
       }
 
       onOpenChange(false)
       // Reset form
-      setFormData({ email: '', password: '', name: '', confirmPassword: '' })
+      setFormData({ email: '', password: '', name: '', confirmPassword: '', postcode: '' })
     } catch (error) {
       console.error('Authentication flow failed', error)
       toast.error('Authentication failed. Please try again.')
@@ -168,32 +208,45 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
 
   const handleSocialAuth = (provider: 'google' | 'facebook') => {
     setIsLoading(true)
-    
-    // Simulate social auth
-    setTimeout(() => {
-      const mockUser: UserProfile = {
-        id: `${provider}-user-${Date.now()}`,
-        email: `user@${provider}.com`,
-        name: `${provider === 'google' ? 'Google' : 'Facebook'} User`,
-        userType: 'donor',
-        createdAt: new Date().toISOString(),
-        verified: true,
-        rating: 4.8,
-        verificationLevel: {
-          email: true,
-          phone: false,
-          identity: false,
-          address: false,
-          payment: false,
-          community: false
-        },
-        rewardsBalance: 60
-      }
 
-      setUser(mockUser)
-      toast.success(`Signed in with ${provider}`)
-      onOpenChange(false)
-      setIsLoading(false)
+    // Simulate social auth
+    setTimeout(async () => {
+      try {
+        const mockUser: UserProfile = {
+          id: `${provider}-user-${Date.now()}`,
+          email: `user@${provider}.com`,
+          name: `${provider === 'google' ? 'Google' : 'Facebook'} User`,
+          userType: 'donor',
+          postcode: 'SW1A 1AA',
+          createdAt: new Date().toISOString(),
+          verified: true,
+          rating: 4.8,
+          verificationLevel: {
+            email: true,
+            phone: false,
+            identity: false,
+            address: false,
+            payment: false,
+            community: false
+          },
+          rewardsBalance: 60
+        }
+
+        const existingProfiles = await kvGet<Record<string, UserProfile>>('user-profiles') || {}
+        await kvSet('user-profiles', {
+          ...existingProfiles,
+          [mockUser.id]: mockUser,
+        })
+
+        setUser(mockUser)
+        toast.success(`Signed in with ${provider}`)
+        onOpenChange(false)
+      } catch (error) {
+        console.error('Social auth failed', error)
+        toast.error('Unable to complete social sign in. Please try again.')
+      } finally {
+        setIsLoading(false)
+      }
     }, 1000)
   }
 
@@ -250,17 +303,31 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
           {/* Email Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="Enter your full name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Enter your full name"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="postcode">Postcode</Label>
+                  <Input
+                    id="postcode"
+                    type="text"
+                    placeholder="e.g. SW1A 1AA"
+                    value={formData.postcode}
+                    onChange={(e) => handleInputChange('postcode', e.target.value.toUpperCase())}
+                    onBlur={(e) => handleInputChange('postcode', formatPostcode(e.target.value))}
+                    disabled={isLoading}
+                  />
+                </div>
+              </>
             )}
 
             <div className="space-y-2">

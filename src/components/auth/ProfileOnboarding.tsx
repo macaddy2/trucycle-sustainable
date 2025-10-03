@@ -92,12 +92,12 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
 
     if (currentStep === 2) {
       if (!profileData.postcode.trim()) {
-        toast.error(`Enter ${ALLOWED_POSTCODE_DISPLAY} to continue`)
+        toast.error('Please enter your postcode')
         return
       }
 
       if (!validatePostcode(profileData.postcode)) {
-        toast.error(`TruCycle is onboarding in ${ALLOWED_POSTCODE_DISPLAY} only right now`)
+        toast.error('Enter a valid UK postcode to continue')
         return
       }
 
@@ -115,34 +115,44 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
     }
   }
 
+  const UK_POSTCODE_REGEX = /^[A-Z]{1,2}\d[A-Z\d]?\d?[A-Z]{2}$/
+
   const normalizePostcode = (value: string) => value.replace(/\s+/g, '').toUpperCase()
   const formatPostcode = (value: string) => {
     const normalized = normalizePostcode(value)
     if (!normalized) {
       return ''
     }
-    return normalized.replace(/^(\w{2,4})(\w{3})$/, '$1 $2')
+    if (normalized.length <= 3) {
+      return normalized
+    }
+    return `${normalized.slice(0, normalized.length - 3)} ${normalized.slice(-3)}`
   }
-
-  const ALLOWED_POSTCODE = 'IG11 7FR'
-  const NORMALIZED_ALLOWED_POSTCODE = normalizePostcode(ALLOWED_POSTCODE)
-  const ALLOWED_POSTCODE_DISPLAY = formatPostcode(ALLOWED_POSTCODE)
 
   const handlePostcodeChange = (value: string) => {
     const sanitized = value.toUpperCase().replace(/[^A-Z0-9\s]/g, '')
-    const normalized = normalizePostcode(sanitized).slice(0, NORMALIZED_ALLOWED_POSTCODE.length)
+    const normalized = normalizePostcode(sanitized).slice(0, 8)
     const formatted = formatPostcode(normalized)
     setProfileData((prev) => ({ ...prev, postcode: formatted }))
   }
 
-  const validatePostcode = (postcode: string) => normalizePostcode(postcode) === NORMALIZED_ALLOWED_POSTCODE
+  const validatePostcode = (postcode: string) => UK_POSTCODE_REGEX.test(normalizePostcode(postcode))
 
   const deriveAreaDetails = (postcode: string) => {
-    if (validatePostcode(postcode)) {
-      return { area: 'Barking', district: 'East London', serviceArea: 'Barking & Dagenham' }
+    const normalized = normalizePostcode(postcode)
+    if (!validatePostcode(normalized)) {
+      return { area: undefined, district: undefined, serviceArea: undefined }
     }
 
-    return { area: 'Greater London', district: 'Greater London', serviceArea: 'Greater London' }
+    const outward = normalized.slice(0, normalized.length - 3)
+    const londonPrefixes = ['E', 'EC', 'N', 'NW', 'SE', 'SW', 'W', 'WC']
+    const isLondon = londonPrefixes.some((prefix) => outward.startsWith(prefix))
+
+    return {
+      area: outward,
+      district: isLondon ? 'London' : 'United Kingdom',
+      serviceArea: isLondon ? 'Greater London' : 'National network'
+    }
   }
 
   const verifyPostcodeDetails = async (postcode: string) => ({
@@ -152,7 +162,7 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
 
   const handleComplete = async () => {
     if (!profileData.postcode || !validatePostcode(profileData.postcode)) {
-      toast.error(`TruCycle is onboarding in ${ALLOWED_POSTCODE_DISPLAY} only right now`)
+      toast.error('Enter a valid postcode to finish onboarding')
       return
     }
 
@@ -162,9 +172,11 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
       const verificationData = await verifyPostcodeDetails(profileData.postcode)
 
       if (!verificationData.isValid) {
-        toast.error(`Please use postcode ${ALLOWED_POSTCODE_DISPLAY} to continue onboarding`)
+        toast.error('Please enter a valid UK postcode to continue onboarding')
         return
       }
+
+      const formattedPostcode = formatPostcode(profileData.postcode)
 
       // Update user profile with verified address data
       const updatedUser: UserProfile = {
@@ -173,10 +185,10 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
         email: user?.email || '',
         name: user?.name || '',
         userType: profileData.userType as 'donor' | 'collector',
-        postcode: formatPostcode(profileData.postcode) || ALLOWED_POSTCODE_DISPLAY,
-        area: verificationData.area,
-        district: verificationData.district,
-        serviceArea: verificationData.serviceArea,
+        postcode: formattedPostcode,
+        area: verificationData.area ?? formattedPostcode.split(' ')[0],
+        district: verificationData.district ?? 'United Kingdom',
+        serviceArea: verificationData.serviceArea ?? 'National network',
         createdAt: user?.createdAt || new Date().toISOString(),
         onboardingCompleted: true,
         addressVerified: true,
@@ -351,7 +363,7 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
               </div>
               <h3 className="text-h3">Verify Your Location</h3>
               <p className="text-muted-foreground">
-                We're currently onboarding Barking households in {ALLOWED_POSTCODE_DISPLAY}.
+                Add your UK postcode so we can tailor nearby listings, partner shops, and community highlights.
               </p>
             </div>
 
@@ -361,17 +373,17 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
                 <Input
                   id="postcode"
                   type="text"
-                  placeholder={ALLOWED_POSTCODE_DISPLAY}
+                  placeholder="e.g. SW1A 1AA"
                   value={profileData.postcode}
                   onChange={(event) => handlePostcodeChange(event.target.value)}
                   className="text-center text-lg font-medium"
                 />
                 <p className="text-xs text-muted-foreground text-center">
-                  Use {ALLOWED_POSTCODE_DISPLAY} (case-insensitive) to unlock the full onboarding demo.
+                  We'll format it for you. Use the postcode that best represents your usual drop-off or pickup area.
                 </p>
                 {!validatePostcode(profileData.postcode) && profileData.postcode.trim() !== '' && (
                   <p className="text-xs text-destructive text-center">
-                    This postcode isn't part of the Barking pilot yet.
+                    Enter a valid UK postcode to continue.
                   </p>
                 )}
               </div>
@@ -383,8 +395,8 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
                     <div className="space-y-1">
                       <p className="text-sm font-medium">Privacy Protected</p>
                       <p className="text-xs text-muted-foreground">
-                        Your exact address is kept private. Only your general area is visible to other users, 
-                        and your full address is only shared with verified collectors after a successful match.
+                        Your exact address stays private. Other users only see an approximate area, and full details are
+                        shared securely once you confirm a match.
                       </p>
                     </div>
                   </div>

@@ -107,6 +107,9 @@ export function Homepage({
               <Button size="lg" onClick={onStartListing}>
                 List or donate now
               </Button>
+              <Button size="lg" variant="outline" onClick={onExploreBrowse}>
+                Browse available items
+              </Button>
             </div>
           </div>
 
@@ -150,13 +153,16 @@ export function Homepage({
               </div>
             ) : (
               <div className="mt-6 rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">Welcome back{userName ? `, ${userName}` : ''}!</p>
-                <p className="mt-1">
-                  Resume your sustainable journey by checking new messages or measuring your impact.
-                </p>
-                <Button size="sm" className="mt-3" variant="outline" onClick={onOpenMessages}>
-                  View messages
-                </Button>
+                <p className="font-medium text-foreground">Signed in{userName ? ` as ${userName}` : ''}</p>
+                <p className="mt-1">Choose a quick action to keep your exchanges moving.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" onClick={onStartListing}>
+                    Add an item
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={onOpenMessages}>
+                    Open messages
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -209,9 +215,6 @@ export function Homepage({
               Switch between browsing, listing, messaging, and measuring impact without losing context. These highlights preview the core experiences you can jump into at any time.
             </p>
           </div>
-          <Button variant="ghost" onClick={onExploreBrowse}>
-            Jump into marketplace
-          </Button>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
