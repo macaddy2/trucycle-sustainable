@@ -30,7 +30,6 @@ import {
   DemoGuide,
   Homepage,
 } from './components'
-import { ListingQuickStartDialog } from './components/ListingQuickStartDialog'
 import { ShopScannerOverview } from './components/ShopScannerOverview'
 import { TruCycleGlyph } from './components/icons/TruCycleGlyph'
 import { NotificationList, type Notification } from './components/NotificationList'
@@ -71,8 +70,6 @@ function App() {
   const [onboardingMode, setOnboardingMode] = useState<'onboarding' | 'edit'>('onboarding')
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [showShopScanner, setShowShopScanner] = useState(false)
-  const [showListingQuickStart, setShowListingQuickStart] = useState(false)
-  const [listingQuickStartDefaults, setListingQuickStartDefaults] = useState<{ intent?: 'exchange' | 'donate' | 'recycle'; fulfillment?: 'pickup' | 'dropoff' }>({})
   const [shouldResumeListingAfterAuth, setShouldResumeListingAfterAuth] = useState(false)
   const [showDemoGuide, setShowDemoGuide] = useKV<boolean>('show-demo-guide', true)
   const [pendingFulfillmentMethod, setPendingFulfillmentMethod] = useState<'pickup' | 'dropoff' | null>(null)
@@ -425,13 +422,6 @@ function App() {
   }, [hasHomeTab, navigateToTab])
 
 
-  const handleDropOffPlanned = (location: DropOffLocation) => {
-    setPendingFulfillmentMethod('dropoff')
-    setPendingDropOffLocation(location)
-    setPendingListingIntent('donate')
-    navigateToTab('list')
-  }
-
   const handleListingComplete = useCallback(({ listing, qrCode }: ListingCompletionDetails) => {
     const fulfillment = listing.fulfillmentMethod ?? 'pickup'
     const isDropOff = fulfillment === 'dropoff'
@@ -444,33 +434,18 @@ function App() {
     })
   }, [navigateToTab])
 
+  const handleDropOffPlanned = (location: DropOffLocation) => {
+    setPendingFulfillmentMethod('dropoff')
+    setPendingDropOffLocation(location)
+    setPendingListingIntent('donate')
+    navigateToTab('list')
+  }
+
   const handleStartListing = useCallback((intent?: 'exchange' | 'donate' | 'recycle') => {
     const fallbackIntent: 'exchange' | 'donate' | 'recycle' = intent ?? (user?.userType === 'collector' ? 'exchange' : 'donate')
-    setListingQuickStartDefaults({
-      intent: fallbackIntent,
-      fulfillment: fallbackIntent === 'donate' ? 'dropoff' : 'pickup',
-    })
-    setShowListingQuickStart(true)
-  }, [user?.userType])
 
-  const handleListingQuickStartClose = useCallback((open: boolean) => {
-    setShowListingQuickStart(open)
-    if (!open) {
-      setListingQuickStartDefaults({})
-      setShouldResumeListingAfterAuth(false)
-    }
-  }, [])
-
-  const handleListingQuickStartContinue = useCallback((options: {
-    intent: 'exchange' | 'donate' | 'recycle'
-    fulfillment: 'pickup' | 'dropoff'
-    notes?: string
-    preferPartnerSupport?: boolean
-  }) => {
-    setShowListingQuickStart(false)
-    setListingQuickStartDefaults({})
-    setPendingListingIntent(options.intent)
-    setPendingFulfillmentMethod(options.fulfillment)
+    setPendingListingIntent(fallbackIntent)
+    setPendingFulfillmentMethod(fallbackIntent === 'donate' ? 'dropoff' : 'pickup')
     setPendingDropOffLocation(null)
 
     if (!user) {
@@ -481,7 +456,7 @@ function App() {
     }
 
     navigateToTab('list')
-  }, [navigateToTab, user])
+  }, [navigateToTab, user, user?.userType])
 
   // If in shop scanner mode, render only the scanner
   if (showShopScanner) {
@@ -504,10 +479,10 @@ function App() {
                 className="group flex items-center space-x-3 rounded-full border border-transparent px-2 py-1 transition hover:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/40"
                 title="Go to homepage"
               >
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary transition-transform group-hover:scale-105">
-                  <TruCycleGlyph className="h-5 w-5" />
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-primary/80 to-emerald-500 text-primary-foreground shadow-lg ring-2 ring-primary/30 transition-transform group-hover:scale-105">
+                  <TruCycleGlyph className="h-8 w-8 drop-shadow-sm" />
                 </div>
-                <h1 className="text-h2 text-foreground">TruCycle</h1>
+                <h1 className="text-h2 text-foreground drop-shadow-sm">TruCycle</h1>
               </button>
             </div>
 
@@ -776,14 +751,6 @@ function App() {
           }
         }}
         initialMode={authMode}
-      />
-
-      <ListingQuickStartDialog
-        open={showListingQuickStart}
-        onOpenChange={handleListingQuickStartClose}
-        defaultIntent={listingQuickStartDefaults.intent ?? (user?.userType === 'collector' ? 'exchange' : 'donate')}
-        defaultFulfillment={listingQuickStartDefaults.fulfillment}
-        onContinue={handleListingQuickStartContinue}
       />
 
       <ProfileOnboarding

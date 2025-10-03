@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Heart,
   MapPin,
@@ -264,73 +265,118 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-h3">Find an Item</CardTitle>
-          <CardDescription>Search and filter the marketplace to match what you need</CardDescription>
+      <Card className="border-border/60 bg-card/80 shadow-xl backdrop-blur-sm">
+        <CardHeader className="space-y-3">
+          <CardTitle className="flex items-center gap-3 text-h3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <MagnifyingGlass size={18} />
+            </span>
+            <span>Find an Item</span>
+          </CardTitle>
+          <CardDescription className="text-base">
+            Search, filter, and pinpoint the perfect reuse opportunity around you.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={handleFiltersSubmit}>
-            <div className="relative">
-              <MagnifyingGlass size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={handleSearchInputChange}
-                placeholder="Search items..."
-                className="pl-10 w-full"
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {['All', 'Electronics', 'Furniture', 'Clothing'].map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedCondition} onValueChange={setSelectedCondition}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Condition" />
-                </SelectTrigger>
-                <SelectContent>
-                  {['All', 'excellent', 'good', 'fair', 'poor'].map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option === 'All' ? 'All' : option.charAt(0).toUpperCase() + option.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedType} onValueChange={(value) => setSelectedType(value as typeof selectedType)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {['All', 'exchange', 'donate', 'recycle'].map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option === 'All' ? 'All types' : option.charAt(0).toUpperCase() + option.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setSelectedCategory('All')
-                  setSelectedCondition('All')
-                  setSelectedType('All')
-                }}
-              >
-                Clear filters
+          <form className="space-y-6" onSubmit={handleFiltersSubmit}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <div className="relative flex-1">
+                <MagnifyingGlass size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={handleSearchInputChange}
+                  placeholder="Search furniture, electronics, baby essentials..."
+                  className="w-full rounded-2xl border-border/70 bg-background/80 pl-11 pr-4 py-3"
+                />
+              </div>
+              <Button type="submit" className="h-12 min-w-[160px] rounded-2xl px-6 text-sm font-semibold">
+                <MagnifyingGlass size={16} className="mr-2" />
+                Search listings
               </Button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="rounded-2xl border border-border/60 bg-background/70 p-4 shadow-sm">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</span>
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SelectTrigger className="mt-2 rounded-xl border-border/50 bg-background/80">
+                        <SelectValue placeholder="All categories" />
+                      </SelectTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>Refine results by item type, from electronics to clothing.</TooltipContent>
+                  </Tooltip>
+                  <SelectContent>
+                    {['All', 'Electronics', 'Furniture', 'Clothing', 'Books', 'Sports Equipment', 'Home Decor', 'Other'].map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option === 'All' ? 'All categories' : option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="rounded-2xl border border-border/60 bg-background/70 p-4 shadow-sm">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Condition</span>
+                <Select value={selectedCondition} onValueChange={setSelectedCondition}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SelectTrigger className="mt-2 rounded-xl border-border/50 bg-background/80">
+                        <SelectValue placeholder="All conditions" />
+                      </SelectTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>Filter by item quality to match your refurbishment effort.</TooltipContent>
+                  </Tooltip>
+                  <SelectContent>
+                    {['All', 'excellent', 'good', 'fair', 'poor'].map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option === 'All' ? 'All conditions' : option.charAt(0).toUpperCase() + option.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="rounded-2xl border border-border/60 bg-background/70 p-4 shadow-sm">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Action</span>
+                <Select value={selectedType} onValueChange={(value) => setSelectedType(value as typeof selectedType)}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SelectTrigger className="mt-2 rounded-xl border-border/50 bg-background/80">
+                        <SelectValue placeholder="All intents" />
+                      </SelectTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>Focus on exchanges, donations, or recycling opportunities.</TooltipContent>
+                  </Tooltip>
+                  <SelectContent>
+                    {['All', 'exchange', 'donate', 'recycle'].map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option === 'All' ? 'All intents' : option.charAt(0).toUpperCase() + option.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col justify-between rounded-2xl border border-dashed border-border/60 bg-background/50 p-4 shadow-inner">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quick actions</span>
+                <p className="mt-2 flex-1 text-xs text-muted-foreground">
+                  Reset everything to explore the full catalogue and discover unexpected gems.
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="mt-4 justify-start px-0 text-sm font-semibold text-primary hover:text-primary"
+                  onClick={() => {
+                    setSelectedCategory('All')
+                    setSelectedCondition('All')
+                    setSelectedType('All')
+                  }}
+                >
+                  Clear filters
+                </Button>
+              </div>
             </div>
           </form>
         </CardContent>
@@ -360,10 +406,13 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
             const requestButtonLabel = item.actionType === 'recycle' ? 'Arrange recycling' : 'Request a Claim'
 
             return (
-              <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="aspect-video bg-muted flex items-center justify-center relative">
+              <Card
+                key={item.id}
+                className="group overflow-hidden rounded-2xl border border-border/60 bg-background/80 shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl"
+              >
+                <div className="relative flex aspect-video items-center justify-center bg-muted">
                   {item.photos.length > 0 ? (
-                    <img src={item.photos[0]} alt={item.title} className="w-full h-full object-cover" />
+                    <img src={item.photos[0]} alt={item.title} className="h-full w-full object-cover" />
                   ) : (
                     <Package size={48} className="text-muted-foreground" />
                   )}
@@ -390,30 +439,72 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                   </div>
                 </div>
 
-                <CardContent className="p-4 space-y-3">
-                  <div>
-                    <h3 className="text-h3 line-clamp-1">{item.title}</h3>
-                    <p className="text-small text-muted-foreground line-clamp-2">{item.description}</p>
+                <CardContent className="space-y-4 p-5">
+                  <div className="space-y-1.5">
+                    <h3 className="text-h3 line-clamp-1 text-foreground transition-colors group-hover:text-primary">
+                      {item.title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground line-clamp-3">{item.description}</p>
                   </div>
 
-                  <div className="flex items-center justify-between text-small text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <MapPin size={14} />
-                      {item.location}
-                    </span>
-                    <span>{item.distance}</span>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin size={14} />
+                          <span className="max-w-[160px] truncate">{item.location}</span>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{item.location}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">
+                          {item.distance}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>Approximate distance from your saved area.</TooltipContent>
+                    </Tooltip>
                   </div>
 
-                  <div className="flex items-center justify-between text-small">
-                    <Badge variant="outline" className={conditionBadgeClass[item.condition]}>
-                      {item.condition.charAt(0).toUpperCase() + item.condition.slice(1)}
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="outline" className="capitalize">
+                          {item.category}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>Item category</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="outline" className={`capitalize ${conditionBadgeClass[item.condition]}`}>
+                          {item.condition}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>Reported condition</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="secondary" className="flex items-center gap-1">
+                          <Clock size={12} />
+                          <span>{formatTimeAgo(item.createdAt)}</span>
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>Time since listing was published</TooltipContent>
+                    </Tooltip>
+                    <Badge variant="outline" className="flex items-center gap-1 border-emerald-200 bg-emerald-50 text-emerald-700">
+                      <Leaf size={12} />
+                      <span>{item.co2Impact}kg CO₂ saved</span>
                     </Badge>
-                    <span className="text-primary font-medium">-{item.co2Impact}kg CO₂</span>
                   </div>
 
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>By {item.ownerName}</span>
-                    <span><Clock size={12} className="inline mr-1" />{formatTimeAgo(item.createdAt)}</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Package size={12} />
+                      {itemRequests.length} request{itemRequests.length === 1 ? '' : 's'}
+                    </span>
                   </div>
 
                   <div className="flex flex-col gap-2 sm:flex-row">
@@ -428,7 +519,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                   </div>
 
                   {collectionStatus?.collected ? (
-                    <div className="flex items-center justify-between text-xs text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+                    <div className="flex items-center justify-between rounded-lg border border-green-100 bg-green-50 px-3 py-2 text-xs text-green-700">
                       <span>Collected on {new Date(collectionStatus.confirmedAt).toLocaleDateString()}</span>
                       <Badge variant="secondary" className="bg-green-600 text-white">
                         Rewarded
@@ -444,8 +535,8 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                         {pendingRequests > 0
                           ? `Review ${pendingRequests} interested collector${pendingRequests > 1 ? 's' : ''}`
                           : itemRequests.length > 0
-                          ? 'View interested collectors'
-                          : 'No requests yet'}
+                            ? 'View interested collectors'
+                            : 'No requests yet'}
                       </Button>
                     ) : null
                   )}

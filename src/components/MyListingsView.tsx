@@ -322,7 +322,7 @@ export function MyListingsView({
   }
 
   const handleApproveRequest = async (request: ClaimRequest) => {
-    const approved = confirmClaimRequest(request.id)
+    const approved = await confirmClaimRequest(request.id)
     if (!approved) {
       toast.error('Unable to approve this request')
       return

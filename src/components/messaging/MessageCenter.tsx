@@ -277,7 +277,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
 
   const handleApproveRequest = async (request: ClaimRequest) => {
     if (!currentUser) return
-    const approved = confirmClaimRequest(request.id)
+    const approved = await confirmClaimRequest(request.id)
     if (!approved) return
 
     const chatIdentifier = await createOrGetChat(
