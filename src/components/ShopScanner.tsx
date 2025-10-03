@@ -36,7 +36,11 @@ interface ScannedTransaction {
   shopAttendant?: string
 }
 
-export function ShopScanner() {
+interface ShopScannerProps {
+  onClose?: () => void
+}
+
+export function ShopScanner({ onClose }: ShopScannerProps = {}) {
   const [scanInput, setScanInput] = useState('')
   const [scannedData, setScannedData] = useState<QRCodeData | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -176,110 +180,110 @@ export function ShopScanner() {
     return `${minutes}m remaining`
   }
 
-  return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-32 -left-24 h-72 w-72 rounded-full bg-emerald-500/30 blur-3xl" />
-        <div className="absolute top-1/3 right-0 h-80 w-80 translate-x-1/3 rounded-full bg-cyan-500/20 blur-3xl" />
-        <div className="absolute bottom-0 left-1/2 h-64 w-64 -translate-x-1/2 translate-y-1/3 rounded-full bg-primary/20 blur-3xl" />
-      </div>
+  const handleExit = () => {
+    if (onClose) {
+      onClose()
+    } else {
+      window.location.href = window.location.pathname
+    }
+  }
 
-      <div className="relative mx-auto flex max-w-6xl flex-col gap-10 px-6 py-12">
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur">
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-12">
+        <div className="rounded-3xl border border-border bg-card p-8 shadow-xl">
           <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-5">
-              <div className="flex items-center gap-3 text-emerald-300">
+              <div className="flex items-center gap-3 text-primary">
                 <ShieldCheck size={24} />
-                <span className="text-xs uppercase tracking-[0.4em]">Partner shop console</span>
+                <span className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Partner shop console</span>
               </div>
               <div className="space-y-3">
-                <h1 className="text-4xl font-semibold leading-tight text-white sm:text-5xl">TruCycle Shop Scanner</h1>
-                <p className="max-w-2xl text-base text-slate-200">
+                <h1 className="text-4xl font-semibold leading-tight text-foreground sm:text-5xl">TruCycle Shop Scanner</h1>
+                <p className="max-w-2xl text-base text-muted-foreground">
                   Welcome your neighbours, verify their QR code, and keep the circular economy flowing with fast drop-off and pickup processing.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-3 text-sm text-slate-200">
-                <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1">
-                  <QrCode size={16} className="text-emerald-300" />
+              <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                <span className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-1">
+                  <QrCode size={16} className="text-primary" />
                   Secure QR validation
                 </span>
-                <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1">
-                  <Package size={16} className="text-cyan-300" />
+                <span className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-1">
+                  <Package size={16} className="text-sky-500" />
                   Real-time item status
                 </span>
-                <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1">
-                  <Clock size={16} className="text-slate-200" />
+                <span className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-1">
+                  <Clock size={16} className="text-amber-500" />
                   72h QR expiry reminders
                 </span>
               </div>
             </div>
 
-            <div className="flex w-full flex-col gap-3 text-sm text-slate-200 lg:w-64 lg:items-end">
-              <div className="rounded-2xl border border-white/10 bg-black/30 px-5 py-4 text-left shadow-inner lg:text-right">
-                <span className="text-xs uppercase tracking-[0.3em] text-emerald-300">Today</span>
-                <p className="mt-2 text-lg font-semibold text-white">
+            <div className="flex w-full flex-col gap-3 text-sm text-muted-foreground lg:w-64 lg:items-end">
+              <div className="rounded-2xl border border-border bg-background px-5 py-4 text-left shadow-sm lg:text-right">
+                <span className="text-xs uppercase tracking-[0.3em] text-primary">Today</span>
+                <p className="mt-2 text-lg font-semibold text-foreground">
                   {totalTransactions} transaction{totalTransactions === 1 ? '' : 's'}
                 </p>
-                <p className="text-xs text-slate-300">
-                  Drop-offs {dropOffCount} · Pickups {pickupCount}
-                </p>
+                <p className="text-xs">Drop-offs {dropOffCount} · Pickups {pickupCount}</p>
               </div>
               {latestTransaction && (
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-5 py-4 text-xs text-slate-300">
-                  <p className="uppercase tracking-[0.2em] text-slate-400">Last processed</p>
-                  <p className="mt-1 text-sm font-medium text-white">{latestTransaction.qrData.itemTitle}</p>
+                <div className="rounded-2xl border border-border bg-background px-5 py-4 text-xs">
+                  <p className="uppercase tracking-[0.2em] text-muted-foreground">Last processed</p>
+                  <p className="mt-1 text-sm font-medium text-foreground">{latestTransaction.qrData.itemTitle}</p>
                   <p>{formatDateTime(latestTransaction.scannedAt)}</p>
                 </div>
               )}
               <Button
-                variant="secondary"
-                onClick={() => (window.location.href = window.location.pathname)}
-                className="self-start rounded-full px-6 py-2 font-medium text-slate-900 shadow lg:self-end"
+                variant="outline"
+                onClick={handleExit}
+                className="self-start rounded-full px-6 py-2 font-medium lg:self-end"
               >
-                Back to main app
+                Exit scanner
               </Button>
             </div>
           </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
-          <Card className="border-white/10 bg-white/5 shadow-2xl backdrop-blur">
-            <CardHeader className="border-b border-white/10 pb-6">
+          <Card className="shadow-lg">
+            <CardHeader className="border-b border-border pb-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <CardTitle className="text-2xl font-semibold text-white">Scan & verify</CardTitle>
-                  <p className="mt-1 text-sm text-slate-300">
+                  <CardTitle className="text-2xl font-semibold text-foreground">Scan & verify</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
                     Accept drop-offs or release collections in seconds.
                   </p>
                 </div>
-                <Badge variant="outline" className="border-emerald-400/40 bg-emerald-500/10 px-3 py-1 text-emerald-200">
+                <Badge variant="outline" className="border-primary/30 bg-primary/10 px-3 py-1 text-primary">
                   Live shift
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-emerald-100 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm text-primary sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                   <Scan size={20} />
                   <span>Keep QR codes within view of the scanner — they refresh every 72 hours.</span>
                 </div>
-                <div className="rounded-full border border-emerald-400/40 bg-emerald-500/20 px-4 py-1 text-xs uppercase tracking-widest">
+                <div className="rounded-full border border-primary/20 bg-primary/10 px-4 py-1 text-xs uppercase tracking-widest text-primary">
                   Verified network
                 </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr),minmax(0,1fr)]">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-200">Shop attendant on duty</label>
+                  <label className="text-sm font-medium text-foreground">Shop attendant on duty</label>
                   <Input
                     placeholder="Enter your name..."
                     value={attendantName}
                     onChange={(e) => setAttendantName(e.target.value)}
-                    className="border-white/20 bg-black/40 text-slate-100 placeholder:text-slate-400 focus:border-emerald-400 focus:ring-emerald-300/40"
+                    className="border-border bg-background text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary/40"
                   />
                 </div>
-                <div className="rounded-2xl border border-dashed border-white/20 bg-black/30 p-4 text-xs text-slate-300">
-                  <p className="font-semibold text-slate-200">Shift log</p>
+                <div className="rounded-2xl border border-dashed border-border bg-muted p-4 text-xs text-muted-foreground">
+                  <p className="font-semibold text-foreground">Shift log</p>
                   <p className="mt-1">
                     {attendantName
                       ? `Thanks, ${attendantName}. Every confirmed QR code will be tagged with your name.`
@@ -292,13 +296,13 @@ export function ShopScanner() {
                 <div className="space-y-6">
                   <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr),minmax(0,0.9fr)]">
                     <div className="space-y-3">
-                      <label className="text-sm font-medium text-slate-200">QR code data</label>
+                      <label className="text-sm font-medium text-foreground">QR code data</label>
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <Input
                           placeholder="Scan or paste QR code data..."
                           value={scanInput}
                           onChange={(e) => setScanInput(e.target.value)}
-                          className="flex-1 border-white/20 bg-black/40 text-slate-100 placeholder:text-slate-400 focus:border-emerald-400 focus:ring-emerald-300/40"
+                          className="flex-1 border-border bg-background text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary/40"
                         />
                         <Button
                           onClick={handleManualScan}
@@ -308,32 +312,32 @@ export function ShopScanner() {
                           {isProcessing ? 'Processing…' : 'Scan now'}
                         </Button>
                       </div>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-muted-foreground">
                         Paste the JSON string provided by the TruCycle scanner or use the upload option.
                       </p>
                     </div>
 
-                    <div className="rounded-3xl border border-white/10 bg-black/40 p-5 text-sm text-slate-300">
-                      <p className="text-sm font-medium text-white">Smooth handover checklist</p>
+                    <div className="rounded-3xl border border-border bg-muted p-5 text-sm text-muted-foreground">
+                      <p className="text-sm font-medium text-foreground">Smooth handover checklist</p>
                       <div className="mt-3 space-y-3">
                         <div className="flex items-start gap-3">
-                          <ArrowRight size={16} className="mt-1 text-emerald-300" />
+                          <ArrowRight size={16} className="mt-1 text-primary" />
                           <p>Welcome the neighbour and confirm their item matches the QR details.</p>
                         </div>
                         <div className="flex items-start gap-3">
-                          <ArrowRight size={16} className="mt-1 text-emerald-300" />
+                          <ArrowRight size={16} className="mt-1 text-primary" />
                           <p>Check the item condition quickly — flag anything unusual in the notes.</p>
                         </div>
                         <div className="flex items-start gap-3">
-                          <ArrowRight size={16} className="mt-1 text-emerald-300" />
+                          <ArrowRight size={16} className="mt-1 text-primary" />
                           <p>Submit the transaction to notify both parties instantly.</p>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-white/20 bg-black/40 p-6 text-center">
-                    <p className="text-sm text-slate-300">Prefer to upload a QR code image?</p>
+                  <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-muted p-6 text-center">
+                    <p className="text-sm text-muted-foreground">Prefer to upload a QR code image?</p>
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -347,58 +351,58 @@ export function ShopScanner() {
                       }}
                     />
                     <Button
-                      variant="secondary"
+                      variant="outline"
                       onClick={() => fileInputRef.current?.click()}
-                      className="rounded-full px-6 py-2 text-slate-900"
+                      className="rounded-full px-6 py-2"
                     >
                       Upload image
                     </Button>
-                    <p className="text-xs text-slate-400">Supports PNG or JPEG exports from the TruCycle kiosk scanner.</p>
+                    <p className="text-xs text-muted-foreground">Supports PNG or JPEG exports from the TruCycle kiosk scanner.</p>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/40 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted p-4">
                     <Badge
                       variant={scannedData.type === 'donor' ? 'default' : 'secondary'}
                       className="rounded-full px-4 py-1 text-sm capitalize"
                     >
                       {scannedData.type === 'donor' ? 'Item drop-off' : 'Item pickup'}
                     </Badge>
-                    <div className="flex items-center gap-2 text-xs text-slate-300">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Clock size={14} />
                       <span>{formatExpiryCountdown(scannedData.metadata.expiresAt)}</span>
                     </div>
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
-                      <p className="text-xs uppercase tracking-widest text-slate-400">Transaction ID</p>
-                      <p className="mt-2 font-mono text-sm text-white">{scannedData.transactionId}</p>
+                    <div className="rounded-2xl border border-border bg-background p-4">
+                      <p className="text-xs uppercase tracking-widest text-muted-foreground">Transaction ID</p>
+                      <p className="mt-2 font-mono text-sm text-foreground">{scannedData.transactionId}</p>
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
-                      <p className="text-xs uppercase tracking-widest text-slate-400">Item</p>
-                      <p className="mt-2 text-sm font-medium text-white">{scannedData.itemTitle}</p>
-                      <p className="text-xs text-slate-400 capitalize">
+                    <div className="rounded-2xl border border-border bg-background p-4">
+                      <p className="text-xs uppercase tracking-widest text-muted-foreground">Item</p>
+                      <p className="mt-2 text-sm font-medium text-foreground">{scannedData.itemTitle}</p>
+                      <p className="text-xs text-muted-foreground capitalize">
                         {scannedData.metadata.category} · {scannedData.metadata.condition}
                       </p>
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
-                      <p className="text-xs uppercase tracking-widest text-slate-400">Neighbour</p>
-                      <p className="mt-2 flex items-center gap-2 text-sm text-white">
+                    <div className="rounded-2xl border border-border bg-background p-4">
+                      <p className="text-xs uppercase tracking-widest text-muted-foreground">Neighbour</p>
+                      <p className="mt-2 flex items-center gap-2 text-sm text-foreground">
                         <User size={16} /> {scannedData.userName}
                       </p>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-muted-foreground">
                         {scannedData.type === 'donor' ? 'Dropping off for community reuse' : 'Collecting their reservation'}
                       </p>
                     </div>
-                    <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
-                      <p className="text-xs uppercase tracking-widest text-slate-400">Impact</p>
-                      <p className="mt-2 text-sm font-medium text-emerald-300">
+                    <div className="rounded-2xl border border-border bg-background p-4">
+                      <p className="text-xs uppercase tracking-widest text-muted-foreground">Impact</p>
+                      <p className="mt-2 text-sm font-medium text-primary">
                         -{scannedData.metadata.co2Impact} kg CO₂e
                       </p>
                       {scannedData.dropOffLocation && (
-                        <p className="mt-1 flex items-center gap-2 text-xs text-slate-300">
+                        <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                           <MapPin size={14} />
                           {scannedData.dropOffLocation}
                         </p>
@@ -407,20 +411,20 @@ export function ShopScanner() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-200">Shop notes (optional)</label>
+                    <label className="text-sm font-medium text-foreground">Shop notes (optional)</label>
                     <Textarea
                       placeholder="Capture condition details, storage location, or follow-up actions..."
                       value={shopNotes}
                       onChange={(e) => setShopNotes(e.target.value)}
                       rows={3}
-                      className="border-white/20 bg-black/40 text-slate-100 placeholder:text-slate-400 focus:border-emerald-400 focus:ring-emerald-300/40"
+                      className="border-border bg-background text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary/40"
                     />
                   </div>
 
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Button
                       onClick={handleConfirmTransaction}
-                      className="flex-1 bg-emerald-500 text-emerald-950 hover:bg-emerald-400"
+                      className="flex-1"
                       disabled={!attendantName.trim()}
                     >
                       <CheckCircle size={16} className="mr-2" />
@@ -429,7 +433,7 @@ export function ShopScanner() {
                     <Button
                       variant="outline"
                       onClick={handleCancelScan}
-                      className="border-white/20 bg-black/40 text-slate-100 hover:bg-black/50"
+                      className="border-border"
                     >
                       <X size={16} className="mr-2" />
                       Cancel
@@ -441,10 +445,10 @@ export function ShopScanner() {
           </Card>
 
           <div className="space-y-6">
-            <Card className="border-white/10 bg-white/5 shadow-xl backdrop-blur">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-lg font-semibold text-white">Quick start checklist</CardTitle>
-                <CardDescription className="text-slate-300">
+                <CardTitle className="text-lg font-semibold text-foreground">Quick start checklist</CardTitle>
+                <CardDescription className="text-muted-foreground">
                   Guide volunteers through each QR interaction and deliver a polished shop experience.
                 </CardDescription>
               </CardHeader>
@@ -464,43 +468,43 @@ export function ShopScanner() {
                   },
                 ].map((step, index) => (
                   <div key={step.title} className="flex items-start gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/20 text-sm font-semibold text-emerald-200">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                       {index + 1}
                     </span>
                     <div>
-                      <p className="text-sm font-medium text-white">{step.title}</p>
-                      <p className="text-xs text-slate-300">{step.description}</p>
+                      <p className="text-sm font-medium text-foreground">{step.title}</p>
+                      <p className="text-xs text-muted-foreground">{step.description}</p>
                     </div>
                   </div>
                 ))}
               </CardContent>
             </Card>
 
-            <Card className="border-white/10 bg-white/5 shadow-xl backdrop-blur">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-lg font-semibold text-white">Impact snapshot</CardTitle>
-                <CardDescription className="text-slate-300">
+                <CardTitle className="text-lg font-semibold text-foreground">Impact snapshot</CardTitle>
+                <CardDescription className="text-muted-foreground">
                   Celebrate the climate wins your shop creates with every processed item.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-400">Drop-offs</p>
-                    <p className="mt-2 text-lg font-semibold text-white">{dropOffCount}</p>
+                  <div className="rounded-2xl border border-border bg-background p-4">
+                    <p className="text-xs uppercase tracking-widest text-muted-foreground">Drop-offs</p>
+                    <p className="mt-2 text-lg font-semibold text-foreground">{dropOffCount}</p>
                   </div>
-                  <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                    <p className="text-xs uppercase tracking-widest text-slate-400">Pickups</p>
-                    <p className="mt-2 text-lg font-semibold text-white">{pickupCount}</p>
+                  <div className="rounded-2xl border border-border bg-background p-4">
+                    <p className="text-xs uppercase tracking-widest text-muted-foreground">Pickups</p>
+                    <p className="mt-2 text-lg font-semibold text-foreground">{pickupCount}</p>
                   </div>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                  <p className="text-xs uppercase tracking-widest text-slate-400">CO₂ saved this shift</p>
-                  <p className="mt-2 text-lg font-semibold text-emerald-300">
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground">CO₂ saved this shift</p>
+                  <p className="mt-2 text-lg font-semibold text-primary">
                     -{totalCarbon.toFixed(1)} kg
                   </p>
                 </div>
-                <div className="rounded-2xl border border-dashed border-white/20 bg-black/20 p-4 text-xs text-slate-300">
+                <div className="rounded-2xl border border-dashed border-border bg-muted p-4 text-xs text-muted-foreground">
                   <p>
                     Share these numbers with visitors to build trust and encourage more sustainable exchanges.
                   </p>
@@ -510,23 +514,23 @@ export function ShopScanner() {
           </div>
         </div>
 
-        <Card className="border-white/10 bg-white/5 shadow-2xl backdrop-blur">
-          <CardHeader className="border-b border-white/10">
+        <Card>
+          <CardHeader className="border-b border-border">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle className="text-xl font-semibold text-white">Recent transactions</CardTitle>
-              <Badge variant="outline" className="border-white/20 bg-white/5 px-4 py-1 text-slate-200">
+              <CardTitle className="text-xl font-semibold text-foreground">Recent transactions</CardTitle>
+              <Badge variant="outline" className="border-border px-4 py-1 text-muted-foreground">
                 {totalTransactions} today
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="pt-6">
             {shopTransactions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/20 bg-black/40 p-12 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10">
-                  <Package size={28} className="text-slate-300" />
+              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-muted p-12 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                  <Package size={28} className="text-primary" />
                 </div>
-                <p className="text-sm font-medium text-white">No transactions yet today</p>
-                <p className="text-xs text-slate-300">Process your first drop-off or pickup to see it appear here instantly.</p>
+                <p className="text-sm font-medium text-foreground">No transactions yet today</p>
+                <p className="text-xs text-muted-foreground">Process your first drop-off or pickup to see it appear here instantly.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -535,34 +539,34 @@ export function ShopScanner() {
                   return (
                     <div
                       key={index}
-                      className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-black/40 p-4 sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-4 rounded-2xl border border-border bg-background p-4 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className={`flex h-10 w-10 items-center justify-center rounded-full ${isDropOff ? 'bg-emerald-500/20 text-emerald-200' : 'bg-cyan-500/20 text-cyan-200'}`}
+                          className={`flex h-10 w-10 items-center justify-center rounded-full ${isDropOff ? 'bg-primary/10 text-primary' : 'bg-sky-100 text-sky-600'}`}
                         >
                           <Package size={20} />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-white">{transaction.qrData.itemTitle}</p>
-                          <p className="text-xs text-slate-300">
+                          <p className="text-sm font-medium text-foreground">{transaction.qrData.itemTitle}</p>
+                          <p className="text-xs text-muted-foreground">
                             {transaction.qrData.userName} • {transaction.qrData.transactionId}
                           </p>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-muted-foreground">
                             Attendant: {transaction.shopAttendant || '—'}
                           </p>
                         </div>
                       </div>
-                      <div className="flex flex-col items-start gap-2 text-xs text-slate-300 sm:items-end">
+                      <div className="flex flex-col items-start gap-2 text-xs text-muted-foreground sm:items-end">
                         <div className="flex items-center gap-2">
                           <Clock size={14} />
                           <span>{formatDateTime(transaction.scannedAt)}</span>
                         </div>
-                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-[11px] font-medium text-emerald-200">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary">
                           <CheckCircle size={12} />
                           Processed
                         </span>
-                        <span className="text-[11px] text-emerald-200">
+                        <span className="text-[11px] text-primary">
                           -{transaction.qrData.metadata.co2Impact} kg CO₂e
                         </span>
                       </div>

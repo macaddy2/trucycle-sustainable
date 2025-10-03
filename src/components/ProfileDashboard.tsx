@@ -5,10 +5,11 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
-import { CheckCircle, MapPin, Bell, Heart, Shield, Package, Star, NotePencil, SignOut } from '@phosphor-icons/react'
+import { CheckCircle, MapPin, Bell, Heart, Shield, Package, Star, NotePencil, SignOut, SlidersHorizontal } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import { AuthDialog } from './auth'
+import { ProfileSettingsDialog } from './ProfileSettingsDialog'
 import { VerificationBadge } from './VerificationBadge'
 import { RatingDisplay } from './RatingSystem'
 import type { ManagedListing } from './MyListingsView'
@@ -49,6 +50,7 @@ export function ProfileDashboard({ onCreateListing: _onCreateListing, onOpenMess
   const [listings] = useKV<ManagedListing[]>('user-listings', [])
   const [showAuthDialog, setShowAuthDialog] = useState(false)
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialActiveTab)
+  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => {
     setActiveTab(initialActiveTab === 'impact' ? 'impact' : 'overview')
@@ -109,6 +111,7 @@ export function ProfileDashboard({ onCreateListing: _onCreateListing, onOpenMess
     setUser(null)
     toast.success('Signed out')
     setShowAuthDialog(true)
+    setShowSettings(false)
   }
 
   const handleTabChange = (tab: ProfileTab) => {
@@ -134,6 +137,7 @@ export function ProfileDashboard({ onCreateListing: _onCreateListing, onOpenMess
         </Card>
 
         <AuthDialog open={showAuthDialog} onOpenChange={setShowAuthDialog} />
+        <ProfileSettingsDialog open={showSettings} onOpenChange={setShowSettings} />
       </>
     )
   }
@@ -187,6 +191,10 @@ export function ProfileDashboard({ onCreateListing: _onCreateListing, onOpenMess
               <Button variant="outline" onClick={handleEditProfile}>
                 <NotePencil size={16} className="mr-2" />
                 Edit profile
+              </Button>
+              <Button variant="outline" onClick={() => setShowSettings(true)}>
+                <SlidersHorizontal size={16} className="mr-2" />
+                Account settings
               </Button>
               <Button variant="destructive" onClick={handleSignOut}>
                 <SignOut size={16} className="mr-2" />
@@ -313,6 +321,9 @@ export function ProfileDashboard({ onCreateListing: _onCreateListing, onOpenMess
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AuthDialog open={showAuthDialog} onOpenChange={setShowAuthDialog} />
+      <ProfileSettingsDialog open={showSettings} onOpenChange={setShowSettings} />
     </div>
   )
 }

@@ -6,7 +6,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
 import {
-  Recycle,
   ArrowsClockwise,
   Leaf,
   Question as Search,
@@ -16,7 +15,6 @@ import {
   Package,
   Storefront,
   ChatCircle,
-  ArrowLeft,
   House
 } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
@@ -32,6 +30,9 @@ import {
   DemoGuide,
   Homepage,
 } from './components'
+import { ListingQuickStartDialog } from './components/ListingQuickStartDialog'
+import { ShopScannerOverview } from './components/ShopScannerOverview'
+import { TruCycleGlyph } from './components/icons/TruCycleGlyph'
 import { NotificationList, type Notification } from './components/NotificationList'
 import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
@@ -62,7 +63,6 @@ interface UserProfile {
 
 function App() {
   const [currentTab, setCurrentTabState] = useState('home')
-  const [navigationHistory, setNavigationHistory] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [user, setUser] = useKV<UserProfile | null>('current-user', null)
   const [onboardingDismissals, setOnboardingDismissals] = useKV<Record<string, boolean>>('onboarding-dismissals', {})
@@ -71,6 +71,9 @@ function App() {
   const [onboardingMode, setOnboardingMode] = useState<'onboarding' | 'edit'>('onboarding')
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [showShopScanner, setShowShopScanner] = useState(false)
+  const [showListingQuickStart, setShowListingQuickStart] = useState(false)
+  const [listingQuickStartDefaults, setListingQuickStartDefaults] = useState<{ intent?: 'exchange' | 'donate' | 'recycle'; fulfillment?: 'pickup' | 'dropoff' }>({})
+  const [shouldResumeListingAfterAuth, setShouldResumeListingAfterAuth] = useState(false)
   const [showDemoGuide, setShowDemoGuide] = useKV<boolean>('show-demo-guide', true)
   const [pendingFulfillmentMethod, setPendingFulfillmentMethod] = useState<'pickup' | 'dropoff' | null>(null)
   const [pendingDropOffLocation, setPendingDropOffLocation] = useState<DropOffLocation | null>(null)
@@ -95,27 +98,7 @@ function App() {
   } = useRecommendationNotifications(user ?? null)
 
   const navigateToTab = useCallback((nextTab: string) => {
-    setCurrentTabState(prevTab => {
-      if (prevTab === nextTab) {
-        return prevTab
-      }
-
-      setNavigationHistory(history => [...history, prevTab])
-      return nextTab
-    })
-  }, [])
-
-  const handleNavigateBack = useCallback(() => {
-    setNavigationHistory(history => {
-      if (history.length === 0) {
-        return history
-      }
-
-      const updatedHistory = [...history]
-      const previousTab = updatedHistory.pop()!
-      setCurrentTabState(previousTab)
-      return updatedHistory
-    })
+    setCurrentTabState(nextTab)
   }, [])
 
   const navTabs = useMemo(() => {
@@ -138,17 +121,10 @@ function App() {
   const hasDropOffTab = navTabs.some((tab) => tab.value === 'dropoff')
   const hasDismissedOnboarding = user ? Boolean(onboardingDismissals[user.id]) : false
 
-  const canNavigateBack = navigationHistory.length > 0
-  const showBackButton = currentTab !== 'home'
   const userFirstName = user?.name && typeof user.name === 'string' ? user.name.split(' ')[0] : undefined
 
   useEffect(() => {
-    const availableTabs = new Set(navTabs.map(tab => tab.value))
-
-    setNavigationHistory(history => {
-      const filteredHistory = history.filter(tab => availableTabs.has(tab))
-      return filteredHistory.length === history.length ? history : filteredHistory
-    })
+    const availableTabs = new Set<string>([...navTabs.map(tab => tab.value), 'list'])
 
     if (!availableTabs.has(currentTab)) {
       const fallbackTab = navTabs[0]?.value ?? currentTab
@@ -184,6 +160,13 @@ function App() {
   }, [currentTab])
 
   useEffect(() => {
+    if (user && shouldResumeListingAfterAuth) {
+      setShouldResumeListingAfterAuth(false)
+      navigateToTab('list')
+    }
+  }, [user, shouldResumeListingAfterAuth, navigateToTab])
+
+  useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     if (urlParams.get('mode') === 'shop-scanner') {
       setShowShopScanner(true)
@@ -215,8 +198,18 @@ function App() {
     }
 
     window.addEventListener('open-profile-onboarding', handleOpenProfileOnboarding)
+    const handleOpenAuthDialog = (event: Event) => {
+      const detail = (event as CustomEvent<{ mode?: 'signin' | 'signup' }>).detail
+      if (detail?.mode) {
+        setAuthMode(detail.mode)
+      }
+      setShowAuthDialog(true)
+    }
+
+    window.addEventListener('open-auth-dialog', handleOpenAuthDialog)
     return () => {
       window.removeEventListener('open-profile-onboarding', handleOpenProfileOnboarding)
+      window.removeEventListener('open-auth-dialog', handleOpenAuthDialog)
     }
   }, [user, setOnboardingDismissals])
 
@@ -266,8 +259,8 @@ function App() {
     return map
   }, [trayNotifications])
 
-  const hasUnreadNotifications = trayNotifications.some(({ notification }) => !notification.read)
-  const totalUnreadNotifications = systemUnreadCount + recommendationUnreadCount
+  const hasUnreadNotifications = user ? trayNotifications.some(({ notification }) => !notification.read) : false
+  const totalUnreadNotifications = user ? systemUnreadCount + recommendationUnreadCount : 0
 
   const handleNotificationMarkAsRead = useCallback((id: string) => {
     const source = notificationSourceMap.get(id)
@@ -290,7 +283,8 @@ function App() {
   const handleNotificationsMarkAll = useCallback(() => {
     markAllSystemNotifications()
     recommendationNotifications.forEach((notification) => markRecommendationAsRead(notification.id))
-  }, [markAllSystemNotifications, markRecommendationAsRead, recommendationNotifications])
+    setNotificationsOpen(false)
+  }, [markAllSystemNotifications, markRecommendationAsRead, recommendationNotifications, setNotificationsOpen])
 
   useEffect(() => {
     const handleClaimRequested = (event: Event) => {
@@ -342,6 +336,10 @@ function App() {
   const handleAuthComplete = () => {
     if (user && !user.onboardingCompleted) {
       setShowOnboarding(true)
+    }
+
+    if (!user) {
+      setShouldResumeListingAfterAuth(false)
     }
   }
 
@@ -448,13 +446,49 @@ function App() {
 
   const handleStartListing = useCallback((intent?: 'exchange' | 'donate' | 'recycle') => {
     const fallbackIntent: 'exchange' | 'donate' | 'recycle' = intent ?? (user?.userType === 'collector' ? 'exchange' : 'donate')
-    setPendingListingIntent(fallbackIntent)
+    setListingQuickStartDefaults({
+      intent: fallbackIntent,
+      fulfillment: fallbackIntent === 'donate' ? 'dropoff' : 'pickup',
+    })
+    setShowListingQuickStart(true)
+  }, [user?.userType])
+
+  const handleListingQuickStartClose = useCallback((open: boolean) => {
+    setShowListingQuickStart(open)
+    if (!open) {
+      setListingQuickStartDefaults({})
+      setShouldResumeListingAfterAuth(false)
+    }
+  }, [])
+
+  const handleListingQuickStartContinue = useCallback((options: {
+    intent: 'exchange' | 'donate' | 'recycle'
+    fulfillment: 'pickup' | 'dropoff'
+    notes?: string
+    preferPartnerSupport?: boolean
+  }) => {
+    setShowListingQuickStart(false)
+    setListingQuickStartDefaults({})
+    setPendingListingIntent(options.intent)
+    setPendingFulfillmentMethod(options.fulfillment)
+    setPendingDropOffLocation(null)
+
+    if (!user) {
+      setShouldResumeListingAfterAuth(true)
+      setAuthMode('signup')
+      setShowAuthDialog(true)
+      return
+    }
+
     navigateToTab('list')
-  }, [navigateToTab, user?.userType])
+  }, [navigateToTab, user])
 
   // If in shop scanner mode, render only the scanner
   if (showShopScanner) {
-    return <ShopScanner />
+    if (user?.partnerAccess) {
+      return <ShopScanner onClose={() => setShowShopScanner(false)} />
+    }
+    return <ShopScannerOverview onClose={() => setShowShopScanner(false)} />
   }
 
   return (
@@ -464,27 +498,14 @@ function App() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              {showBackButton && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleNavigateBack}
-                  disabled={!canNavigateBack}
-                  title={canNavigateBack ? 'Go back to the previous view' : 'No previous view'}
-                  className="px-2"
-                >
-                  <ArrowLeft size={16} />
-                  <span className="hidden sm:inline">Back</span>
-                </Button>
-              )}
               <button
                 type="button"
                 onClick={handleLogoClick}
                 className="group flex items-center space-x-3 rounded-full border border-transparent px-2 py-1 transition hover:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/40"
                 title="Go to homepage"
               >
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center transition-transform group-hover:scale-105">
-                  <Recycle size={20} className="text-primary-foreground" />
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary transition-transform group-hover:scale-105">
+                  <TruCycleGlyph className="h-5 w-5" />
                 </div>
                 <h1 className="text-h2 text-foreground">TruCycle</h1>
               </button>
@@ -524,16 +545,15 @@ function App() {
                     </PopoverContent>
                   </Popover>
 
-                  {user?.partnerAccess && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowShopScanner(true)}
-                      title="Shop Scanner (For Partner Shops)"
-                    >
-                      <QrCode size={16} />
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowShopScanner(true)}
+                    title={user?.partnerAccess ? 'Open partner shop scanner' : 'View your QR activity'}
+                    className={user?.partnerAccess ? 'border-primary/50 text-primary' : undefined}
+                  >
+                    <QrCode size={16} />
+                  </Button>
 
                   <div className="flex items-center space-x-2">
                     <Tooltip>
@@ -695,8 +715,8 @@ function App() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
-                  <Recycle size={16} className="text-primary-foreground" />
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <TruCycleGlyph className="h-4 w-4" />
                 </div>
                 <span className="font-medium">TruCycle</span>
               </div>
@@ -747,8 +767,8 @@ function App() {
       </footer>
 
       {/* Authentication Dialogs */}
-      <AuthDialog 
-        open={showAuthDialog} 
+      <AuthDialog
+        open={showAuthDialog}
         onOpenChange={(open) => {
           setShowAuthDialog(open)
           if (!open) {
@@ -758,8 +778,16 @@ function App() {
         initialMode={authMode}
       />
 
-      <ProfileOnboarding 
-        open={showOnboarding} 
+      <ListingQuickStartDialog
+        open={showListingQuickStart}
+        onOpenChange={handleListingQuickStartClose}
+        defaultIntent={listingQuickStartDefaults.intent ?? (user?.userType === 'collector' ? 'exchange' : 'donate')}
+        defaultFulfillment={listingQuickStartDefaults.fulfillment}
+        onContinue={handleListingQuickStartContinue}
+      />
+
+      <ProfileOnboarding
+        open={showOnboarding}
         onOpenChange={handleOnboardingOpenChange}
         onComplete={handleOnboardingComplete}
         mode={onboardingMode}
