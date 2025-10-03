@@ -93,25 +93,31 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
                     attribution="&copy; <a href='https://www.openstreetmap.org/'>OpenStreetMap</a> contributors"
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  {DROP_OFF_LOCATIONS.map(location => (
-                    <Marker
-                      key={location.id}
-                      position={[location.coordinates.lat, location.coordinates.lng]}
-                      icon={selectedLocation?.id === location.id ? selectorMarkerIcon : undefined}
-                      eventHandlers={{
-                        click: () => setActiveLocationId(location.id),
-                        dblclick: () => onSelect(location)
-                      }}
-                    >
-                      <Popup minWidth={220}>
-                        <div className="space-y-2">
-                          <p className="font-medium">{location.name}</p>
-                          <p className="text-xs text-muted-foreground">{location.address}</p>
-                          <Button size="sm" className="w-full" onClick={() => onSelect(location)}>Use this location</Button>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  ))}
+                  {DROP_OFF_LOCATIONS.map(location => {
+                    const isSelected = selectedLocation?.id === location.id
+
+                    return (
+                      <Marker
+                        key={location.id}
+                        position={[location.coordinates.lat, location.coordinates.lng]}
+                        {...(isSelected ? { icon: selectorMarkerIcon } : {})}
+                        eventHandlers={{
+                          click: () => setActiveLocationId(location.id),
+                          dblclick: () => onSelect(location)
+                        }}
+                      >
+                        <Popup minWidth={220}>
+                          <div className="space-y-2">
+                            <p className="font-medium">{location.name}</p>
+                            <p className="text-xs text-muted-foreground">{location.address}</p>
+                            <Button size="sm" className="w-full" onClick={() => onSelect(location)}>
+                              Use this location
+                            </Button>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    )
+                  })}
                   <RecenterMap center={[activeLocation.coordinates.lat, activeLocation.coordinates.lng]} />
                 </MapContainer>
 
