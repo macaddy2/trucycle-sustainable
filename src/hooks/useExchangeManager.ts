@@ -2,6 +2,8 @@ import { useCallback, useMemo } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import type { ManagedListing } from '@/types/listings'
+import { kvGet, kvSet } from '@/lib/kvStore'
+import type { QRCodeData } from '@/components/QRCode'
 
 export interface ClaimRequest {
   id: string
@@ -34,8 +36,9 @@ export function useExchangeManager() {
   const [claimRequests, setClaimRequests] = useKV<ClaimRequest[]>('claim-requests', [])
   const [donorRewards, setDonorRewards] = useKV<Record<string, number>>('donor-rewards', {})
   const [collectedItems, setCollectedItems] = useKV<Record<string, CollectedItemRecord>>('collected-items', {})
-  const [, setUserListings] = useKV<ManagedListing[]>('user-listings', [])
-  const [, setGlobalListings] = useKV<ManagedListing[]>('global-listings', [])
+  const [userListings, setUserListings] = useKV<ManagedListing[]>('user-listings', [])
+  const [globalListings, setGlobalListings] = useKV<ManagedListing[]>('global-listings', [])
+  const [, setUserQrCodes] = useKV<QRCodeData[]>('user-qr-codes', [])
 
   const submitClaimRequest = useCallback((
     payload: Omit<ClaimRequest, 'id' | 'status' | 'createdAt' | 'decisionAt'>,
@@ -71,7 +74,64 @@ export function useExchangeManager() {
     return newRequest
   }, [claimRequests, setClaimRequests])
 
-  const confirmClaimRequest = useCallback((requestId: string): ClaimRequest | null => {
+  const createQrCodesForExchange = useCallback(async (
+    listing: ManagedListing,
+    request: ClaimRequest
+  ) => {
+    const transactionId = `TC${Date.now()}${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+    const baseMetadata: QRCodeData['metadata'] = {
+      category: listing.category || 'general',
+      condition: listing.condition || 'good',
+      co2Impact: listing.co2Impact ?? 5,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+      actionType: listing.actionType || 'donate',
+    }
+
+    const dropOffLocation = listing.fulfillmentMethod === 'dropoff' && listing.dropOffLocation
+      ? `${listing.dropOffLocation.name}${listing.dropOffLocation.postcode ? `, ${listing.dropOffLocation.postcode}` : ''}`
+      : listing.location
+
+    const donorQr: QRCodeData = {
+      id: `qr-${Date.now()}-donor`,
+      type: 'donor',
+      itemId: listing.id,
+      itemTitle: listing.title,
+      itemDescription: listing.description,
+      itemImage: listing.photos?.[0],
+      userId: request.donorId,
+      userName: request.donorName,
+      transactionId,
+      dropOffLocation: dropOffLocation || undefined,
+      metadata: baseMetadata,
+      status: 'active',
+    }
+
+    const collectorQr: QRCodeData = {
+      ...donorQr,
+      id: `qr-${Date.now()}-collector`,
+      type: 'collector',
+      userId: request.collectorId,
+      userName: request.collectorName,
+    }
+
+    const existingGlobal = await kvGet<QRCodeData[]>('global-qr-codes') || []
+    const filteredGlobal = existingGlobal.filter((qr) => qr.transactionId !== transactionId)
+    await kvSet('global-qr-codes', [...filteredGlobal, donorQr, collectorQr])
+
+    setUserQrCodes((previous) => {
+      const filtered = previous.filter(
+        (qr) => !(qr.transactionId === transactionId && (qr.userId === request.donorId || qr.userId === request.collectorId))
+      )
+      return [...filtered, donorQr, collectorQr]
+    })
+
+    toast.success('QR codes prepared for this exchange', {
+      description: 'Both parties can now access the hand-off codes from the QR hub.',
+    })
+  }, [setUserQrCodes])
+
+  const confirmClaimRequest = useCallback(async (requestId: string): Promise<ClaimRequest | null> => {
     const target = claimRequests.find(request => request.id === requestId)
     if (!target) return null
 
@@ -94,10 +154,17 @@ export function useExchangeManager() {
     const approvedRequest = updatedRequests.find(request => request.id === requestId) || null
     if (approvedRequest) {
       toast.success(`${approvedRequest.collectorName} has been approved for this exchange.`)
+
+      const relatedListing = globalListings.find(listing => listing.id === approvedRequest.itemId)
+        || userListings.find(listing => listing.id === approvedRequest.itemId)
+
+      if (relatedListing) {
+        await createQrCodesForExchange(relatedListing, approvedRequest)
+      }
     }
 
     return approvedRequest
-  }, [claimRequests, setClaimRequests])
+  }, [claimRequests, setClaimRequests, globalListings, userListings, createQrCodesForExchange])
 
   const completeClaimRequest = useCallback((requestId: string, rewardPoints = 25): CompleteRequestResult | null => {
     const target = claimRequests.find(request => request.id === requestId)

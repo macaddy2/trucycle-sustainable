@@ -35,4 +35,6 @@ export interface ManagedListing {
   moderation?: ModerationResult
   userId?: string
   userName?: string
+  handoverNotes?: string
+  preferPartnerSupport?: boolean
 }
