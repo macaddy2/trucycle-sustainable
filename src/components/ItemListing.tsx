@@ -13,7 +13,8 @@ import {
   Clock,
   Package,
   Recycle,
-  MagnifyingGlass
+  MagnifyingGlass,
+  Leaf,
 } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { useExchangeManager } from '@/hooks'
