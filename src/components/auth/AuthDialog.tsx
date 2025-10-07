@@ -40,19 +40,6 @@ interface UserProfile {
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const UK_POSTCODE_REGEX = /^[A-Z]{1,2}\d[A-Z\d]?\d?[A-Z]{2}$/
-
-const normalizePostcode = (value: string) => value.replace(/\s+/g, '').toUpperCase()
-
-const formatPostcode = (value: string) => {
-  const normalized = normalizePostcode(value)
-  if (normalized.length <= 3) {
-    return normalized
-  }
-  const main = normalized.slice(0, normalized.length - 3)
-  const tail = normalized.slice(-3)
-  return `${main} ${tail}`
-}
 
 export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthDialogProps) {
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode)
@@ -62,8 +49,7 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
     email: '',
     password: '',
     name: '',
-    confirmPassword: '',
-    postcode: ''
+    confirmPassword: ''
   })
 
   const [, setUser] = useKV('current-user', null)
@@ -85,14 +71,6 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
     if (mode === 'signup') {
       if (!formData.name) {
         toast.error('Please enter your full name')
-        return false
-      }
-      if (!formData.postcode) {
-        toast.error('Please enter your postcode')
-        return false
-      }
-      if (!UK_POSTCODE_REGEX.test(normalizePostcode(formData.postcode))) {
-        toast.error('Enter a valid UK postcode')
         return false
       }
       if (formData.password !== formData.confirmPassword) {
@@ -132,15 +110,12 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
           return
         }
 
-        const formattedPostcode = formatPostcode(formData.postcode)
-
         // Create new user profile
         const newUser: UserProfile = {
           id: Date.now().toString(),
           email: normalizedEmail,
           name: formData.name.trim(),
           userType: 'donor', // Default type, will be set in onboarding
-          postcode: formattedPostcode,
           createdAt: new Date().toISOString(),
           onboardingCompleted: false,
           verified: true,
@@ -197,7 +172,7 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
 
       onOpenChange(false)
       // Reset form
-      setFormData({ email: '', password: '', name: '', confirmPassword: '', postcode: '' })
+      setFormData({ email: '', password: '', name: '', confirmPassword: '' })
     } catch (error) {
       console.error('Authentication flow failed', error)
       toast.error('Authentication failed. Please try again.')
@@ -217,7 +192,6 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
           email: `user@${provider}.com`,
           name: `${provider === 'google' ? 'Google' : 'Facebook'} User`,
           userType: 'donor',
-          postcode: 'SW1A 1AA',
           createdAt: new Date().toISOString(),
           verified: true,
           rating: 4.8,
@@ -312,18 +286,6 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
                     placeholder="Enter your full name"
                     value={formData.name}
                     onChange={(e) => handleInputChange('name', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="postcode">Postcode</Label>
-                  <Input
-                    id="postcode"
-                    type="text"
-                    placeholder="e.g. SW1A 1AA"
-                    value={formData.postcode}
-                    onChange={(e) => handleInputChange('postcode', e.target.value.toUpperCase())}
-                    onBlur={(e) => handleInputChange('postcode', formatPostcode(e.target.value))}
                     disabled={isLoading}
                   />
                 </div>
