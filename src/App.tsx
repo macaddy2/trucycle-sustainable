@@ -94,9 +94,40 @@ function App() {
     markAsRead: markRecommendationAsRead,
   } = useRecommendationNotifications(user ?? null)
 
+  const allTabs = useMemo(() => new Set([
+    'home', 'browse', 'listings', 'messages', 'dropoff', 'impact', 'profile', 'list'
+  ]), [])
+
+  const baseNormalized = useMemo(() => {
+    const base = import.meta.env.BASE_URL || '/'
+    return base.replace(/\/$/, '')
+  }, [])
+
+  const pathToTab = useCallback((pathname: string) => {
+    let path = pathname
+    if (baseNormalized && path.startsWith(baseNormalized)) {
+      path = path.slice(baseNormalized.length)
+    }
+    path = path.replace(/^\/+|\/+$/g, '')
+    const seg = path.split('/')[0]?.toLowerCase() || ''
+    if (!seg) return 'home'
+    return allTabs.has(seg) ? seg : 'home'
+  }, [allTabs, baseNormalized])
+
+  const tabToPath = useCallback((tab: string) => {
+    const seg = (tab || 'home').toLowerCase()
+    const segment = seg === 'home' ? 'home' : seg
+    return `${baseNormalized}/${segment}`
+  }, [baseNormalized])
+
   const navigateToTab = useCallback((nextTab: string) => {
     setCurrentTabState(nextTab)
-  }, [])
+    const targetPath = tabToPath(nextTab)
+    const withQuery = `${targetPath}${window.location.search}${window.location.hash}`
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ tab: nextTab }, '', withQuery)
+    }
+  }, [tabToPath])
 
   const navTabs = useMemo(() => {
     const isCollector = user?.userType === 'collector'
@@ -127,9 +158,32 @@ function App() {
       const fallbackTab = navTabs[0]?.value ?? currentTab
       if (fallbackTab && fallbackTab !== currentTab) {
         setCurrentTabState(fallbackTab)
+        const targetPath = tabToPath(fallbackTab)
+        const withQuery = `${targetPath}${window.location.search}${window.location.hash}`
+        if (window.location.pathname !== targetPath) {
+          window.history.replaceState({ tab: fallbackTab }, '', withQuery)
+        }
       }
     }
   }, [navTabs, currentTab])
+
+  useEffect(() => {
+    const initial = pathToTab(window.location.pathname)
+    if (initial !== currentTab) {
+      setCurrentTabState(initial)
+    }
+    const canonical = tabToPath(initial)
+    const withQuery = `${canonical}${window.location.search}${window.location.hash}`
+    if (window.location.pathname !== canonical) {
+      window.history.replaceState({ tab: initial }, '', withQuery)
+    }
+    const onPop = () => {
+      const t = pathToTab(window.location.pathname)
+      setCurrentTabState(t)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 
   // Check for shop scanner mode in URL
   const handleOpenMessages = useCallback((options?: { itemId?: string; chatId?: string; initialView?: 'chats' | 'requests' }) => {
