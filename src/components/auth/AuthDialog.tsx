@@ -7,6 +7,8 @@ import { Separator } from '@/components/ui/separator'
 import { Card, CardContent } from '@/components/ui/card'
 import { Eye, EyeSlash, GoogleLogo, FacebookLogo, EnvelopeSimple } from '@phosphor-icons/react'
 import { kvGet, kvSet } from '@/lib/kvStore'
+import { login as apiLogin, register as apiRegister } from '@/lib/api'
+import type { RegisterDto } from '@/lib/api'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
@@ -98,84 +100,49 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
     setIsLoading(true)
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500))
-
       const normalizedEmail = formData.email.trim().toLowerCase()
-      const credentials = await kvGet<Record<string, { userId: string; password: string }>>('user-credentials') || {}
 
       if (mode === 'signup') {
-        if (credentials[normalizedEmail]) {
-          toast.error('An account with this email already exists')
-          return
-        }
-
-        // Create new user profile
-        const newUser: UserProfile = {
-          id: Date.now().toString(),
+        const [first, ...rest] = formData.name.trim().split(' ')
+        const dto: RegisterDto = {
+          first_name: first || '',
+          last_name: rest.join(' ') || first || '',
           email: normalizedEmail,
-          name: formData.name.trim(),
-          userType: 'donor', // Default type, will be set in onboarding
-          createdAt: new Date().toISOString(),
-          onboardingCompleted: false,
-          verified: true,
-          rating: 5.0,
-          verificationLevel: {
-            email: true,
-            phone: false,
-            identity: false,
-            address: false,
-            payment: false,
-            community: false
-          },
-          rewardsBalance: 0,
-          partnerAccess: false
+          password: formData.password,
+          role: 'customer',
         }
-
-        // Store user profile
-        const userProfiles = await kvGet<Record<string, UserProfile>>('user-profiles') || {}
-        await kvSet('user-profiles', {
-          ...userProfiles,
-          [newUser.id]: newUser
-        })
-
-        await kvSet('user-credentials', {
-          ...credentials,
-          [normalizedEmail]: { userId: newUser.id, password: formData.password }
-        })
-
-        setUser(newUser)
-        toast.success(`Welcome to TruCycle, ${newUser.name}!`)
+        const res = await apiRegister(dto)
+        const displayName = `${res?.data?.user?.firstName ?? ''} ${res?.data?.user?.lastName ?? ''}`.trim()
+        toast.success(
+          displayName
+            ? `Welcome, ${displayName}. Please verify your email to activate your account.`
+            : 'Please verify your email to activate your account.'
+        )
+        onOpenChange(false)
       } else {
-        const credentialRecord = credentials[normalizedEmail]
-        if (!credentialRecord) {
-          toast.error('No account found with that email address')
-          return
+        const res = await apiLogin({ email: normalizedEmail, password: formData.password })
+        const user = res?.data?.user
+        if (user) {
+          const profile: UserProfile = {
+            id: user.id,
+            email: user.email,
+            name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+            userType: 'donor',
+            createdAt: new Date().toISOString(),
+            verified: user.status === 'active',
+          }
+          setUser(profile)
+          toast.success(`Welcome back${profile.name ? `, ${profile.name.split(' ')[0]}` : ''}!`)
+          onOpenChange(false)
+        } else {
+          toast.error('Login failed. Please try again.')
         }
-
-        if (credentialRecord.password !== formData.password) {
-          toast.error('Incorrect password')
-          return
-        }
-
-        const userProfiles = await kvGet<Record<string, UserProfile>>('user-profiles') || {}
-        const existingUser = userProfiles[credentialRecord.userId]
-
-        if (!existingUser) {
-          toast.error('We could not load your profile. Please sign up again.')
-          return
-        }
-
-        setUser(existingUser)
-        toast.success(`Welcome back${existingUser.name ? `, ${existingUser.name.split(' ')[0]}` : ''}!`)
       }
 
-      onOpenChange(false)
-      // Reset form
       setFormData({ email: '', password: '', name: '', confirmPassword: '' })
-    } catch (error) {
+    } catch (error: any) {
       console.error('Authentication flow failed', error)
-      toast.error('Authentication failed. Please try again.')
+      toast.error(error?.message || 'Authentication failed. Please try again.')
     } finally {
       setIsLoading(false)
     }
