@@ -148,6 +148,13 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
     }
   }
 
+  const openForgotPassword = () => {
+    const base = (import.meta as any).env?.BASE_URL || '/'
+    const target = String(base || '/').replace(/\/$/, '') + '/auth/forgot-password'
+    onOpenChange(false)
+    window.location.assign(target)
+  }
+
   const handleSocialAuth = (provider: 'google' | 'facebook') => {
     setIsLoading(true)
 
@@ -303,6 +310,14 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
                 </Button>
               </div>
             </div>
+
+            {mode === 'signin' && (
+              <div className="text-right -mt-2">
+                <Button type="button" variant="link" className="px-0 h-auto text-sm" onClick={openForgotPassword}>
+                  Forgot password?
+                </Button>
+              </div>
+            )}
 
             {mode === 'signup' && (
               <div className="space-y-2">

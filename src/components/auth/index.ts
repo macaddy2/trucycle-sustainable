@@ -1,2 +1,5 @@
 export { AuthDialog } from './AuthDialog'
 export { ProfileOnboarding } from './ProfileOnboarding'
+export { VerifyEmailPage } from './VerifyEmailPage'
+export { ForgotPasswordPage } from './ForgotPasswordPage'
+export { ResetPasswordPage } from './ResetPasswordPage'
