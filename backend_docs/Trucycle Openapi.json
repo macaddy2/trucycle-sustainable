@@ -1,0 +1,2955 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/auth/health": {
+      "get": {
+        "operationId": "AuthController_health",
+        "summary": "Auth service health check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Service is reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "status": "ok"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "summary": "Register a new user account",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "User registration payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "User registered successfully.",
+                    "data": {
+                      "user": {
+                        "id": "3f2f8c2e-6b1a-4c8e-9a61-22f924e0f6f1",
+                        "firstName": "Jane",
+                        "lastName": "Doe",
+                        "email": "jane@example.com",
+                        "status": "pending"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "summary": "Log in with email and password",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Login credentials",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login success with access and refresh tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "Login successful.",
+                    "data": {
+                      "user": {
+                        "id": "3f2f8c2e-6b1a-4c8e-9a61-22f924e0f6f1",
+                        "email": "jane@example.com",
+                        "firstName": "Jane",
+                        "lastName": "Doe",
+                        "status": "active"
+                      },
+                      "tokens": {
+                        "accessToken": "eyJhbGciOi...access",
+                        "refreshToken": "eyJhbGciOi...refresh"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/resend-verification": {
+      "post": {
+        "operationId": "AuthController_resendVerification",
+        "summary": "Resend email verification link",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Email to resend verification to",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendVerificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success message returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "Verification email sent successfully.",
+                    "data": null
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/forget-password": {
+      "post": {
+        "operationId": "AuthController_forgetPassword",
+        "summary": "Request a password reset email",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Email to send reset link to",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success message returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "Reset password email sent successfully.",
+                    "data": null
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/verify": {
+      "post": {
+        "operationId": "AuthController_verify",
+        "summary": "Verify a user using a token",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Verification token payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification success with user and tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "Verification successfully.",
+                    "data": {
+                      "user": {
+                        "id": "3f2f8c2e-6b1a-4c8e-9a61-22f924e0f6f1",
+                        "firstName": "Jane",
+                        "lastName": "Doe",
+                        "email": "jane@example.com",
+                        "status": "active"
+                      },
+                      "tokens": {
+                        "accessToken": "eyJhbGciOi...access",
+                        "refreshToken": "eyJhbGciOi...refresh"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "operationId": "AuthController_resetPassword",
+        "summary": "Reset password using a token",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "New password and reset token",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success message returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "Password changed successfully.",
+                    "data": null
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "summary": "Retrieve the current user profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Current user basic profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "User retrieved successfully.",
+                    "data": {
+                      "user": {
+                        "id": "3f2f8c2e-6b1a-4c8e-9a61-22f924e0f6f1",
+                        "email": "jane@example.com",
+                        "firstName": "Jane",
+                        "lastName": "Doe",
+                        "status": "active"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/notifications/send": {
+      "post": {
+        "operationId": "NotificationsController_send",
+        "summary": "Queue a notification to be sent",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Notification job payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "userId",
+                  "template"
+                ],
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "c7f2c3a1-45b6-4ad4-9d8a-8f5b8c9a4d12"
+                  },
+                  "template": {
+                    "type": "string",
+                    "example": "WELCOME"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "example": {
+                      "name": "Jane"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Queued job acknowledgment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "queued": true,
+                      "notificationId": "stub",
+                      "userId": "c7f2c3a1-45b6-4ad4-9d8a-8f5b8c9a4d12",
+                      "template": "WELCOME"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "notifications"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/shops/health": {
+      "get": {
+        "operationId": "ShopsController_health",
+        "summary": "Shops service health check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Service is reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "status": "ok"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "shops"
+        ]
+      }
+    },
+    "/shops/nearby": {
+      "get": {
+        "operationId": "ShopsController_nearby",
+        "summary": "Find nearby shops by coordinates",
+        "parameters": [
+          {
+            "name": "lon",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lat",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "radius",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nearby shops list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": [
+                      {
+                        "id": "shop-id",
+                        "name": "Recycle Center",
+                        "distanceMeters": 250
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "shops"
+        ]
+      }
+    },
+    "/items/health": {
+      "get": {
+        "operationId": "ItemsController_health",
+        "summary": "Items service health check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Service is reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "status": "ok"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "items"
+        ]
+      }
+    },
+    "/items": {
+      "get": {
+        "operationId": "searchItems",
+        "summary": "Retrieve public item listings near a location",
+        "parameters": [
+          {
+            "name": "lat",
+            "required": false,
+            "in": "query",
+            "description": "Latitude in decimal degrees (-90 to 90)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lng",
+            "required": false,
+            "in": "query",
+            "description": "Longitude in decimal degrees (-180 to 180)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "postcode",
+            "required": false,
+            "in": "query",
+            "description": "Fallback postcode when lat/lng are omitted (forward geocoded via OpenStreetMap)",
+            "schema": {
+              "maxLength": 32,
+              "type": "string"
+            }
+          },
+          {
+            "name": "radius",
+            "required": false,
+            "in": "query",
+            "description": "Search radius in kilometres",
+            "schema": {
+              "minimum": 0.1,
+              "maximum": 50,
+              "default": 5,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by item status (defaults to active)",
+            "schema": {
+              "enum": [
+                "draft",
+                "active",
+                "claimed",
+                "complete",
+                "pending_dropoff",
+                "awaiting_collection",
+                "rejected",
+                "pending_recycle",
+                "pending_recycle_processing",
+                "recycled"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "Exact category match (case-insensitive)",
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Requested page (1-indexed)",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Items per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of public items with search origin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "search_origin": {
+                        "lat": 51.5074,
+                        "lng": -0.1278,
+                        "radius_km": 5
+                      },
+                      "items": [
+                        {
+                          "id": "item-id",
+                          "title": "Reusable bottle",
+                          "status": "active",
+                          "distance_km": 0.8,
+                          "pickup_option": "exchange",
+                          "qr_code": "https://cdn.../qr.png",
+                          "images": [
+                            {
+                              "url": "https://...",
+                              "altText": null
+                            }
+                          ],
+                          "estimated_co2_saved_kg": 1.2,
+                          "owner": {
+                            "id": "user-id",
+                            "name": "Jane Doe",
+                            "profile_image": null,
+                            "verification": {
+                              "email_verified": true,
+                              "identity_verified": false,
+                              "address_verified": false
+                            },
+                            "rating": 4.9,
+                            "reviews_count": 12
+                          },
+                          "created_at": "2024-06-01T10:00:00.000Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "items"
+        ]
+      },
+      "post": {
+        "operationId": "createItem",
+        "summary": "Create a new item listing",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Item details to create",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Item created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "item-id",
+                      "title": "Reusable bottle",
+                      "status": "pending_dropoff",
+                      "pickup_option": "donate",
+                      "estimated_co2_saved_kg": 1.2,
+                      "location": {
+                        "address_line": "10 Downing St",
+                        "postcode": "SW1A 2AA",
+                        "latitude": 51.5,
+                        "longitude": -0.12
+                      },
+                      "qr_code": "https://.../qr.png",
+                      "created_at": "2024-06-01T10:00:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "items"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/items/me/listed": {
+      "get": {
+        "operationId": "listMyItems",
+        "summary": "List items created by the authenticated user",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by item status",
+            "schema": {
+              "enum": [
+                "draft",
+                "active",
+                "claimed",
+                "complete",
+                "pending_dropoff",
+                "awaiting_collection",
+                "rejected",
+                "pending_recycle",
+                "pending_recycle_processing",
+                "recycled"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Results per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User items and pagination",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "items": [
+                        {
+                          "id": "item-id",
+                          "title": "Reusable bottle",
+                          "status": "active",
+                          "pickup_option": "exchange",
+                          "qr_code": "https://...",
+                          "images": [
+                            {
+                              "url": "https://...",
+                              "altText": null
+                            }
+                          ],
+                          "estimated_co2_saved_kg": 1.2,
+                          "metadata": null,
+                          "location": {
+                            "address_line": "10 Downing St",
+                            "postcode": "SW1A 2AA",
+                            "latitude": 51.5034,
+                            "longitude": -0.1276
+                          },
+                          "created_at": "2024-06-01T10:00:00.000Z",
+                          "claim": null
+                        }
+                      ],
+                      "pagination": {
+                        "page": 1,
+                        "limit": 10,
+                        "total": 1,
+                        "total_pages": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "items"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/items/me/collected": {
+      "get": {
+        "operationId": "listMyCollectedItems",
+        "summary": "List items collected by the authenticated user",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by item status",
+            "schema": {
+              "enum": [
+                "draft",
+                "active",
+                "claimed",
+                "complete",
+                "pending_dropoff",
+                "awaiting_collection",
+                "rejected",
+                "pending_recycle",
+                "pending_recycle_processing",
+                "recycled"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Results per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "claim_status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by claim status",
+            "schema": {
+              "enum": [
+                "pending_approval",
+                "approved",
+                "complete",
+                "rejected",
+                "cancelled"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collected items and pagination",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "items": [
+                        {
+                          "claim_id": "claim-id",
+                          "claim_status": "complete",
+                          "claim_created_at": "2024-06-01T10:00:00.000Z",
+                          "claim_approved_at": "2024-06-01T10:30:00.000Z",
+                          "claim_completed_at": "2024-06-01T12:00:00.000Z",
+                          "item": {
+                            "id": "item-id",
+                            "title": "Aluminum can",
+                            "status": "recycled",
+                            "pickup_option": "recycle",
+                            "qr_code": "https://...",
+                            "images": [
+                              {
+                                "url": "https://...",
+                                "altText": null
+                              }
+                            ],
+                            "estimated_co2_saved_kg": 0.2,
+                            "location": {
+                              "address_line": "1 Recycling Way",
+                              "postcode": "RC1 2CL",
+                              "latitude": 51.5,
+                              "longitude": -0.1
+                            },
+                            "created_at": "2024-06-01T09:00:00.000Z",
+                            "owner": {
+                              "id": "user-id",
+                              "name": "Jane Doe",
+                              "profile_image": null
+                            }
+                          }
+                        }
+                      ],
+                      "pagination": {
+                        "page": 1,
+                        "limit": 10,
+                        "total": 1,
+                        "total_pages": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "items"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/items/me/impact": {
+      "get": {
+        "operationId": "getMyImpactMetrics",
+        "summary": "Get environmental impact metrics for the authenticated user",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Impact metrics summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "total_co2_saved_kg": 12.5,
+                      "items_exchanged": 10,
+                      "items_donated": 32,
+                      "monthly_goal": {
+                        "target_kg": 50,
+                        "achieved_kg": 8.4,
+                        "remaining_kg": 41.6,
+                        "progress_percent": 16.8
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "items"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/items/{id}": {
+      "get": {
+        "operationId": "getItemById",
+        "summary": "Retrieve a single item listing by id",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "item-id",
+                      "title": "Reusable bottle"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "items"
+        ]
+      },
+      "patch": {
+        "operationId": "updateItem",
+        "summary": "Update an existing item listing",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Fields to update on the item",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated item details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "item-id",
+                      "title": "Updated title",
+                      "condition": "good",
+                      "postcode": "AB12 3CD",
+                      "latitude": 51.5,
+                      "longitude": -0.12,
+                      "updated_at": "2024-06-01T11:00:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "items"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteItem",
+        "summary": "Delete an existing item listing",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Item deleted"
+          }
+        },
+        "tags": [
+          "items"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/qr/scan": {
+      "post": {
+        "operationId": "QrController_scan",
+        "summary": "Scan a QR code and register action",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Generic scan payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "qrPayload",
+                  "direction"
+                ],
+                "properties": {
+                  "qrPayload": {
+                    "type": "string",
+                    "example": "QR:ITEM:1234..."
+                  },
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "in",
+                      "out"
+                    ]
+                  },
+                  "location": {
+                    "type": "object",
+                    "required": [
+                      "type",
+                      "coordinates"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "example": "Point"
+                      },
+                      "coordinates": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "example": [
+                          7.49,
+                          9.07
+                        ]
+                      }
+                    }
+                  },
+                  "shopId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "e1d9f1a1-2c3b-4d5e-9f7a-1b2c3d4e5f6a"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scan accepted acknowledgment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "accepted": true,
+                      "duplicate": false,
+                      "idempotencyKey": "abc123",
+                      "direction": "in"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "qr"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/qr/item/{itemId}/view": {
+      "get": {
+        "operationId": "viewItemViaQr",
+        "summary": "Retrieve QR item context",
+        "parameters": [
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "description": "UUID of the item",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item context view (status, pickup option, QR, latest claim summary, scan events)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "item-id",
+                      "status": "awaiting_collection",
+                      "pickup_option": "exchange",
+                      "qr_code": "https://cdn.trucycle.com/qrs/item-123.png",
+                      "claim": {
+                        "id": "claim-id",
+                        "status": "approved",
+                        "collector_id": "collector-user-id"
+                      },
+                      "scan_events": [
+                        {
+                          "scan_type": "ITEM_VIEW",
+                          "shop_id": null,
+                          "scanned_at": "2024-06-01T10:00:00.000Z"
+                        },
+                        {
+                          "scan_type": "DROP_OFF_IN",
+                          "shop_id": "SHOP123",
+                          "scanned_at": "2024-06-01T09:00:00.000Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "qr"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/qr/item/{itemId}/dropoff-in": {
+      "post": {
+        "operationId": "dropoffInViaQr",
+        "summary": "Register a donor drop-off",
+        "parameters": [
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "description": "UUID of the item being dropped off",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Dropoff scan payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DropoffScanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Dropoff registered result with current item status and scan history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "scan_result": "accepted",
+                      "scan_type": "DROP_OFF_IN",
+                      "item_status": "awaiting_collection",
+                      "scanned_at": "2024-06-01T10:00:00.000Z",
+                      "scan_events": [
+                        {
+                          "scan_type": "DROP_OFF_IN",
+                          "shop_id": "SHOP123",
+                          "scanned_at": "2024-06-01T10:00:00.000Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "qr"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/qr/item/{itemId}/claim-out": {
+      "post": {
+        "operationId": "completeClaimViaQr",
+        "summary": "Complete a claim via QR scan",
+        "parameters": [
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "description": "UUID of the item being claimed out",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Shop scan payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShopScanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Claim completion registered with outcome and scan history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "claim-id",
+                      "status": "complete",
+                      "scan_type": "CLAIM_OUT",
+                      "scan_result": "completed",
+                      "completed_at": "2024-06-01T11:00:00.000Z",
+                      "scan_events": [
+                        {
+                          "scan_type": "CLAIM_OUT",
+                          "shop_id": "SHOP123",
+                          "scanned_at": "2024-06-01T11:00:00.000Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "qr"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/qr/item/{itemId}/recycle-in": {
+      "post": {
+        "operationId": "recycleInViaQr",
+        "summary": "Register recycle intake",
+        "parameters": [
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "description": "UUID of the item entering recycle processing",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Shop scan payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShopScanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recycle intake registered with timestamp and scan history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "item-id",
+                      "status": "pending_recycle_processing",
+                      "recycle_in_at": "2024-06-01T12:00:00.000Z",
+                      "shop_id": "SHOP123",
+                      "scan_events": [
+                        {
+                          "scan_type": "RECYCLE_IN",
+                          "shop_id": "SHOP123",
+                          "scanned_at": "2024-06-01T12:00:00.000Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "qr"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/qr/item/{itemId}/recycle-out": {
+      "post": {
+        "operationId": "recycleOutViaQr",
+        "summary": "Mark recycle completion",
+        "parameters": [
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "description": "UUID of the item completing recycle processing",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Shop scan payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShopScanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recycle completion registered with timestamp and scan history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "item-id",
+                      "status": "recycled",
+                      "recycle_out_at": "2024-06-01T14:00:00.000Z",
+                      "shop_id": "SHOP123",
+                      "scan_events": [
+                        {
+                          "scan_type": "RECYCLE_OUT",
+                          "shop_id": "SHOP123",
+                          "scanned_at": "2024-06-01T14:00:00.000Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "qr"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/claims": {
+      "post": {
+        "operationId": "createClaim",
+        "summary": "Create a claim for an item",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Claim details",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateClaimDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Claim created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "f2e2a1ab-12cd-4f34-98ee-6a1a93d7d7c1",
+                      "item_id": "a438e1dc-1e7f-4b24-9d0f-4d2f2a5d5e7c",
+                      "collector_id": "9f0c9559-83d3-4afd-8a79-5f437c82c1d1",
+                      "status": "pending_approval",
+                      "created_at": "2024-06-01T13:45:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "claims"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/claims/{id}/approve": {
+      "patch": {
+        "operationId": "approveClaim",
+        "summary": "Approve a pending claim",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Claim approved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "f2e2a1ab-12cd-4f34-98ee-6a1a93d7d7c1",
+                      "status": "approved",
+                      "approved_at": "2024-06-01T14:00:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "claims"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/reviews": {
+      "post": {
+        "operationId": "ReviewsController_create",
+        "summary": "Create a review for a user",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Review payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReviewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "review-id",
+                      "created_at": "2024-06-01T12:00:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reviews"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/users/{id}/reviews": {
+      "get": {
+        "operationId": "ReviewsController_list",
+        "summary": "List reviews and aggregate rating for a user",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reviews list and aggregates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "rating": 4.8,
+                      "reviews_count": 12,
+                      "reviews": [
+                        {
+                          "id": "r1",
+                          "rating": 5,
+                          "comment": "Nice",
+                          "reviewer": {
+                            "id": "user-id",
+                            "name": "Jane Doe"
+                          },
+                          "created_at": "2024-06-01T10:00:00.000Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reviews"
+        ]
+      }
+    },
+    "/users": {
+      "get": {
+        "operationId": "UsersController_list",
+        "summary": "List users (admin/debug)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Array of users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": [
+                      {
+                        "id": "user-id",
+                        "email": "user@example.com",
+                        "firstName": "Jane",
+                        "lastName": "Doe",
+                        "status": "active",
+                        "profileImageUrl": null,
+                        "createdAt": "2024-06-01T10:00:00.000Z"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "UsersController_create",
+        "summary": "Create a user (admin/debug)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "User creation payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "user-id",
+                      "email": "user@example.com"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/users/{id}/verification": {
+      "get": {
+        "operationId": "UsersController_verification",
+        "summary": "Retrieve user verification status",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verification info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "email_verified": true,
+                      "identity_verified": false,
+                      "address_verified": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/users/me/profile-image": {
+      "patch": {
+        "operationId": "UsersController_updateProfileImage",
+        "summary": "Update current user profile image",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Profile image payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileImageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated image URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "user-id",
+                      "profile_image_url": "https://..."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/users/me/profile": {
+      "patch": {
+        "operationId": "UsersController_updateProfile",
+        "summary": "Update current user profile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Profile fields payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "user-id",
+                      "first_name": "Jane",
+                      "last_name": "Doe",
+                      "phone": null
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/messages/rooms": {
+      "post": {
+        "operationId": "createOrFindRoom",
+        "summary": "Ensure a direct room exists between two users",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Identify the other user to open a room with.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "otherUserId"
+                ],
+                "properties": {
+                  "otherUserId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "2c4c0f2c-97f2-4e4f-96b4-e8d9ba1d21f6"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Room summary including participants, last message, and timestamps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "a438e1dc-1e7f-4b24-9d0f-4d2f2a5d5e7c",
+                      "participants": [
+                        {
+                          "id": "9f0c9559-83d3-4afd-8a79-5f437c82c1d1",
+                          "firstName": "Ada",
+                          "lastName": "Lovelace",
+                          "profileImageUrl": null,
+                          "online": true
+                        },
+                        {
+                          "id": "2c4c0f2c-97f2-4e4f-96b4-e8d9ba1d21f6",
+                          "firstName": "Grace",
+                          "lastName": "Hopper",
+                          "profileImageUrl": null,
+                          "online": false
+                        }
+                      ],
+                      "lastMessage": {
+                        "id": "1b8cf2e2-5f24-4dc4-8c0c-0c0fe5bc9f91",
+                        "roomId": "a438e1dc-1e7f-4b24-9d0f-4d2f2a5d5e7c",
+                        "direction": "outgoing",
+                        "category": "direct",
+                        "imageUrl": null,
+                        "caption": null,
+                        "text": "Looking forward to the pickup tomorrow!",
+                        "createdAt": "2024-06-01T13:45:00.000Z",
+                        "sender": {
+                          "id": "9f0c9559-83d3-4afd-8a79-5f437c82c1d1",
+                          "firstName": "Ada",
+                          "lastName": "Lovelace",
+                          "profileImageUrl": null
+                        }
+                      },
+                      "createdAt": "2024-05-30T09:12:00.000Z",
+                      "updatedAt": "2024-06-01T13:45:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "messages"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/messages/rooms/active": {
+      "get": {
+        "operationId": "listActiveRooms",
+        "summary": "List all active rooms for the authenticated user",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "An array of rooms ordered by most recent activity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": [
+                      {
+                        "id": "a438e1dc-1e7f-4b24-9d0f-4d2f2a5d5e7c",
+                        "participants": [
+                          {
+                            "id": "9f0c9559-83d3-4afd-8a79-5f437c82c1d1",
+                            "firstName": "Ada",
+                            "lastName": "Lovelace",
+                            "profileImageUrl": null,
+                            "online": true
+                          },
+                          {
+                            "id": "2c4c0f2c-97f2-4e4f-96b4-e8d9ba1d21f6",
+                            "firstName": "Grace",
+                            "lastName": "Hopper",
+                            "profileImageUrl": null,
+                            "online": false
+                          }
+                        ],
+                        "lastMessage": {
+                          "id": "1b8cf2e2-5f24-4dc4-8c0c-0c0fe5bc9f91",
+                          "roomId": "a438e1dc-1e7f-4b24-9d0f-4d2f2a5d5e7c",
+                          "direction": "outgoing",
+                          "category": "direct",
+                          "imageUrl": null,
+                          "caption": null,
+                          "text": "Looking forward to the pickup tomorrow!",
+                          "createdAt": "2024-06-01T13:45:00.000Z",
+                          "sender": {
+                            "id": "9f0c9559-83d3-4afd-8a79-5f437c82c1d1",
+                            "firstName": "Ada",
+                            "lastName": "Lovelace",
+                            "profileImageUrl": null
+                          }
+                        },
+                        "createdAt": "2024-05-30T09:12:00.000Z",
+                        "updatedAt": "2024-06-01T13:45:00.000Z"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "messages"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/messages/rooms/{roomId}/messages": {
+      "get": {
+        "operationId": "listRoomMessages",
+        "summary": "Retrieve paginated messages within a room",
+        "parameters": [
+          {
+            "name": "roomId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Messages ordered from oldest to newest with a pagination cursor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "messages": [
+                        {
+                          "id": "1b8cf2e2-5f24-4dc4-8c0c-0c0fe5bc9f91",
+                          "roomId": "a438e1dc-1e7f-4b24-9d0f-4d2f2a5d5e7c",
+                          "direction": "outgoing",
+                          "category": "direct",
+                          "imageUrl": null,
+                          "caption": null,
+                          "text": "Looking forward to the pickup tomorrow!",
+                          "createdAt": "2024-06-01T13:45:00.000Z",
+                          "sender": {
+                            "id": "9f0c9559-83d3-4afd-8a79-5f437c82c1d1",
+                            "firstName": "Ada",
+                            "lastName": "Lovelace",
+                            "profileImageUrl": null
+                          }
+                        }
+                      ],
+                      "nextCursor": null
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "messages"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "clearRoomMessages",
+        "summary": "Clear all messages in a room",
+        "parameters": [
+          {
+            "name": "roomId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirmation that the room history has been purged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "success": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "messages"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/messages/rooms/{roomId}/search": {
+      "get": {
+        "operationId": "searchRoomMessages",
+        "summary": "Full-text search across a room conversation",
+        "parameters": [
+          {
+            "name": "roomId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Messages that match the provided query (minimum 3 characters).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": [
+                      {
+                        "id": "1b8cf2e2-5f24-4dc4-8c0c-0c0fe5bc9f91",
+                        "roomId": "a438e1dc-1e7f-4b24-9d0f-4d2f2a5d5e7c",
+                        "direction": "outgoing",
+                        "category": "direct",
+                        "imageUrl": null,
+                        "caption": null,
+                        "text": "Looking forward to the pickup tomorrow!",
+                        "createdAt": "2024-06-01T13:45:00.000Z",
+                        "sender": {
+                          "id": "9f0c9559-83d3-4afd-8a79-5f437c82c1d1",
+                          "firstName": "Ada",
+                          "lastName": "Lovelace",
+                          "profileImageUrl": null
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "messages"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/messages/rooms/{roomId}/messages/image": {
+      "post": {
+        "operationId": "sendImageMessage",
+        "summary": "Send an image message to the room",
+        "parameters": [
+          {
+            "name": "roomId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Multipart payload containing the image and optional caption.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "image"
+                ],
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Image file to upload"
+                  },
+                  "caption": {
+                    "type": "string",
+                    "example": "Proof of collection"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "View model of the uploaded image message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "1b8cf2e2-5f24-4dc4-8c0c-0c0fe5bc9f91",
+                      "roomId": "a438e1dc-1e7f-4b24-9d0f-4d2f2a5d5e7c",
+                      "direction": "outgoing",
+                      "category": "direct",
+                      "imageUrl": "https://cdn.trucycle.com/messages/image-123.png",
+                      "caption": "Proof of collection",
+                      "text": null,
+                      "createdAt": "2024-06-01T13:45:00.000Z",
+                      "sender": {
+                        "id": "9f0c9559-83d3-4afd-8a79-5f437c82c1d1",
+                        "firstName": "Ada",
+                        "lastName": "Lovelace",
+                        "profileImageUrl": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "messages"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/messages/rooms/{roomId}/messages/general": {
+      "post": {
+        "operationId": "sendGeneralMessage",
+        "summary": "Send a general/system message to the room",
+        "parameters": [
+          {
+            "name": "roomId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Plain-text message with an optional title.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "text"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "example": "Pickup reminder"
+                  },
+                  "text": {
+                    "type": "string",
+                    "example": "Our driver will arrive tomorrow between 9am and 11am."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "View model of the general message as seen by the sender.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "1b8cf2e2-5f24-4dc4-8c0c-0c0fe5bc9f91",
+                      "roomId": "a438e1dc-1e7f-4b24-9d0f-4d2f2a5d5e7c",
+                      "direction": "general",
+                      "category": "general",
+                      "imageUrl": null,
+                      "caption": "Pickup reminder",
+                      "text": "Our driver will arrive tomorrow between 9am and 11am.",
+                      "createdAt": "2024-06-01T13:45:00.000Z",
+                      "sender": {
+                        "id": "9f0c9559-83d3-4afd-8a79-5f437c82c1d1",
+                        "firstName": "Ada",
+                        "lastName": "Lovelace",
+                        "profileImageUrl": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "messages"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/messages/rooms/{roomId}": {
+      "delete": {
+        "operationId": "deleteRoom",
+        "summary": "Delete a room and its messages",
+        "parameters": [
+          {
+            "name": "roomId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirmation that the room has been removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "success": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "messages"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "TruCycle API",
+    "description": "TruCycle REST API",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http",
+        "description": "Paste token only — no Bearer, no quotes."
+      }
+    },
+    "schemas": {
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "example": "Jane"
+          },
+          "last_name": {
+            "type": "string",
+            "example": "Doe"
+          },
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "collector",
+              "facility",
+              "admin",
+              "finance",
+              "partner"
+            ]
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name",
+          "email",
+          "password"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "ResendVerificationDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "user@example.com"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ForgetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "user@example.com"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "VerifyDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "description": "Email verification token (JWT)"
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "description": "Password reset token (JWT)"
+          },
+          "new_password": {
+            "type": "string",
+            "example": "new-StrongP@ssw0rd",
+            "minLength": 8
+          }
+        },
+        "required": [
+          "token",
+          "new_password"
+        ]
+      },
+      "CreateItemImageDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Publicly accessible image URL",
+            "format": "uri"
+          },
+          "altText": {
+            "type": "string",
+            "description": "Short alt text to improve accessibility",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "UpdateItemDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Listing title",
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed item description",
+            "maxLength": 4000
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "new",
+              "like_new",
+              "good",
+              "fair",
+              "poor"
+            ],
+            "description": "Declared physical condition"
+          },
+          "category": {
+            "type": "string",
+            "description": "High-level category label",
+            "maxLength": 120
+          },
+          "address_line": {
+            "type": "string",
+            "description": "Street address or landmark",
+            "maxLength": 255
+          },
+          "postcode": {
+            "type": "string",
+            "description": "Postal code",
+            "maxLength": 32
+          },
+          "images": {
+            "description": "Optional list of hosted images (max 10)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateItemImageDto"
+            }
+          },
+          "dropoff_location_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Shop or hub identifier when scheduling a drop-off"
+          },
+          "delivery_preferences": {
+            "type": "string",
+            "description": "Free-form preferences such as availability or notes",
+            "maxLength": 240
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional structured attributes (weight, dimensions, etc.)"
+          },
+          "size_unit": {
+            "type": "string",
+            "enum": [
+              "m",
+              "inch",
+              "ft"
+            ],
+            "description": "Units for length/breadth/height (m/inch/ft)"
+          },
+          "size_length": {
+            "type": "number",
+            "description": "Length in provided unit",
+            "minimum": 0
+          },
+          "size_breadth": {
+            "type": "number",
+            "description": "Breadth in provided unit",
+            "minimum": 0
+          },
+          "size_height": {
+            "type": "number",
+            "description": "Height in provided unit",
+            "minimum": 0
+          },
+          "weight_kg": {
+            "type": "number",
+            "description": "Weight in kilograms",
+            "minimum": 0
+          },
+          "estimated_co2_saved_kg": {
+            "type": "number",
+            "description": "Optional estimated CO2 saved (kg)",
+            "minimum": 0
+          }
+        }
+      },
+      "CreateItemDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Listing title",
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed item description",
+            "maxLength": 4000
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "new",
+              "like_new",
+              "good",
+              "fair",
+              "poor"
+            ],
+            "description": "Declared physical condition"
+          },
+          "category": {
+            "type": "string",
+            "description": "High-level category label",
+            "maxLength": 120
+          },
+          "address_line": {
+            "type": "string",
+            "description": "Street address or landmark",
+            "maxLength": 255
+          },
+          "postcode": {
+            "type": "string",
+            "description": "Postal code",
+            "maxLength": 32
+          },
+          "images": {
+            "description": "Optional list of hosted images (max 10)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateItemImageDto"
+            }
+          },
+          "pickup_option": {
+            "type": "string",
+            "enum": [
+              "donate",
+              "exchange",
+              "recycle"
+            ],
+            "description": "Defines the fulfilment flow (donate | exchange | recycle)"
+          },
+          "dropoff_location_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Shop or hub identifier when scheduling a drop-off"
+          },
+          "delivery_preferences": {
+            "type": "string",
+            "description": "Free-form preferences such as availability or notes",
+            "maxLength": 240
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional structured attributes (weight, dimensions, etc.)"
+          },
+          "size_unit": {
+            "type": "string",
+            "enum": [
+              "m",
+              "inch",
+              "ft"
+            ],
+            "description": "Units for length/breadth/height (m/inch/ft)"
+          },
+          "size_length": {
+            "type": "number",
+            "description": "Length in provided unit",
+            "minimum": 0
+          },
+          "size_breadth": {
+            "type": "number",
+            "description": "Breadth in provided unit",
+            "minimum": 0
+          },
+          "size_height": {
+            "type": "number",
+            "description": "Height in provided unit",
+            "minimum": 0
+          },
+          "weight_kg": {
+            "type": "number",
+            "description": "Weight in kilograms",
+            "minimum": 0
+          },
+          "estimated_co2_saved_kg": {
+            "type": "number",
+            "description": "Optional estimated CO2 saved (kg)",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "title",
+          "condition",
+          "category",
+          "address_line",
+          "postcode",
+          "pickup_option",
+          "size_unit",
+          "size_length",
+          "size_breadth",
+          "size_height",
+          "weight_kg"
+        ]
+      },
+      "DropoffScanDto": {
+        "type": "object",
+        "properties": {
+          "shop_id": {
+            "type": "string",
+            "description": "Identifier of the shop where the scan occurred"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "accept",
+              "reject"
+            ],
+            "default": "accept"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason provided when rejecting a donor drop-off"
+          }
+        },
+        "required": [
+          "shop_id",
+          "action"
+        ]
+      },
+      "ShopScanDto": {
+        "type": "object",
+        "properties": {
+          "shop_id": {
+            "type": "string",
+            "description": "Identifier of the shop where the scan occurred"
+          }
+        },
+        "required": [
+          "shop_id"
+        ]
+      },
+      "CreateClaimDto": {
+        "type": "object",
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "description": "UUID of the item being claimed"
+          }
+        },
+        "required": [
+          "item_id"
+        ]
+      },
+      "CreateReviewDto": {
+        "type": "object",
+        "properties": {
+          "target_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rating": {
+            "type": "number",
+            "description": "Rating between 0.0 and 5.0",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "comment": {
+            "type": "string",
+            "description": "Optional short comment",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "target_user_id",
+          "rating"
+        ]
+      },
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "UpdateProfileImageDto": {
+        "type": "object",
+        "properties": {
+          "profile_image_url": {
+            "type": "string",
+            "description": "Public image URL",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "profile_image_url"
+        ]
+      },
+      "UpdateProfileDto": {
+        "type": "object",
+        "properties": {
+          "first_name": {
+            "type": "object",
+            "description": "First name",
+            "maxLength": 100
+          },
+          "last_name": {
+            "type": "object",
+            "description": "Last name",
+            "maxLength": 100
+          },
+          "phone": {
+            "type": "object",
+            "description": "Phone number",
+            "maxLength": 32
+          }
+        }
+      }
+    }
+  }
+}

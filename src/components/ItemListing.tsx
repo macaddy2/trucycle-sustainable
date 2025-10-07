@@ -598,9 +598,9 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-primary rounded-full overflow-hidden flex items-center justify-center text-primary-foreground">
                             {activeItem.ownerAvatar ? (
-                              <img src={activeItem.ownerAvatar} alt={activeItem.ownerName} className="w-full h-full object-cover" />
+                              <img src={activeItem.ownerAvatar} alt={activeItem.ownerName || 'Owner avatar'} className="w-full h-full object-cover" />
                             ) : (
-                              activeItem.ownerName.charAt(0)
+                              activeItem.ownerName?.charAt(0) ?? '?'
                             )}
                           </div>
                           <div>
