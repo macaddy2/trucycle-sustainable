@@ -52,6 +52,23 @@ export function ProfileDashboard({ onCreateListing: _onCreateListing, onOpenMess
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialActiveTab)
   const [showSettings, setShowSettings] = useState(false)
 
+  // Ensure verification data is always defined and complete
+  const DEFAULT_VERIFICATION_LEVEL: UserProfile['verificationLevel'] = {
+    email: false,
+    phone: false,
+    identity: false,
+    address: false,
+    payment: false,
+    community: false,
+  }
+  const normalizedVerification = useMemo<UserProfile['verificationLevel']>(
+    () => ({
+      ...DEFAULT_VERIFICATION_LEVEL,
+      ...(user?.verificationLevel ?? {}),
+    }),
+    [user]
+  )
+
   useEffect(() => {
     setActiveTab(initialActiveTab === 'impact' ? 'impact' : 'overview')
   }, [initialActiveTab])
@@ -61,14 +78,14 @@ export function ProfileDashboard({ onCreateListing: _onCreateListing, onOpenMess
       return { completed: 0, total: VERIFICATION_KEYS.length }
     }
 
-    const completed = VERIFICATION_KEYS.filter((key) => user.verificationLevel[key]).length
+    const completed = VERIFICATION_KEYS.filter((key) => Boolean(normalizedVerification[key])).length
     return { completed, total: VERIFICATION_KEYS.length }
-  }, [user])
+  }, [user, normalizedVerification])
 
   const displayedVerification = useMemo(() => {
     if (!user) return []
-    return VERIFICATION_KEYS.map((key) => ({ key, value: user.verificationLevel[key] }))
-  }, [user])
+    return VERIFICATION_KEYS.map((key) => ({ key, value: normalizedVerification[key] }))
+  }, [user, normalizedVerification])
 
   const recentListings = useMemo(() => listings.slice(0, 5), [listings])
 
@@ -161,7 +178,7 @@ export function ProfileDashboard({ onCreateListing: _onCreateListing, onOpenMess
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-h2">{user.name}</h2>
-                  <VerificationBadge userType={user.userType} verificationLevel={user.verificationLevel} />
+                  <VerificationBadge verified={normalizedVerification} />
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground mt-1">
                   <Badge variant={user.userType === 'donor' ? 'default' : 'secondary'}>
