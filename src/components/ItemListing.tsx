@@ -259,12 +259,6 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-h1 mb-2">Browse Items</h1>
-        <p className="text-body text-muted-foreground">
-          Discover sustainable opportunities in your community
-        </p>
-      </div>
 
       <Card className="border-border/60 bg-card/80 shadow-xl backdrop-blur-sm">
         <CardHeader className="space-y-3">
@@ -362,9 +356,9 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
 
               <div className="flex flex-col justify-between rounded-2xl border border-dashed border-border/60 bg-background/50 p-4 shadow-inner">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quick actions</span>
-                <p className="mt-2 flex-1 text-xs text-muted-foreground">
+                {/* <p className="mt-2 flex-1 text-xs text-muted-foreground">
                   Reset everything to explore the full catalogue and discover unexpected gems.
-                </p>
+                </p> */}
                 <Button
                   type="button"
                   variant="ghost"
