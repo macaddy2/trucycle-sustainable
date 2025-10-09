@@ -17,6 +17,7 @@ import { classifyListing, type ListingClassificationResult } from '@/lib/ai/clas
 import { moderateImages, type ModerationResult } from '@/lib/ai/moderation'
 import { QRCodeDisplay, type QRCodeData } from './QRCode'
 import type { ListingValuation, ManagedListing } from '@/types/listings'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 
 const CATEGORIES = [
   'Electronics',
@@ -37,17 +38,17 @@ const CONDITIONS = [
 ]
 
 const INTENT_CONFIG: Record<'exchange' | 'donate' | 'recycle', { title: string; description: string; accent: string; icon: ReactNode }> = {
-  donate: {
-    title: 'Donate to the community',
-    description: 'Perfect for items that still have plenty of life left. We will guide you to a trusted partner hub.',
-    accent: 'from-emerald-500/20 via-emerald-500/10 to-transparent',
-    icon: <Heart size={20} className="text-emerald-600" />,
-  },
   exchange: {
     title: 'Exchange with neighbours',
     description: 'Great for high-value items you would like to share or swap securely with messaging and QR codes.',
     accent: 'from-blue-500/20 via-blue-500/10 to-transparent',
     icon: <ArrowsClockwise size={20} className="text-blue-600" />,
+  },
+  donate: {
+    title: 'Donate to the community',
+    description: 'Perfect for items that still have plenty of life left. We will guide you to a trusted partner hub.',
+    accent: 'from-emerald-500/20 via-emerald-500/10 to-transparent',
+    icon: <Heart size={20} className="text-emerald-600" />,
   },
   recycle: {
     title: 'Recycle responsibly',
@@ -234,12 +235,13 @@ export function ItemListingForm({
     if (initialIntent) {
       return initialIntent
     }
-    return user?.userType === 'collector' ? 'exchange' : 'donate'
-  }, [initialIntent, user?.userType])
+    return 'exchange'
+  }, [initialIntent])
   const [quickStartIntent, setQuickStartIntent] = useState<'exchange' | 'donate' | 'recycle'>(defaultQuickStartIntent)
   const [quickStartFulfillment, setQuickStartFulfillment] = useState<'pickup' | 'dropoff'>(
     defaultQuickStartIntent === 'donate' ? 'dropoff' : 'pickup'
   )
+  const [showQuickStart, setShowQuickStart] = useState(true)
 
   useEffect(() => {
     if (!formContainerRef.current) {
@@ -267,7 +269,7 @@ export function ItemListingForm({
     photos: [] as string[],
     location: '',
     contactMethod: 'platform',
-    fulfillmentMethod: (defaultQuickStartIntent === 'donate' ? 'dropoff' : 'pickup') as 'pickup' | 'dropoff' | '',
+    fulfillmentMethod: 'pickup' as 'pickup' | 'dropoff' | '',
     dropOffLocation: null as DropOffLocation | null,
     handoverNotes: '',
     preferPartnerSupport: defaultQuickStartIntent === 'donate'
@@ -300,7 +302,9 @@ export function ItemListingForm({
 
     return 2
   }, [formData.actionType])
-  const effectiveFulfillmentMethod = formData.actionType === 'donate' ? 'dropoff' : formData.fulfillmentMethod
+  // Enforce view state: Donate uses drop-off; others show pickup only
+  const effectiveFulfillmentMethod: 'pickup' | 'dropoff' =
+    formData.actionType === 'donate' ? 'dropoff' : 'pickup'
   const defaultPickupAddress = useMemo(() => {
     if (!user) {
       return ''
@@ -434,7 +438,7 @@ export function ItemListingForm({
       case 3:
         return formData.actionType !== ''
       case 4: {
-        const effectiveMethod = formData.actionType === 'donate' ? 'dropoff' : formData.fulfillmentMethod
+        const effectiveMethod = effectiveFulfillmentMethod
         if (effectiveMethod === 'dropoff') {
           return Boolean(formData.dropOffLocation)
         }
@@ -458,10 +462,6 @@ export function ItemListingForm({
     }))
 
     setQuickStartFulfillment(method)
-
-    if (method === 'dropoff') {
-      setShowDropOffSelector(true)
-    }
   }, [])
 
   const handleQuickStartIntentSelect = useCallback((intent: 'exchange' | 'donate' | 'recycle') => {
@@ -474,23 +474,18 @@ export function ItemListingForm({
       condition: DEFAULT_CONDITION_BY_INTENT[intent],
       preferPartnerSupport: intent === 'donate' ? true : prev.preferPartnerSupport,
       handoverNotes: prev.handoverNotes,
+      location: intent === 'exchange' && defaultPickupAddress ? defaultPickupAddress : prev.location,
     }))
 
-    const nextFulfillment = intent === 'donate' ? 'dropoff' : 'pickup'
+    const nextFulfillment: 'pickup' | 'dropoff' = intent === 'donate' ? 'dropoff' : 'pickup'
     setQuickStartFulfillment(nextFulfillment)
     handleFulfillmentSelect(nextFulfillment)
-  }, [handleFulfillmentSelect])
+  }, [handleFulfillmentSelect, defaultPickupAddress])
 
   const handleQuickStartFulfillmentSelect = useCallback((method: 'pickup' | 'dropoff') => {
-    if (quickStartIntent === 'donate' && method === 'pickup') {
-      toast.info('Donations are routed through trusted partner hubs. We have kept drop-off selected for you.')
-      handleFulfillmentSelect('dropoff')
-      return
-    }
-
     setQuickStartFulfillment(method)
     handleFulfillmentSelect(method)
-  }, [handleFulfillmentSelect, quickStartIntent])
+  }, [handleFulfillmentSelect])
 
   const scrollToDetailCard = useCallback(() => {
     document.getElementById('listing-form-steps')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -502,7 +497,7 @@ export function ItemListingForm({
     }
 
     setQuickStartIntent(initialIntent)
-    const defaultMethod = initialIntent === 'donate' ? 'dropoff' : 'pickup'
+    const defaultMethod: 'pickup' | 'dropoff' = 'pickup'
     setQuickStartFulfillment(defaultMethod)
     setCurrentStep(1)
     setFormData(prev => ({
@@ -510,10 +505,11 @@ export function ItemListingForm({
       actionType: initialIntent,
       category: DEFAULT_CATEGORY_BY_INTENT[initialIntent],
       condition: DEFAULT_CONDITION_BY_INTENT[initialIntent],
+      location: initialIntent === 'exchange' && defaultPickupAddress ? defaultPickupAddress : prev.location,
     }))
     handleFulfillmentSelect(defaultMethod)
     onIntentHandled?.()
-  }, [initialIntent, handleFulfillmentSelect, onIntentHandled])
+  }, [initialIntent, handleFulfillmentSelect, onIntentHandled, defaultPickupAddress])
 
   const handleDropOffSelection = (location: DropOffLocation) => {
     setFormData(prev => ({
@@ -548,22 +544,14 @@ export function ItemListingForm({
     onDropOffPrefillHandled?.()
   }, [prefillDropOffLocation, onDropOffPrefillHandled])
 
-  useEffect(() => {
-    if (formData.actionType === 'donate') {
-      if (formData.fulfillmentMethod !== 'dropoff') {
-        handleFulfillmentSelect('dropoff')
-      }
-    } else if (formData.fulfillmentMethod === 'dropoff' && !formData.dropOffLocation) {
-      handleFulfillmentSelect('pickup')
-    }
-  }, [formData.actionType, formData.fulfillmentMethod, formData.dropOffLocation, handleFulfillmentSelect])
+  // No forced fulfillment changes by action type
 
   useEffect(() => {
-    const effectiveMethod = formData.actionType === 'donate' ? 'dropoff' : formData.fulfillmentMethod
+    const effectiveMethod = effectiveFulfillmentMethod
     if (currentStep === 4 && effectiveMethod === 'dropoff' && !formData.dropOffLocation) {
       setShowDropOffSelector(true)
     }
-  }, [currentStep, formData.actionType, formData.dropOffLocation, formData.fulfillmentMethod])
+  }, [currentStep, formData.dropOffLocation, effectiveFulfillmentMethod])
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
@@ -606,7 +594,8 @@ export function ItemListingForm({
         : undefined
       const rewardPoints = listingValuation?.rewardPoints ?? Math.round(carbonImpact * 8)
 
-      const fulfillmentMethod = formData.fulfillmentMethod || 'pickup'
+      const fulfillmentMethod: 'pickup' | 'dropoff' =
+        formData.actionType === 'donate' ? 'dropoff' : 'pickup'
       const listingStatus: CreatedListing['status'] =
         fulfillmentMethod === 'dropoff' ? 'pending_dropoff' : 'active'
       let classification = classificationResult
@@ -820,7 +809,103 @@ export function ItemListingForm({
         />
       )}
       <div ref={formContainerRef} id="listing-form-start" className="space-y-8">
-        <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-background via-primary/5 to-emerald-500/10 p-8 shadow-lg">
+        {/* Quick Start Modal */}
+        <Dialog open={showQuickStart} onOpenChange={setShowQuickStart}>
+          <DialogContent className="max-w-4xl sm:max-w-4xl md:max-w-5xl">
+            <DialogHeader>
+              <DialogTitle>
+                <Badge variant="secondary" className="uppercase tracking-widest text-xs mr-2">Quick start</Badge>
+                Let&apos;s set up your next listing
+              </DialogTitle>
+              <DialogDescription>
+                Choose what you&apos;d like to do and how the handover should work. Exchange uses your saved address by default; only donations use pick-up service.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-3">
+                {(['exchange','donate','recycle'] as const).map((intentKey) => {
+                  const config = INTENT_CONFIG[intentKey]
+                  const isSelected = quickStartIntent === intentKey
+                  return (
+                    <button
+                      key={intentKey}
+                      type="button"
+                      onClick={() => handleQuickStartIntentSelect(intentKey)}
+                      className={`relative overflow-hidden rounded-2xl border p-5 text-left transition focus:outline-none focus:ring-2 focus:ring-primary/40 ${isSelected ? 'border-primary shadow-lg' : 'border-border/60 shadow-sm hover:border-primary/40 hover:shadow-md'}`}
+                    >
+                      <span className={`pointer-events-none absolute inset-0 -z-10 rounded-2xl bg-gradient-to-br ${config.accent}`} aria-hidden="true" />
+                      <div className="flex items-center gap-3 text-primary">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-background/75 shadow-inner">
+                          {config.icon}
+                        </span>
+                        <div>
+                          <p className="font-semibold text-foreground">{config.title}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{config.description}</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 text-xs font-semibold uppercase tracking-wide text-primary">
+                        {isSelected ? 'Selected' : 'Use this focus'}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {FULFILLMENT_OPTIONS.filter((option) =>
+                  quickStartIntent === 'donate' ? option.value === 'dropoff' : option.value === 'pickup'
+                ).map((option) => {
+                  const Icon = option.icon
+                  const isSelected = quickStartFulfillment === option.value
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleQuickStartFulfillmentSelect(option.value)}
+                      className={`relative overflow-hidden rounded-2xl border p-5 text-left transition focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                        isSelected ? 'border-primary shadow-lg' : 'border-border/60 shadow-sm hover:border-primary/40 hover:shadow-md'
+                      }`}
+                    >
+                      <span className={`pointer-events-none absolute inset-0 -z-10 rounded-2xl bg-gradient-to-br ${option.accent}`} aria-hidden="true" />
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-background/75 shadow-inner">
+                          <Icon size={20} className="text-foreground" />
+                        </span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-foreground">{option.title}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{option.description}</p>
+                        </div>
+                      </div>
+                      <span className="mt-auto text-xs font-semibold text-primary">
+                        {isSelected ? 'Selected' : 'Choose option'}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="quickstart-notes" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Optional notes for collectors
+                </Label>
+                <Textarea
+                  id="quickstart-notes"
+                  placeholder="Share access tips, preferred timings, or sustainability highlights..."
+                  value={formData.handoverNotes}
+                  onChange={(event) => handleInputChange('handoverNotes', event.target.value)}
+                  className="min-h-[96px] bg-background/80"
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <Button type="button" variant="secondary" onClick={() => { setShowQuickStart(false); scrollToDetailCard() }}>
+                  Continue to detailed form
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+        <section className="hidden rounded-3xl border border-border/60 bg-gradient-to-br from-background via-primary/5 to-emerald-500/10 p-8 shadow-lg">
           <div className="space-y-8">
             <div className="space-y-2">
               <Badge variant="secondary" className="w-fit uppercase tracking-widest text-xs">Quick start</Badge>
@@ -909,17 +994,7 @@ export function ItemListingForm({
                   className="min-h-[96px] bg-background/80"
                 />
               </div>
-              <label className="flex h-full items-start gap-3 rounded-2xl border border-border/60 bg-background/80 p-4 text-left text-sm shadow-inner">
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                  checked={formData.preferPartnerSupport}
-                  onChange={(event) => setFormData(prev => ({ ...prev, preferPartnerSupport: event.target.checked }))}
-                />
-                <span className="text-muted-foreground">
-                  I&apos;d like TruCycle to recommend partner hubs nearby to support this handover.
-                </span>
-              </label>
+              
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1016,7 +1091,7 @@ export function ItemListingForm({
             </div>
               </div>
             )}
-            {(classificationLoading || classificationResult || moderationLoading || moderationResult) && (
+            {false && (classificationLoading || classificationResult || moderationLoading || moderationResult) && (
               <div className="grid gap-4 md:grid-cols-2">
                 {(classificationLoading || classificationResult) && (
                   <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">
@@ -1156,76 +1231,7 @@ export function ItemListingForm({
         {/* Step 4: Hand-off & Location */}
         {currentStep === 4 && (
           <div className="space-y-4">
-            <div className="space-y-1">
-              <h3 className="text-lg font-semibold">Hand-off details</h3>
-              <p className="text-sm text-muted-foreground">
-                Confirm how and where the item will be collected.
-              </p>
-            </div>
-
-            {formData.actionType !== 'donate' && (
-              <div>
-                <Label>How will the item be handed over? *</Label>
-                <div className="grid grid-cols-1 gap-4 mt-2 md:grid-cols-2">
-                  <Card
-                    className={`cursor-pointer transition-colors ${
-                      effectiveFulfillmentMethod === 'pickup'
-                        ? 'border-primary bg-primary/5'
-                        : 'hover:border-primary/50'
-                    }`}
-                    onClick={() => handleFulfillmentSelect('pickup')}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start space-x-3">
-                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Truck
-                            size={28}
-                            className={effectiveFulfillmentMethod === 'pickup' ? 'text-primary' : 'text-muted-foreground'}
-                          />
-                        </div>
-                        <div>
-                          <div className="font-medium text-lg">Pickup from my location</div>
-                          <p className="text-sm text-muted-foreground">
-                            Share a safe meeting area once you approve a collector.
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card
-                    className={`cursor-pointer transition-colors ${
-                      effectiveFulfillmentMethod === 'dropoff'
-                        ? 'border-primary bg-primary/5'
-                        : 'hover:border-primary/50'
-                    }`}
-                    onClick={() => handleFulfillmentSelect('dropoff')}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start space-x-3">
-                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Storefront
-                            size={28}
-                            className={effectiveFulfillmentMethod === 'dropoff' ? 'text-primary' : 'text-muted-foreground'}
-                          />
-                        </div>
-                        <div>
-                          <div className="font-medium text-lg">Partner shop handover</div>
-                          <p className="text-sm text-muted-foreground">
-                            Choose a TruCycle Partner Shop so staff can manage the exchange for you.
-                          </p>
-                          {effectiveFulfillmentMethod === 'dropoff' && formData.dropOffLocation && (
-                            <Badge variant="secondary" className="mt-3">
-                              Selected: {formData.dropOffLocation.name}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            )}
+              {/* Removed hand-off choice UI — Exchange shows pickup only, Donate uses partner shop */}
 
             <div>
               <Label htmlFor="location">
@@ -1365,6 +1371,55 @@ export function ItemListingForm({
             </Button>
           )}
         </div>
+        {(classificationLoading || classificationResult || moderationLoading || moderationResult) && (
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            {(classificationLoading || classificationResult) && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">
+                <p className="text-sm font-semibold text-primary">AI category guidance</p>
+                {classificationLoading ? (
+                  <p className="text-xs text-muted-foreground">Analysing your listing details.</p>
+                ) : classificationResult ? (
+                  <>
+                    <Badge variant="outline" className="uppercase tracking-wide">
+                      {CLASSIFICATION_LABELS[classificationResult.recommendedAction]}
+                    </Badge>
+                    <p className="text-sm">{classificationResult.reasoning}</p>
+                    {classificationResult.highlights.length > 0 && (
+                      <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                        {classificationResult.highlights.map((point, index) => (
+                          <li key={index}>{point}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Provide more detail to receive tailored recommendations.</p>
+                )}
+              </div>
+            )}
+            {(moderationLoading || moderationResult) && (
+              <div className={`rounded-lg border p-4 space-y-2 ${moderationResult?.status === 'flagged' ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'bg-muted/40'}`}>
+                <p className="text-sm font-semibold">Image safety check</p>
+                {moderationLoading ? (
+                  <p className="text-xs text-muted-foreground">Reviewing photos for safety.</p>
+                ) : moderationResult ? (
+                  <>
+                    <p className="text-sm">{moderationResult.message}</p>
+                    {moderationResult.labels.length > 0 && (
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        {moderationResult.labels.map((label) => (
+                          <Badge key={label} variant="outline">{label}</Badge>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Add a photo or description to run an automated safety check.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
           </CardContent>
         </Card>
       </div>

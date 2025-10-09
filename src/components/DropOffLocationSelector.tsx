@@ -44,7 +44,7 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
   const activeLocation = DROP_OFF_LOCATIONS.find(location => location.id === activeLocationId) ?? DROP_OFF_LOCATIONS[0]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-background/80 backdrop-blur-sm p-4 md:p-10 overflow-y-auto">
+    <div className="fixed inset-0 z-[70] flex items-start justify-center bg-background/80 backdrop-blur-sm p-4 md:p-10 overflow-y-auto">
       <Card className="w-full max-w-5xl shadow-2xl border-primary/30">
         <CardHeader className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div>
