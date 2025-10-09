@@ -12,8 +12,7 @@ import {
   CheckCircle,
   MapPin,
   Package,
-  CalendarCheck,
-  QrCode
+  CalendarCheck
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useMessaging, useExchangeManager } from '@/hooks'
@@ -89,6 +88,9 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   const [globalListings] = useKV<ManagedListing[]>('global-listings', [])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const scrollViewportRef = useRef<HTMLElement | null>(null)
+  const [isAtBottom, setIsAtBottom] = useState(true)
 
   const normalizeChat = useCallback((chat: MessagingChat): MessagingChat => ({
     ...chat,
@@ -184,8 +186,10 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     })
   }, [currentMessages])
 
+  const isNewChat = useMemo(() => currentMessages.every(m => m.type === 'system'), [currentMessages])
+
   const messageTemplates = useMemo(() => {
-    if (!selectedChat || !currentUser) return [] as string[]
+    if (!selectedChat || !currentUser || !isNewChat) return [] as string[]
     const otherName = currentUser.id === selectedChat.donorId
       ? selectedChat.collectorName
       : selectedChat.donorName
@@ -238,9 +242,52 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     markMessagesAsRead(selectedChatId)
   }, [markMessagesAsRead, selectedChatId])
 
+  // Auto-scroll only the ScrollArea viewport (not the entire page),
+  // and only when the user is already near the bottom.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [currentMessages])
+    if (!scrollViewportRef.current && messagesContainerRef.current) {
+      const viewport = messagesContainerRef.current.closest('[data-slot="scroll-area-viewport"]') as HTMLElement | null
+      if (viewport) scrollViewportRef.current = viewport
+    }
+
+    const viewport = scrollViewportRef.current
+    if (!viewport) return
+
+    if (isAtBottom) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' })
+    }
+  }, [currentMessages, isAtBottom])
+
+  // Track whether the user is near the bottom of the message list and set up listener per chat.
+  useEffect(() => {
+    if (!scrollViewportRef.current && messagesContainerRef.current) {
+      const vp = messagesContainerRef.current.closest('[data-slot="scroll-area-viewport"]') as HTMLElement | null
+      if (vp) scrollViewportRef.current = vp
+    }
+
+    const target = scrollViewportRef.current
+    if (!target) return
+
+    const onScroll = () => {
+      const threshold = 48
+      const distanceFromBottom = target.scrollHeight - (target.scrollTop + target.clientHeight)
+      setIsAtBottom(distanceFromBottom <= threshold)
+    }
+
+    // Initialize once when chat changes
+    onScroll()
+    target.addEventListener('scroll', onScroll)
+    return () => target.removeEventListener('scroll', onScroll)
+  }, [selectedChatId])
+
+  // When switching to a chat, jump the viewport to the bottom once.
+  useEffect(() => {
+    if (!messagesContainerRef.current) return
+    const viewport = messagesContainerRef.current.closest('[data-slot="scroll-area-viewport"]') as HTMLElement | null
+    if (!viewport) return
+    // Jump to bottom without affecting page scroll
+    viewport.scrollTop = viewport.scrollHeight
+  }, [selectedChatId])
 
   const sendSystemMessage = useCallback((chatIdValue: string, content: string, action: string) => {
     dispatchMessage(chatIdValue, content, 'system', { systemAction: action })
@@ -369,16 +416,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
         visible: Boolean(selectedChat)
       },
       {
-        label: 'Generate QR Code',
-        icon: QrCode,
-        action: () => {
-          if (!selectedChat) return
-          setSelectedDropOffLocation('TruCycle Partner Shop - Camden Market, London NW1 8AH')
-        },
-        color: 'text-purple-600',
-        visible: Boolean(selectedChat) && hasSharedLocation && hasScheduledExchange
-      },
-      {
         label: 'Schedule Pickup',
         icon: CalendarCheck,
         action: () => {
@@ -458,7 +495,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
 
   const renderBody = () => (
     <>
-              <div className={`flex flex-col min-h-0 ${isPage ? 'h-[min(80vh,640px)]' : 'h-full'}`}>
+              <div className={`flex flex-col min-h-0 ${isPage ? 'h-[min(100svh,720px)]' : 'h-full'}`}>
                 <div className="flex items-center justify-between border-b border-border p-4">
                   <div>
                     <h2 className="text-h3 font-medium">Messages</h2>
@@ -499,7 +536,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                     ) : (
                       <>
                         <div className="w-1/3 border-r border-border flex flex-col min-h-0">
-                          <ScrollArea className="flex-1">
+                          <ScrollArea className="flex-1 min-h-0">
                             <div className="p-3 space-y-2">
                               {groupedRequests.map(group => {
                                 const pending = group.requests.filter(request => request.status === 'pending').length
@@ -535,7 +572,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
       
                         <div className="flex-1 flex flex-col min-h-0">
                           {selectedRequestGroup ? (
-                            <ScrollArea className="flex-1">
+                            <ScrollArea className="flex-1 min-h-0">
                               <div className="p-4 space-y-4">
                                 <div className="flex items-center justify-between">
                                   <div>
@@ -620,9 +657,9 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                     )}
                   </div>
                 ) : (
-                  <div className="flex flex-1">
+                  <div className="flex flex-1 min-h-0">
                     <div className="w-1/3 border-r border-border flex flex-col min-h-0">
-                      <ScrollArea className="flex-1">
+                      <ScrollArea className="flex-1 min-h-0">
                         {normalizedChats.length === 0 ? (
                           <div className="p-6 text-center text-sm text-muted-foreground space-y-2">
                             <Package size={36} className="mx-auto text-muted-foreground" />
@@ -705,8 +742,8 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                             </Badge>
                           </div>
       
-                          <ScrollArea className="flex-1 p-4">
-                            <div className="space-y-4">
+                          <ScrollArea className="flex-1 min-h-0 p-4">
+                            <div ref={messagesContainerRef} className="space-y-4">
                               {currentMessages.map(message => (
                                 <div
                                   key={message.id}
