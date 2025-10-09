@@ -3,9 +3,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
 import { Card, CardContent } from '@/components/ui/card'
-import { Eye, EyeSlash, GoogleLogo, FacebookLogo, EnvelopeSimple } from '@phosphor-icons/react'
+import { Eye, EyeSlash, EnvelopeSimple } from '@phosphor-icons/react'
 import { kvGet, kvSet } from '@/lib/kvStore'
 import { login as apiLogin, register as apiRegister } from '@/lib/api'
 import type { RegisterDto } from '@/lib/api'
@@ -155,48 +154,7 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
     window.location.assign(target)
   }
 
-  const handleSocialAuth = (provider: 'google' | 'facebook') => {
-    setIsLoading(true)
-
-    // Simulate social auth
-    setTimeout(async () => {
-      try {
-        const mockUser: UserProfile = {
-          id: `${provider}-user-${Date.now()}`,
-          email: `user@${provider}.com`,
-          name: `${provider === 'google' ? 'Google' : 'Facebook'} User`,
-          userType: 'donor',
-          createdAt: new Date().toISOString(),
-          verified: true,
-          rating: 4.8,
-          verificationLevel: {
-            email: true,
-            phone: false,
-            identity: false,
-            address: false,
-            payment: false,
-            community: false
-          },
-          rewardsBalance: 60
-        }
-
-        const existingProfiles = await kvGet<Record<string, UserProfile>>('user-profiles') || {}
-        await kvSet('user-profiles', {
-          ...existingProfiles,
-          [mockUser.id]: mockUser,
-        })
-
-        setUser(mockUser)
-        toast.success(`Signed in with ${provider}`)
-        onOpenChange(false)
-      } catch (error) {
-        console.error('Social auth failed', error)
-        toast.error('Unable to complete social sign in. Please try again.')
-      } finally {
-        setIsLoading(false)
-      }
-    }, 1000)
-  }
+  
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -214,40 +172,6 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Social Authentication */}
-          <div className="space-y-3">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => handleSocialAuth('google')}
-              disabled={isLoading}
-            >
-              <GoogleLogo size={18} className="mr-2" />
-              Continue with Google
-            </Button>
-            
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => handleSocialAuth('facebook')}
-              disabled={isLoading}
-            >
-              <FacebookLogo size={18} className="mr-2" />
-              Continue with Facebook
-            </Button>
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <Separator className="w-full" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with email
-              </span>
-            </div>
-          </div>
-
           {/* Email Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
