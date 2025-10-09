@@ -73,38 +73,38 @@
 }
 
 /* Custom typography for TruCycle */
-.font-roboto {
-  font-family: 'Roboto', sans-serif;
+.font-raleway {
+  font-family: 'Raleway', sans-serif;
 }
 
 .text-h1 {
-  font-family: 'Roboto', sans-serif;
+  font-family: 'Raleway', sans-serif;
   font-weight: 700;
   font-size: 2rem;
   letter-spacing: -0.025em;
 }
 
 .text-h2 {
-  font-family: 'Roboto', sans-serif;
+  font-family: 'Raleway', sans-serif;
   font-weight: 500;
   font-size: 1.5rem;
 }
 
 .text-h3 {
-  font-family: 'Roboto', sans-serif;
+  font-family: 'Raleway', sans-serif;
   font-weight: 500;
   font-size: 1.125rem;
 }
 
 .text-body {
-  font-family: 'Roboto', sans-serif;
+  font-family: 'Raleway', sans-serif;
   font-weight: 400;
   font-size: 1rem;
   line-height: 1.6;
 }
 
 .text-small {
-  font-family: 'Roboto', sans-serif;
+  font-family: 'Raleway', sans-serif;
   font-weight: 400;
   font-size: 0.875rem;
 }

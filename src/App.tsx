@@ -137,10 +137,9 @@ function App() {
       { value: 'home', label: 'Home', Icon: House, show: true },
       { value: 'browse', label: 'Browse', Icon: Search, show: !isDonor },
       { value: 'listings', label: isCollector ? 'My Collected Items' : 'My Listed Items', Icon: Package, show: true },
-      { value: 'messages', label: 'Messages', Icon: ChatCircle, show: Boolean(user) },
       { value: 'dropoff', label: 'Partner Shops', Icon: Storefront, show: !isCollector },
       { value: 'impact', label: 'Impact', Icon: Leaf, show: true },
-      { value: 'profile', label: 'Profile', Icon: User, show: true },
+      
     ].filter((tab) => tab.show)
   }, [user])
 
@@ -152,7 +151,7 @@ function App() {
   const userFirstName = user?.name && typeof user.name === 'string' ? user.name.split(' ')[0] : undefined
 
   useEffect(() => {
-    const availableTabs = new Set<string>([...navTabs.map(tab => tab.value), 'list'])
+    const availableTabs = new Set<string>([...navTabs.map(tab => tab.value), 'list', 'messages', 'profile'])
 
     if (!availableTabs.has(currentTab)) {
       const fallbackTab = navTabs[0]?.value ?? currentTab
@@ -521,10 +520,10 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background font-roboto">
+    <div className="min-h-screen bg-background font-raleway">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container max-w-screen-2xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <button
@@ -538,6 +537,20 @@ function App() {
                 </div>
                 <h1 className="text-h2 text-foreground drop-shadow-sm">TruCycle</h1>
               </button>
+            </div>
+
+            {/* Desktop Navigation Tabs */}
+            <div className="hidden md:flex flex-1 justify-center">
+              <Tabs value={currentTab} onValueChange={navigateToTab}>
+                <TabsList className="gap-3 sm:gap-4 lg:gap-6 px-1">
+                  {navTabs.map(({ value, label, Icon }) => (
+                    <TabsTrigger key={value} value={value} className="flex items-center space-x-2 px-3 sm:px-4 py-1.5">
+                      <Icon size={16} />
+                      <span className="hidden lg:inline">{label}</span>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
             </div>
 
             <div className="hidden md:flex items-center space-x-6">
@@ -607,11 +620,8 @@ function App() {
                 </div>
               ) : (
                 <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" onClick={handleSignIn}>
-                    Sign In
-                  </Button>
-                  <Button size="sm" onClick={handleSignUp}>
-                    Sign Up
+                  <Button size="sm" onClick={handleSignIn}>
+                    Get Started
                   </Button>
                 </div>
               )}
@@ -621,13 +631,13 @@ function App() {
         </div>
       </header>
 
-      {/* Navigation Tabs */}
-      <nav className="border-b border-border bg-background">
-        <div className="container mx-auto px-4">
+      {/* Mobile Navigation Tabs */}
+      <nav className="border-b border-border bg-background md:hidden">
+        <div className="container max-w-screen-2xl mx-auto px-4">
           <Tabs value={currentTab} onValueChange={navigateToTab} className="w-full">
-            <TabsList className="grid w-full grid-flow-col auto-cols-fr md:flex md:w-auto md:gap-2">
+            <TabsList className="grid w-full grid-flow-col auto-cols-fr gap-1.5">
               {navTabs.map(({ value, label, Icon }) => (
-                <TabsTrigger key={value} value={value} className="flex items-center space-x-2">
+                <TabsTrigger key={value} value={value} className="flex items-center space-x-2 py-2">
                   <Icon size={16} />
                   <span className="hidden sm:inline">{label}</span>
                 </TabsTrigger>
