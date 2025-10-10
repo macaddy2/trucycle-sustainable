@@ -93,7 +93,7 @@ export function MessageNotification({ onOpenMessages }: MessageNotificationProps
               <div key={chat.id} className="flex items-center space-x-2 text-sm">
                 <Avatar className="w-6 h-6">
                   <AvatarFallback className="text-xs">
-                    {(currentUser.id === chat.donorId ? chat.collectorName : chat.donorName)[0]}
+                    {((currentUser.id === chat.donorId ? chat.collectorName : chat.donorName) || '?')[0]}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">

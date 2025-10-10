@@ -18,6 +18,8 @@ import { moderateImages, type ModerationResult } from '@/lib/ai/moderation'
 import { QRCodeDisplay, type QRCodeData } from './QRCode'
 import type { ListingValuation, ManagedListing } from '@/types/listings'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { uploadImageToCloudinary } from '@/lib/cloudinary'
+import { createItem } from '@/lib/api'
 
 const CATEGORIES = [
   'Electronics',
@@ -283,6 +285,7 @@ export function ItemListingForm({
   const [classificationLoading, setClassificationLoading] = useState(false)
   const [moderationResult, setModerationResult] = useState<ModerationResult | null>(null)
   const [moderationLoading, setModerationLoading] = useState(false)
+  // We defer actual Cloudinary upload until submit; photos hold data URLs for preview
   const valuationSummary = useMemo(
     () => calculateListingValuation(formData.category, formData.condition, formData.actionType),
     [formData.category, formData.condition, formData.actionType]
@@ -313,7 +316,7 @@ export function ItemListingForm({
     const parts = [user.area, user.district, user.postcode].filter((segment): segment is string => Boolean(segment))
     return parts.join(', ')
   }, [user])
-  const totalSteps = 4
+  const totalSteps = 2
   const progress = (currentStep / totalSteps) * 100
   const { title, description, category, condition, photos } = formData
   useEffect(() => {
@@ -389,30 +392,22 @@ export function ItemListingForm({
     fileInputRef.current?.click()
   }
 
-  const handlePhotoSelection = (event: ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelection = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file) {
-      return
-    }
-
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = reader.result as string
-      setFormData(prev => ({
-        ...prev,
-        photos: [...prev.photos, result]
-      }))
-      toast.success('Photo added successfully')
-    }
-    reader.readAsDataURL(file)
+    if (!file) return
     event.target.value = ''
+    try {
+      const upload = await uploadImageToCloudinary(file, { alt: formData.title || 'listing-image' })
+      setFormData(prev => ({ ...prev, photos: [...prev.photos, upload.secureUrl] }))
+      toast.success('Photo uploaded')
+    } catch (err: any) {
+      console.error('Cloudinary upload failed', err)
+      toast.error('Upload failed. Check Cloudinary preset and env.')
+    }
   }
 
   const removePhoto = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      photos: prev.photos.filter((_, i) => i !== index)
-    }))
+    setFormData(prev => ({ ...prev, photos: prev.photos.filter((_, i) => i !== index) }))
   }
 
   const handleUseDefaultPickup = useCallback(() => {
@@ -432,12 +427,14 @@ export function ItemListingForm({
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        return formData.title.trim() !== '' && formData.description.trim() !== '' && formData.photos.length > 0
-      case 2:
-        return formData.category !== '' && formData.condition !== ''
-      case 3:
-        return formData.actionType !== ''
-      case 4: {
+        return (
+          formData.title.trim() !== '' &&
+          formData.description.trim() !== '' &&
+          formData.photos.length > 0 &&
+          formData.category !== '' &&
+          formData.condition !== ''
+        )
+      case 2: {
         const effectiveMethod = effectiveFulfillmentMethod
         if (effectiveMethod === 'dropoff') {
           return Boolean(formData.dropOffLocation)
@@ -465,6 +462,10 @@ export function ItemListingForm({
   }, [])
 
   const handleQuickStartIntentSelect = useCallback((intent: 'exchange' | 'donate' | 'recycle') => {
+    if (intent === 'recycle') {
+      toast.info('Recycle is coming soon')
+      return
+    }
     setQuickStartIntent(intent)
     setCurrentStep(1)
     setFormData(prev => ({
@@ -480,6 +481,9 @@ export function ItemListingForm({
     const nextFulfillment: 'pickup' | 'dropoff' = intent === 'donate' ? 'dropoff' : 'pickup'
     setQuickStartFulfillment(nextFulfillment)
     handleFulfillmentSelect(nextFulfillment)
+    if (intent === 'donate') {
+      setShowDropOffSelector(true)
+    }
   }, [handleFulfillmentSelect, defaultPickupAddress])
 
   const handleQuickStartFulfillmentSelect = useCallback((method: 'pickup' | 'dropoff') => {
@@ -497,7 +501,7 @@ export function ItemListingForm({
     }
 
     setQuickStartIntent(initialIntent)
-    const defaultMethod: 'pickup' | 'dropoff' = 'pickup'
+    const defaultMethod: 'pickup' | 'dropoff' = initialIntent === 'donate' ? 'dropoff' : 'pickup'
     setQuickStartFulfillment(defaultMethod)
     setCurrentStep(1)
     setFormData(prev => ({
@@ -548,7 +552,7 @@ export function ItemListingForm({
 
   useEffect(() => {
     const effectiveMethod = effectiveFulfillmentMethod
-    if (currentStep === 4 && effectiveMethod === 'dropoff' && !formData.dropOffLocation) {
+    if (currentStep === 2 && effectiveMethod === 'dropoff' && !formData.dropOffLocation) {
       setShowDropOffSelector(true)
     }
   }, [currentStep, formData.dropOffLocation, effectiveFulfillmentMethod])
@@ -618,28 +622,88 @@ export function ItemListingForm({
         setModerationResult(moderation)
       }
 
+      // Ensure photos are uploaded to Cloudinary (unsigned). If a photo is already a URL, keep it.
+      const uploadedPhotoUrls: string[] = []
+      for (const p of formData.photos) {
+        if (/^https?:\/\//i.test(p)) {
+          uploadedPhotoUrls.push(p)
+        } else {
+          // p is a data URL; Cloudinary accepts data URLs as file param
+          const up = await uploadImageToCloudinary(p, { alt: formData.title || 'listing-image' })
+          uploadedPhotoUrls.push(up.secureUrl)
+        }
+      }
+
+      // Build API payload (do not send estimated_co2_saved_kg)
+      const conditionMap: Record<string, 'new' | 'like_new' | 'good' | 'fair' | 'poor'> = {
+        excellent: 'like_new',
+        good: 'good',
+        fair: 'fair',
+        poor: 'poor',
+      }
+
+      const isDropoff = fulfillmentMethod === 'dropoff'
+      const addressLine = isDropoff
+        ? (formData.dropOffLocation?.address || formData.location || '')
+        : (formData.location || '')
+
+      // Derive postcode (required by API)
+      const explicitPostcode = isDropoff
+        ? (formData.dropOffLocation?.postcode || '')
+        : (user?.postcode || '')
+
+      const postcode = explicitPostcode || extractPostcode(addressLine)
+      if (!postcode) {
+        toast.error('Please include a valid postcode (e.g. in your address or profile).')
+        setIsSubmitting(false)
+        return
+      }
+
+      const images = uploadedPhotoUrls.map((url) => ({ url }))
+
+      const payload = {
+        title: formData.title,
+        description: formData.description || undefined,
+        condition: conditionMap[formData.condition as keyof typeof conditionMap] || 'good',
+        category: formData.category,
+        address_line: addressLine,
+        postcode,
+        images: images.length ? images : undefined,
+        pickup_option: formData.actionType,
+        dropoff_location_id: isDropoff ? formData.dropOffLocation?.id : undefined,
+        delivery_preferences: formData.handoverNotes || undefined,
+        metadata: undefined,
+        size_unit: 'm' as const,
+        size_length: 0,
+        size_breadth: 0,
+        size_height: 0,
+        weight_kg: 0,
+      }
+
+      const created = await createItem(payload)
+
+      const server = created?.data
       const newListing: CreatedListing = {
-        id: `listing-${Date.now()}`,
+        id: String(server?.id || `listing-${Date.now()}`),
         ...formData,
         fulfillmentMethod,
         dropOffLocation: formData.dropOffLocation,
         userId: user.id,
         userName: user.name || 'Anonymous User',
-        status: listingStatus,
-        createdAt: new Date().toISOString(),
+        status: mapServerStatusToClient(server?.status) as CreatedListing['status'],
+        createdAt: String(server?.created_at || new Date().toISOString()),
         views: 0,
         interested: [],
         valuation: listingValuation,
         rewardPoints,
         moderation,
         aiClassification: classification,
-        co2Impact: carbonImpact
+        co2Impact: typeof server?.estimated_co2_saved_kg === 'number' ? server!.estimated_co2_saved_kg! : carbonImpact
       }
 
-      // Add to user's listings
+      // Persist locally for the rest of the UI flows
       setListings(currentListings => [...currentListings, newListing])
 
-      // Add to global listings for browsing
       const globalListings = await kvGet('global-listings') || []
       await kvSet('global-listings', [...globalListings, newListing])
 
@@ -704,6 +768,8 @@ export function ItemListingForm({
       setGeneratedQRCode(qrCodeData)
       setLastCreatedListing(newListing)
 
+      // Photos now point to permanent Cloudinary URLs
+
       if (fulfillmentMethod === 'dropoff' && formData.dropOffLocation) {
         const emailLog = await kvGet('email-log') || []
         const partnerEmail = `${formData.dropOffLocation.name
@@ -759,6 +825,22 @@ export function ItemListingForm({
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  function mapServerStatusToClient(status?: string): CreatedListing['status'] {
+    const s = String(status || '').toLowerCase()
+    if (s === 'pending_dropoff') return 'pending_dropoff'
+    if (s === 'claimed' || s === 'awaiting_collection') return 'claimed'
+    if (s === 'complete' || s === 'recycled') return 'collected'
+    if (s === 'active' || !s) return 'active'
+    return 'active'
+  }
+
+  function extractPostcode(text?: string): string {
+    if (!text) return ''
+    // Very light UK postcode pattern (not exhaustive), case-insensitive
+    const m = text.toUpperCase().match(/[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}/)
+    return m ? m[0].replace(/\s+/, ' ') : ''
   }
 
   const handleQRCodeClose = () => {
@@ -818,7 +900,7 @@ export function ItemListingForm({
                 Let&apos;s set up your next listing
               </DialogTitle>
               <DialogDescription>
-                Choose what you&apos;d like to do and how the handover should work. Exchange uses your saved address by default; only donations use pick-up service.
+                Choose what you&apos;d like to do. Exchange uses your saved address by default; donations require selecting a drop-off partner.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6">
@@ -826,12 +908,14 @@ export function ItemListingForm({
                 {(['exchange','donate','recycle'] as const).map((intentKey) => {
                   const config = INTENT_CONFIG[intentKey]
                   const isSelected = quickStartIntent === intentKey
+                  const isDisabled = intentKey === 'recycle'
                   return (
                     <button
                       key={intentKey}
                       type="button"
-                      onClick={() => handleQuickStartIntentSelect(intentKey)}
-                      className={`relative overflow-hidden rounded-2xl border p-5 text-left transition focus:outline-none focus:ring-2 focus:ring-primary/40 ${isSelected ? 'border-primary shadow-lg' : 'border-border/60 shadow-sm hover:border-primary/40 hover:shadow-md'}`}
+                      onClick={() => !isDisabled && handleQuickStartIntentSelect(intentKey)}
+                      disabled={isDisabled}
+                      className={`relative overflow-hidden rounded-2xl border p-5 text-left transition focus:outline-none focus:ring-2 focus:ring-primary/40 ${isSelected ? 'border-primary shadow-lg' : 'border-border/60 shadow-sm hover:border-primary/40 hover:shadow-md'} ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
                       <span className={`pointer-events-none absolute inset-0 -z-10 rounded-2xl bg-gradient-to-br ${config.accent}`} aria-hidden="true" />
                       <div className="flex items-center gap-3 text-primary">
@@ -844,58 +928,16 @@ export function ItemListingForm({
                         </div>
                       </div>
                       <div className="mt-4 text-xs font-semibold uppercase tracking-wide text-primary">
-                        {isSelected ? 'Selected' : 'Use this focus'}
+                        {isDisabled ? 'Coming soon' : isSelected ? 'Selected' : 'Use this focus'}
                       </div>
                     </button>
                   )
                 })}
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                {FULFILLMENT_OPTIONS.filter((option) =>
-                  quickStartIntent === 'donate' ? option.value === 'dropoff' : option.value === 'pickup'
-                ).map((option) => {
-                  const Icon = option.icon
-                  const isSelected = quickStartFulfillment === option.value
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => handleQuickStartFulfillmentSelect(option.value)}
-                      className={`relative overflow-hidden rounded-2xl border p-5 text-left transition focus:outline-none focus:ring-2 focus:ring-primary/40 ${
-                        isSelected ? 'border-primary shadow-lg' : 'border-border/60 shadow-sm hover:border-primary/40 hover:shadow-md'
-                      }`}
-                    >
-                      <span className={`pointer-events-none absolute inset-0 -z-10 rounded-2xl bg-gradient-to-br ${option.accent}`} aria-hidden="true" />
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-background/75 shadow-inner">
-                          <Icon size={20} className="text-foreground" />
-                        </span>
-                        <div className="flex-1">
-                          <p className="font-semibold text-foreground">{option.title}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">{option.description}</p>
-                        </div>
-                      </div>
-                      <span className="mt-auto text-xs font-semibold text-primary">
-                        {isSelected ? 'Selected' : 'Choose option'}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
+              {/* Fulfillment options removed in quick start modal */}
 
-              <div className="space-y-2">
-                <Label htmlFor="quickstart-notes" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Optional notes for collectors
-                </Label>
-                <Textarea
-                  id="quickstart-notes"
-                  placeholder="Share access tips, preferred timings, or sustainability highlights..."
-                  value={formData.handoverNotes}
-                  onChange={(event) => handleInputChange('handoverNotes', event.target.value)}
-                  className="min-h-[96px] bg-background/80"
-                />
-              </div>
+              {/* Notes removed in quick start modal */}
 
               <div className="flex justify-end">
                 <Button type="button" variant="secondary" onClick={() => { setShowQuickStart(false); scrollToDetailCard() }}>
@@ -911,7 +953,7 @@ export function ItemListingForm({
               <Badge variant="secondary" className="w-fit uppercase tracking-widest text-xs">Quick start</Badge>
               <h2 className="text-h3 font-semibold text-foreground">Let&apos;s set up your next listing</h2>
               <p className="text-sm text-muted-foreground">
-                Choose what you&apos;d like to do and how the handover should work. We&apos;ll carry these preferences into the detailed form below.
+                Choose what you&apos;d like to do. We&apos;ll carry this into the detailed form below.
               </p>
             </div>
 
@@ -919,12 +961,14 @@ export function ItemListingForm({
               {Object.entries(INTENT_CONFIG).map(([value, config]) => {
                 const intentValue = value as 'exchange' | 'donate' | 'recycle'
                 const isSelected = quickStartIntent === intentValue
+                const isDisabled = intentValue === 'recycle'
                 return (
                   <button
                     key={value}
                     type="button"
-                    onClick={() => handleQuickStartIntentSelect(intentValue)}
-                    className={`relative overflow-hidden rounded-2xl border p-5 text-left transition focus:outline-none focus:ring-2 focus:ring-primary/40 ${isSelected ? 'border-primary shadow-lg' : 'border-border/60 shadow-sm hover:border-primary/40 hover:shadow-md'}`}
+                    onClick={() => !isDisabled && handleQuickStartIntentSelect(intentValue)}
+                    disabled={isDisabled}
+                    className={`relative overflow-hidden rounded-2xl border p-5 text-left transition focus:outline-none focus:ring-2 focus:ring-primary/40 ${isSelected ? 'border-primary shadow-lg' : 'border-border/60 shadow-sm hover:border-primary/40 hover:shadow-md'} ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
                     <span
                       className={`pointer-events-none absolute inset-0 -z-10 rounded-2xl bg-gradient-to-br ${config.accent}`}
@@ -940,62 +984,16 @@ export function ItemListingForm({
                       </div>
                     </div>
                     <div className="mt-4 text-xs font-semibold uppercase tracking-wide text-primary">
-                      {isSelected ? 'Selected' : 'Use this focus'}
+                      {isDisabled ? 'Coming soon' : isSelected ? 'Selected' : 'Use this focus'}
                     </div>
                   </button>
                 )
               })}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              {FULFILLMENT_OPTIONS.map((option) => {
-                const Icon = option.icon
-                const isSelected = quickStartFulfillment === option.value || (quickStartIntent === 'donate' && option.value === 'dropoff')
-                const isDisabled = quickStartIntent === 'donate' && option.value === 'pickup'
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => handleQuickStartFulfillmentSelect(option.value)}
-                    disabled={isDisabled}
-                    className={`relative flex h-full flex-col items-start gap-3 rounded-2xl border p-5 text-left transition focus:outline-none focus:ring-2 focus:ring-primary/40 ${isSelected ? 'border-primary shadow-lg bg-primary/10' : 'border-border/60 bg-background/80 shadow-sm hover:border-primary/40 hover:shadow-md'} ${isDisabled ? 'cursor-not-allowed opacity-60' : ''}`}
-                  >
-                    <span
-                      className={`pointer-events-none absolute inset-0 -z-10 rounded-2xl bg-gradient-to-br ${option.accent}`}
-                      aria-hidden="true"
-                    />
-                    <div className="flex items-center gap-3 text-primary">
-                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-background/75 shadow-inner">
-                        <Icon size={22} />
-                      </span>
-                      <div>
-                        <p className="font-semibold text-foreground">{option.title}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{option.description}</p>
-                      </div>
-                    </div>
-                    <span className="mt-auto text-xs font-semibold text-primary">
-                      {isDisabled ? 'Required for donations' : isSelected ? 'Selected' : 'Choose option'}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
+            {/* Fulfillment options removed in quick actions section */}
 
-            <div className="grid gap-4 md:grid-cols-[3fr_2fr]">
-              <div className="space-y-2">
-                <Label htmlFor="quickstart-notes" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Optional notes for collectors or partner hubs
-                </Label>
-                <Textarea
-                  id="quickstart-notes"
-                  placeholder="Share access tips, preferred timings, or sustainability highlights..."
-                  value={formData.handoverNotes}
-                  onChange={(event) => handleInputChange('handoverNotes', event.target.value)}
-                  className="min-h-[96px] bg-background/80"
-                />
-              </div>
-              
-            </div>
+            {/* Notes removed in quick actions section */}
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
@@ -1017,6 +1015,17 @@ export function ItemListingForm({
             <CardDescription>
               Step {currentStep} of {totalSteps}: Help reduce waste by listing your item
             </CardDescription>
+            <div className="mt-2 rounded-md border bg-muted/40 p-3 text-sm">
+              <div className="flex flex-wrap items-center gap-3">
+                <span><span className="font-semibold">Action:</span> {formData.actionType === 'donate' ? 'Donate' : 'Exchange'}</span>
+                <span><span className="font-semibold">Category:</span> {formData.category || 'Not set'}</span>
+                {formData.actionType === 'donate' && formData.dropOffLocation && (
+                  <span>
+                    <span className="font-semibold">Drop-off:</span> {formData.dropOffLocation.name} — {formData.dropOffLocation.address}
+                  </span>
+                )}
+              </div>
+            </div>
             <Progress value={progress} className="mt-2" />
           </CardHeader>
           <CardContent className="space-y-6">
@@ -1089,6 +1098,49 @@ export function ItemListingForm({
                 )}
               </div>
             </div>
+            {/* Merge Step 2: Category & Condition here */}
+            <div className="space-y-4">
+              <div>
+                <Label>Category *</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                  {CATEGORIES.map(category => (
+                    <Button
+                      key={category}
+                      type="button"
+                      variant={formData.category === category ? "default" : "outline"}
+                      onClick={() => handleInputChange('category', category)}
+                      className="h-auto p-3 text-center"
+                    >
+                      {category}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label>Condition *</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                  {CONDITIONS.map(condition => (
+                    <Card 
+                      key={condition.value}
+                      className={`cursor-pointer transition-colors ${
+                        formData.condition === condition.value 
+                          ? 'border-primary bg-primary/5' 
+                          : 'hover:border-primary/50'
+                      }`}
+                      onClick={() => handleInputChange('condition', condition.value)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="font-medium">{condition.label}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {condition.description}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            </div>
               </div>
             )}
             {false && (classificationLoading || classificationResult || moderationLoading || moderationResult) && (
@@ -1142,94 +1194,10 @@ export function ItemListingForm({
             )}
 
 
-        {/* Step 2: Category & Condition */}
+        {/* Step 2 merged into Step 1; Step 3 removed */}
+
+        {/* Step 2: Hand-off & Location */}
         {currentStep === 2 && (
-          <div className="space-y-4">
-            <div>
-              <Label>Category *</Label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
-                {CATEGORIES.map(category => (
-                  <Button
-                    key={category}
-                    type="button"
-                    variant={formData.category === category ? "default" : "outline"}
-                    onClick={() => handleInputChange('category', category)}
-                    className="h-auto p-3 text-center"
-                  >
-                    {category}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <Label>Condition *</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                {CONDITIONS.map(condition => (
-                  <Card 
-                    key={condition.value}
-                    className={`cursor-pointer transition-colors ${
-                      formData.condition === condition.value 
-                        ? 'border-primary bg-primary/5' 
-                        : 'hover:border-primary/50'
-                    }`}
-                    onClick={() => handleInputChange('condition', condition.value)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="font-medium">{condition.label}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {condition.description}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Action Type */}
-        {currentStep === 3 && (
-          <div className="space-y-4">
-            <div>
-              <Label>What would you like to do with this item? *</Label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                {ACTION_TYPES.map(action => {
-                  const IconComponent = action.icon
-                  return (
-                    <Card 
-                      key={action.value}
-                      className={`cursor-pointer transition-colors ${
-                        formData.actionType === action.value 
-                          ? 'border-primary bg-primary/5' 
-                          : 'hover:border-primary/50'
-                      }`}
-                      onClick={() => handleInputChange('actionType', action.value)}
-                    >
-                      <CardContent className="p-4 text-center">
-                        <IconComponent 
-                          size={32} 
-                          className={`mx-auto mb-2 ${
-                            formData.actionType === action.value 
-                              ? 'text-primary' 
-                              : 'text-muted-foreground'
-                          }`} 
-                        />
-                        <div className="font-medium">{action.label}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {action.description}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Hand-off & Location */}
-        {currentStep === 4 && (
           <div className="space-y-4">
               {/* Removed hand-off choice UI — Exchange shows pickup only, Donate uses partner shop */}
 

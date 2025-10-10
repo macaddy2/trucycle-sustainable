@@ -14,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ChatCircle, CheckCircle, Clock, Package, PencilSimpleLine, Plus, ShieldCheck, X } from '@phosphor-icons/react'
 import { Textarea } from '@/components/ui/textarea'
 import { useMessaging, useExchangeManager, useNotifications } from '@/hooks'
+import { listMyItems, listMyCollectedItems } from '@/lib/api'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import type { ManagedListing } from '@/types/listings'
 
@@ -319,6 +320,76 @@ export function MyListingsView({
   const handleOpenListingDetails = (listingId: string) => {
     setSelectedListingId(listingId)
     setShowDetailModal(true)
+  }
+
+  // Load server-backed data for my listed / collected items
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        if (isCollector) {
+          const res = await listMyCollectedItems({ limit: 50 })
+          const entries = res?.data?.items || []
+          const mapped: ManagedListing[] = entries.map((e: any) => {
+            const it = e?.item || {}
+            return {
+              id: String(it.id || crypto.randomUUID()),
+              title: String(it.title || 'Untitled'),
+              description: String(it.description || ''),
+              status: mapServerStatusToClient(it.status),
+              category: String(it.category || 'Other'),
+              createdAt: String(it.created_at || new Date().toISOString()),
+              actionType: (it.pickup_option || 'donate') as ManagedListing['actionType'],
+              fulfillmentMethod: (it.pickup_option === 'donate' ? 'dropoff' : 'pickup'),
+              location: it.location?.address_line || it.location?.postcode,
+              photos: Array.isArray(it.images) ? it.images.map((img: any) => img?.url).filter(Boolean) : undefined,
+              valuation: undefined,
+              rewardPoints: undefined,
+              co2Impact: typeof it.estimated_co2_saved_kg === 'number' ? it.estimated_co2_saved_kg : undefined,
+              aiClassification: undefined,
+              moderation: undefined,
+            }
+          })
+          if (!cancelled) setListings(mapped)
+        } else {
+          const res = await listMyItems({ limit: 50 })
+          const items = res?.data?.items || []
+          const mapped: ManagedListing[] = items.map((it: any) => ({
+            id: String(it.id || crypto.randomUUID()),
+            title: String(it.title || 'Untitled'),
+            description: '',
+            status: mapServerStatusToClient(it.status),
+            category: 'Other',
+            createdAt: String(it.created_at || new Date().toISOString()),
+            actionType: (it.pickup_option || 'donate') as ManagedListing['actionType'],
+            fulfillmentMethod: (it.pickup_option === 'donate' ? 'dropoff' : 'pickup'),
+            location: it.location?.address_line || it.location?.postcode,
+            photos: Array.isArray(it.images) ? it.images.map((img: any) => img?.url).filter(Boolean) : undefined,
+            valuation: undefined,
+            rewardPoints: undefined,
+            co2Impact: typeof it.estimated_co2_saved_kg === 'number' ? it.estimated_co2_saved_kg : undefined,
+            aiClassification: undefined,
+            moderation: undefined,
+          }))
+          if (!cancelled) setListings(mapped)
+        }
+      } catch (e: any) {
+        // Do not use demo/fallback data
+        setListings([])
+        toast.error(e?.message || 'Failed to load your items')
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [isCollector, setListings])
+
+  function mapServerStatusToClient(status: unknown): ManagedListing['status'] {
+    const s = String(status || '').toLowerCase()
+    if (s === 'pending_dropoff') return 'pending_dropoff'
+    if (s === 'claimed' || s === 'awaiting_collection') return 'claimed'
+    if (s === 'complete' || s === 'recycled') return 'collected'
+    if (s === 'active' || !s) return 'active'
+    return 'active'
   }
 
   const handleApproveRequest = async (request: ClaimRequest) => {

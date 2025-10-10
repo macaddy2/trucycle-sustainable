@@ -365,7 +365,7 @@ export function RatingList({ userId, ratings, showAll = false, className = '' }:
               <Avatar className="w-8 h-8">
                 <AvatarImage src={rating.reviewerAvatar} />
                 <AvatarFallback className="text-xs">
-                  {rating.reviewerName[0]}
+                  {(rating.reviewerName || '?')[0]}
                 </AvatarFallback>
               </Avatar>
               <div>

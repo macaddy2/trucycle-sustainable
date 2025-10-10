@@ -11,6 +11,12 @@ import type {
   Tokens,
   VerifyDto,
   MeResponse,
+  // items
+  CreateItemDto,
+  SearchItemsResponse,
+  CreateItemResponse,
+  MyListedItemsResponse,
+  MyCollectedItemsResponse,
 } from './types'
 
 const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '') || ''
@@ -154,3 +160,53 @@ export const tokens = {
   clear: clearTokens,
 }
 
+// Helper: build query string from params
+function toQuery(params: Record<string, any> | undefined): string {
+  if (!params) return ''
+  const sp = new URLSearchParams()
+  Object.entries(params).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === '') return
+    sp.append(k, String(v))
+  })
+  const qs = sp.toString()
+  return qs ? `?${qs}` : ''
+}
+
+// ITEMS ENDPOINTS
+export async function searchItems(params?: {
+  lat?: number
+  lng?: number
+  postcode?: string
+  radius?: number
+  status?: string
+  category?: string
+  page?: number
+  limit?: number
+}) {
+  const qs = toQuery(params)
+  return request<ApiEnvelope<SearchItemsResponse>>(`/items${qs}`)
+}
+
+export async function createItem(dto: CreateItemDto) {
+  // IMPORTANT: do NOT include estimated_co2_saved_kg (backend calculates it)
+  return request<ApiEnvelope<CreateItemResponse>>('/items', {
+    method: 'POST',
+    auth: true,
+    body: dto,
+  })
+}
+
+export async function listMyItems(params?: { status?: string; page?: number; limit?: number }) {
+  const qs = toQuery(params)
+  return request<ApiEnvelope<MyListedItemsResponse>>(`/items/me/listed${qs}`, { auth: true })
+}
+
+export async function listMyCollectedItems(params?: {
+  status?: string
+  claim_status?: string
+  page?: number
+  limit?: number
+}) {
+  const qs = toQuery(params)
+  return request<ApiEnvelope<MyCollectedItemsResponse>>(`/items/me/collected${qs}`, { auth: true })
+}

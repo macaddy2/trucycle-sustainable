@@ -22,6 +22,7 @@ import { VerificationBadge } from './VerificationBadge'
 import type { VerificationLevel } from './verificationBadgeUtils'
 import { RatingDisplay } from './RatingSystem'
 import { toast } from 'sonner'
+import { searchItems } from '@/lib/api'
 
 interface UserProfile {
   id: string
@@ -159,7 +160,7 @@ interface ItemListingProps {
 
 export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpenMessages }: ItemListingProps) {
   const [currentUser] = useKV<UserProfile | null>('current-user', null)
-  const [globalListings] = useKV<ListingItem[]>('global-listings', [])
+  
   const [items, setItems] = useState<ListingItem[]>([])
   const [activeItem, setActiveItem] = useState<ListingItem | null>(null)
   const [selectedCategory, setSelectedCategory] = useState('All')
@@ -172,9 +173,80 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
     getRequestsForItem,
   } = useExchangeManager()
 
+  // Load from API; no demo fallback
+
   useEffect(() => {
-    setItems([...sampleItems, ...globalListings])
-  }, [globalListings])
+    let cancelled = false
+    async function load() {
+      try {
+        const categoryParam = selectedCategory && selectedCategory !== 'All' ? selectedCategory : undefined
+        const coordsLat = (currentUser as any)?.lat ?? (currentUser as any)?.latitude
+        const coordsLng = (currentUser as any)?.lng ?? (currentUser as any)?.longitude
+        const profilePostcode = currentUser?.postcode && String(currentUser.postcode).trim()
+        const params: any = { radius: 5, limit: 20 }
+        if (typeof coordsLat === 'number' && typeof coordsLng === 'number') {
+          params.lat = coordsLat
+          params.lng = coordsLng
+        } else if (profilePostcode) {
+          params.postcode = profilePostcode
+        } else {
+          params.postcode = 'IG11 7FR'
+        }
+        if (categoryParam) params.category = categoryParam
+
+        const result = await searchItems(params)
+        const apiItems = (result?.data?.items || []).map((it) => mapPublicItemToListingItem(it))
+        if (!cancelled) {
+          // Do not use demo data; only API results
+          setItems(apiItems)
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setItems([])
+          toast.error(e?.message || 'Failed to load items')
+        }
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [selectedCategory, currentUser])
+
+  function mapPublicItemToListingItem(it: any): ListingItem {
+    const cond = String(it?.condition || '').toLowerCase()
+    const condition: ListingItem['condition'] = cond === 'new' || cond === 'like_new' ? 'excellent' : (['good','fair','poor'].includes(cond) ? (cond as any) : 'good')
+    const owner = it?.owner || {}
+    const verification = owner?.verification || {}
+    const ownerVerificationLevel: VerificationLevel = {
+      email: Boolean(verification.email_verified),
+      phone: false,
+      identity: Boolean(verification.identity_verified),
+      address: Boolean(verification.address_verified),
+      payment: false,
+      community: false,
+    }
+    const photos = Array.isArray(it?.images) ? it.images.map((img: any) => img?.url).filter(Boolean) : []
+    const distance = typeof it?.distance_km === 'number' ? `${it.distance_km.toFixed(1)} km` : ''
+    const actionType = (it?.pickup_option || 'donate') as ListingItem['actionType']
+    return {
+      id: String(it?.id || crypto.randomUUID()),
+      title: String(it?.title || 'Untitled'),
+      description: String(it?.description || ''),
+      category: String(it?.category || 'Other'),
+      condition,
+      location: it?.location?.postcode || '',
+      distance,
+      actionType,
+      photos,
+      createdAt: String(it?.created_at || new Date().toISOString()),
+      co2Impact: typeof it?.estimated_co2_saved_kg === 'number' ? it.estimated_co2_saved_kg : 0,
+      verified: Boolean(verification?.email_verified) || Boolean(verification?.identity_verified) || Boolean(verification?.address_verified),
+      ownerId: String(owner?.id || ''),
+      ownerName: String(owner?.name || 'User'),
+      ownerAvatar: owner?.profile_image || undefined,
+      ownerRating: typeof owner?.rating === 'number' ? owner.rating : undefined,
+      ownerVerificationLevel,
+    }
+  }
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {

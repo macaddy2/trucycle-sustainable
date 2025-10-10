@@ -595,7 +595,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                                               {request.collectorAvatar ? (
                                                 <AvatarImage src={request.collectorAvatar} alt={request.collectorName} />
                                               ) : (
-                                                <AvatarFallback>{request.collectorName[0]}</AvatarFallback>
+                                                <AvatarFallback>{(request.collectorName || '?')[0]}</AvatarFallback>
                                               )}
                                             </Avatar>
                                             <div>
@@ -679,7 +679,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                                     <Avatar className="w-10 h-10">
                                       <AvatarImage src={currentUser.id === chat.donorId ? chat.collectorAvatar : chat.donorAvatar} />
                                       <AvatarFallback>
-                                        {(currentUser.id === chat.donorId ? chat.collectorName : chat.donorName)[0]}
+                                        {((currentUser.id === chat.donorId ? chat.collectorName : chat.donorName) || '?')[0]}
                                       </AvatarFallback>
                                     </Avatar>
       
@@ -725,7 +725,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                               <Avatar>
                                 <AvatarImage src={currentUser.id === selectedChat.donorId ? selectedChat.collectorAvatar : selectedChat.donorAvatar} />
                                 <AvatarFallback>
-                                  {(currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName)[0]}
+                                  {((currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName) || '?')[0]}
                                 </AvatarFallback>
                               </Avatar>
                               <div>

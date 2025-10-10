@@ -54,7 +54,7 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
             </CardTitle>
             <CardDescription className="mt-2 space-y-1">
               <span className="block text-xs font-semibold uppercase tracking-wide text-primary">
-                Step 2 of 3 — Choose a drop-off partner
+                Choose a drop-off partner
               </span>
               <span>
                 Explore trusted TruCycle partners with real-time availability, amenities, and travel-friendly insights.
