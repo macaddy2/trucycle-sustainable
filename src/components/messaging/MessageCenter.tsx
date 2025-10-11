@@ -12,11 +12,12 @@ import {
   CheckCircle,
   MapPin,
   Package,
-  CalendarCheck
+  CalendarCheck,
+  Paperclip
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useMessaging, useExchangeManager } from '@/hooks'
-import { sendGeneralMessage } from '@/lib/api'
+import { sendGeneralMessage, sendImageMessage } from '@/lib/api'
 import { useKV } from '@/hooks/useKV'
 import type { ManagedListing } from '@/types/listings'
 import type { Chat as MessagingChat, Message as MessagingMessage } from '@/hooks/useMessaging'
@@ -323,23 +324,44 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   }, [selectedChatId])
 
   const sendSystemMessage = useCallback(async (chatIdValue: string, content: string, action: string) => {
-    dispatchMessage(chatIdValue, content, 'system', { systemAction: action })
     try {
       const chat = normalizedChats.find(c => c.id === chatIdValue)
       if (chat?.remoteRoomId) {
         await sendGeneralMessage(chat.remoteRoomId, { text: content, title: action })
       }
-    } catch {
-      // ignore backend send failure; local system message already displayed
-    }
-  }, [dispatchMessage, normalizedChats])
+    } catch {}
+  }, [normalizedChats])
 
   const handleSendMessage = () => {
     if (!selectedChat) return
     if (!newMessage.trim()) return
     dispatchMessage(selectedChat.id, newMessage.trim())
     setNewMessage('')
-    toast.success('Message sent')
+  }
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const handlePickImage = () => fileInputRef.current?.click()
+  const handleImageSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !selectedChat) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Only image files are supported')
+      return
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      toast.error('Image is too large. Max 3MB')
+      return
+    }
+    try {
+      const chat = normalizedChats.find(c => c.id === selectedChat.id)
+      if (!chat?.remoteRoomId) return
+      const caption = newMessage.trim() || undefined
+      await sendImageMessage(chat.remoteRoomId, file, caption)
+      if (caption) setNewMessage('')
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to send image')
+    }
   }
 
   const shareLocation = useCallback(() => {
@@ -836,7 +858,17 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                           )}
       
                           <div className="p-4 border-t border-border">
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 items-center">
+                              <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleImageSelected}
+                              />
+                              <Button type="button" variant="outline" size="icon" onClick={handlePickImage} title="Attach image">
+                                <Paperclip size={16} />
+                              </Button>
                               <Input
                                 placeholder="Type your message..."
                                 value={newMessage}
@@ -849,7 +881,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                                 }}
                                 className="flex-1"
                               />
-                              <Button onClick={handleSendMessage} disabled={!newMessage.trim()} size="icon">
+                              <Button onClick={handleSendMessage} disabled={!newMessage.trim()} size="icon" title="Send">
                                 <PaperPlaneTilt size={16} />
                               </Button>
                             </div>

@@ -44,7 +44,7 @@ import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
-import { useInitializeSampleData, useRecommendationNotifications, useNotifications, useExchangeManager } from '@/hooks'
+import { useRecommendationNotifications, useNotifications, useExchangeManager } from '@/hooks'
 import type { ListingCompletionDetails } from './components/ItemListingForm'
 
 interface UserProfile {
@@ -87,7 +87,6 @@ function App() {
   const [messageCenterChatId, setMessageCenterChatId] = useState<string | undefined>()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   
-  const { initializeSampleChats } = useInitializeSampleData()
   const {
     notifications: systemNotifications,
     markAsRead: markSystemNotificationAsRead,
@@ -243,12 +242,7 @@ function App() {
     }
   }, [user, hasDismissedOnboarding])
 
-  // Initialize sample data when user logs in
-  useEffect(() => {
-    if (user) {
-      initializeSampleChats()
-    }
-  }, [initializeSampleChats, user])
+  // Remove sample chat initialization; rely on server rooms/messages
 
   useEffect(() => {
     const handleOpenProfileOnboarding = () => {

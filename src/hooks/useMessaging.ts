@@ -1,8 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import { messageSocket } from '@/lib/messaging/socket'
-import { createOrFindRoom, listRoomMessages } from '@/lib/api'
+import { createOrFindRoom, listRoomMessages, sendGeneralMessage } from '@/lib/api'
 import type { DMMessageView } from '@/lib/api/types'
 
 interface UserProfile {
@@ -61,8 +61,8 @@ interface Chat {
 
 export function useMessaging() {
   const [currentUser] = useKV<UserProfile | null>('current-user', null)
-  const [chats, setChats] = useKV<Chat[]>('user-chats', [])
-  const [messages, setMessages] = useKV<Record<string, Message[]>>('chat-messages', {})
+  const [chats, setChats] = useState<Chat[]>([])
+  const [messages, setMessages] = useState<Record<string, Message[]>>({})
 
   // Connect WS and handle incoming events
   useEffect(() => {
@@ -194,59 +194,19 @@ export function useMessaging() {
       return
     }
 
-    const message: Message = {
-      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      chatId,
-      senderId: currentUser.id,
-      senderName: currentUser.name,
-      senderAvatar: currentUser.avatar,
-      content,
-      timestamp: new Date(),
-      type,
-      status: 'sent',
-      metadata
-    }
-
-    // Add message to chat
-    setMessages(prev => ({
-      ...prev,
-      [chatId]: [...(prev[chatId] || []), message]
-    }))
-
-    // Update chat's last message and timestamp
-    setChats(prev => prev.map(chat => 
-      chat.id === chatId 
-        ? { 
-            ...chat, 
-            lastMessage: message,
-            updatedAt: new Date()
-          }
-        : chat
-    ))
-
-    // Send over WS if linked to a server room (text only here)
+    // Do not optimistically add to UI; rely on 'message:new' events
     try {
       const chat = chats.find(c => c.id === chatId)
       if (chat?.remoteRoomId && type === 'text') {
         await messageSocket.sendMessage(chat.remoteRoomId, content)
+      } else if (chat?.remoteRoomId && type === 'system') {
+        await sendGeneralMessage(chat.remoteRoomId, { text: content, title: metadata?.systemAction })
       }
-    } catch {
-      // ignore WS errors for now
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to send message')
     }
 
-    // Simulate message delivery (in real app, this would be handled by backend)
-    setTimeout(() => {
-      setMessages(prev => ({
-        ...prev,
-        [chatId]: prev[chatId]?.map(msg => 
-          msg.id === message.id 
-            ? { ...msg, status: 'delivered' }
-            : msg
-        ) || []
-      }))
-    }, 500)
-
-    return message.id
+    return undefined
   }
 
   const markMessagesAsRead = (chatId: string) => {
@@ -297,126 +257,5 @@ export function useMessaging() {
     toast.success('Chat deleted')
   }
 
-  const simulateIncomingMessage = (chatId: string, fromUserId: string, fromUserName: string, content: string) => {
-    const message: Message = {
-      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      chatId,
-      senderId: fromUserId,
-      senderName: fromUserName,
-      content,
-      timestamp: new Date(),
-      type: 'text',
-      status: 'delivered'
-    }
-
-    setMessages(prev => ({
-      ...prev,
-      [chatId]: [...(prev[chatId] || []), message]
-    }))
-
-    // Update chat and increment unread if not currently viewing
-    setChats(prev => prev.map(chat => 
-      chat.id === chatId 
-        ? { 
-            ...chat, 
-            lastMessage: message,
-            unreadCount: chat.unreadCount + 1,
-            updatedAt: new Date()
-          }
-        : chat
-    ))
-
-    toast.info(`New message from ${fromUserName}`)
-  }
-
-  const getChatById = (chatId: string) => {
-    return chats.find(chat => chat.id === chatId)
-  }
-
-  const getMessagesForChat = (chatId: string) => {
-    return messages[chatId] || []
-  }
-
-  const getTotalUnreadCount = () => {
-    return chats.reduce((total, chat) => total + chat.unreadCount, 0)
-  }
-
-  const getChatForItem = (itemId: string) => {
-    return chats.find(chat => chat.itemId === itemId)
-  }
-
-  return {
-    chats,
-    messages,
-    currentUser,
-    createOrGetChat,
-    sendMessage,
-    markMessagesAsRead,
-    updateChatStatus,
-    deleteChat,
-    simulateIncomingMessage,
-    getChatById,
-    getMessagesForChat,
-    getTotalUnreadCount,
-    getChatForItem,
-    linkChatToRoom: (chatId: string, remoteRoomId: string) => {
-      setChats(prev => prev.map(c => c.id === chatId ? { ...c, remoteRoomId } : c))
-    },
-    ensureRemoteRoomForChat: async (chatId: string) => {
-      const chat = chats.find(c => c.id === chatId)
-      if (!currentUser || !chat) return null
-      if (chat.remoteRoomId) {
-        try { await messageSocket.joinRoom(currentUser.id === chat.donorId ? chat.collectorId : chat.donorId) } catch {}
-        return chat.remoteRoomId
-      }
-      const otherUserId = currentUser.id === chat.donorId ? chat.collectorId : chat.donorId
-      try {
-        const res = await createOrFindRoom(otherUserId)
-        const roomId = res?.data?.id
-        if (roomId) {
-          setChats(prev => prev.map(c => c.id === chatId ? { ...c, remoteRoomId: roomId } : c))
-          try { await messageSocket.joinRoom(otherUserId) } catch {}
-          return roomId
-        }
-      } catch {}
-      return null
-    },
-    loadHistoryForChat: async (chatId: string) => {
-      const chat = chats.find(c => c.id === chatId)
-      if (!chat?.remoteRoomId) return
-      try {
-        const res = await listRoomMessages(chat.remoteRoomId, { limit: 50 })
-        const items = res?.data?.messages || []
-        if (!Array.isArray(items) || items.length === 0) return
-        const mapped: Message[] = items.map((m) => {
-          const isSystem = m.category === 'general'
-          const isImage = Boolean(m.imageUrl)
-          const type: Message['type'] = isSystem ? 'system' : (isImage ? 'image' : 'text')
-          const senderId = m.sender?.id || 'system'
-          const senderName = m.sender ? [m.sender.firstName, m.sender.lastName].filter(Boolean).join(' ') || 'User' : 'System'
-          const content = m.text || m.caption || (m.imageUrl ? 'Image' : '')
-          return {
-            id: m.id,
-            chatId,
-            senderId,
-            senderName,
-            content,
-            timestamp: new Date(m.createdAt as any),
-            type,
-            status: 'delivered',
-            metadata: m.imageUrl ? { imageUrl: m.imageUrl } : undefined,
-          }
-        })
-        // Deduplicate by message id when merging
-        setMessages(prev => {
-          const existing = prev[chatId] || []
-          const seen = new Set(existing.map(x => x.id))
-          const merged = [...existing, ...mapped.filter(x => !seen.has(x.id))]
-          return { ...prev, [chatId]: merged }
-        })
-      } catch {}
-    }
-  }
-}
 
 export type { Message, Chat }
