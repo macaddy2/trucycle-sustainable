@@ -981,7 +981,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="max-w-5xl h-[640px] p-0 overflow-hidden">
+      <DialogContent className="max-w-5xl h-[640px] max-h-[85vh] p-0 overflow-hidden">
         <DialogHeader className="sr-only">
           <DialogTitle>Message Center</DialogTitle>
         </DialogHeader>
