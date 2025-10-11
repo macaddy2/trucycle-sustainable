@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import { messageSocket } from '@/lib/messaging/socket'
-import { createOrFindRoom, listRoomMessages, sendGeneralMessage } from '@/lib/api'
+import { createOrFindRoom, listRoomMessages, listActiveRooms, sendGeneralMessage } from '@/lib/api'
 import type { DMMessageView } from '@/lib/api/types'
 
 interface UserProfile {
@@ -255,6 +255,63 @@ export function useMessaging() {
     return chats.find(chat => chat.itemId === itemId)
   }
 
+  const refreshActiveRooms = async () => {
+    if (!currentUser) return
+    try {
+      const res = await listActiveRooms()
+      const rooms = Array.isArray(res?.data) ? res.data : []
+      setChats(prev => {
+        // Map each backend room to a lightweight Chat
+        const mapped: Chat[] = rooms.map((r) => {
+          const other = (r.participants || []).find(p => p.id !== currentUser.id) || (r.participants || [])[0]
+          const displayName = other ? [other.firstName, other.lastName].filter(Boolean).join(' ') || 'User' : 'Conversation'
+          const now = new Date()
+          // Build a minimal lastMessage preview if present
+          const lm = r.lastMessage
+          const last: Message | undefined = lm ? {
+            id: lm.id,
+            chatId: `chat_${r.id}`,
+            senderId: lm.sender?.id || 'system',
+            senderName: lm.sender ? [lm.sender.firstName, lm.sender.lastName].filter(Boolean).join(' ') || 'User' : 'System',
+            content: lm.text || lm.caption || (lm.imageUrl ? 'Image' : ''),
+            timestamp: new Date(lm.createdAt as any),
+            type: lm.category === 'general' ? 'system' : (lm.imageUrl ? 'image' : 'text'),
+            status: 'delivered'
+          } : undefined
+          const isDonor = currentUser.userType === 'donor'
+          return {
+            id: `chat_${r.id}`,
+            itemId: `direct_${r.id}`,
+            itemTitle: 'Direct message',
+            itemImage: undefined,
+            donorId: isDonor ? currentUser.id : (other?.id || ''),
+            donorName: isDonor ? currentUser.name : (displayName || 'User'),
+            collectorId: isDonor ? (other?.id || '') : currentUser.id,
+            collectorName: isDonor ? (displayName || 'User') : currentUser.name,
+            donorAvatar: undefined,
+            collectorAvatar: undefined,
+            linkedRequestId: undefined,
+            remoteRoomId: r.id,
+            status: 'active',
+            lastMessage: last,
+            unreadCount: 0,
+            createdAt: new Date(r.createdAt as any || now),
+            updatedAt: new Date(r.updatedAt as any || now),
+          }
+        })
+        // Merge by remoteRoomId or id
+        const existingByRoom = new Map(prev.filter(c => c.remoteRoomId).map(c => [c.remoteRoomId!, c]))
+        const merged = mapped.map(m => {
+          const ex = existingByRoom.get(m.remoteRoomId!)
+          return ex ? { ...ex, lastMessage: m.lastMessage, updatedAt: m.updatedAt } : m
+        })
+        return merged
+      })
+    } catch {
+      // ignore; UI can remain empty
+    }
+  }
+
   return {
     chats,
     messages,
@@ -268,6 +325,7 @@ export function useMessaging() {
     getMessagesForChat,
     getTotalUnreadCount,
     getChatForItem,
+    refreshActiveRooms,
     linkChatToRoom: (chatId: string, remoteRoomId: string) => {
       setChats(prev => prev.map(c => c.id === chatId ? { ...c, remoteRoomId } : c))
     },

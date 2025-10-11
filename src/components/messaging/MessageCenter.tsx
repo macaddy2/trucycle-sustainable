@@ -72,6 +72,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     markMessagesAsRead,
     updateChatStatus,
     createOrGetChat,
+    refreshActiveRooms,
     ensureRemoteRoomForChat,
     loadHistoryForChat
   } = useMessaging()
@@ -274,6 +275,17 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
       }
     })()
   }, [selectedChatId])
+
+  // Initial load of active rooms from server when MessageCenter mounts
+  useEffect(() => {
+    let ran = false
+    if (ran) return
+    ran = true
+    ;(async () => {
+      try { await refreshActiveRooms() } catch {}
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Only auto-scroll when the user was at the bottom prior to updates
   useEffect(() => {
