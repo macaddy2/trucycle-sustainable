@@ -94,6 +94,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const scrollViewportRef = useRef<HTMLElement | null>(null)
   const [isAtBottom, setIsAtBottom] = useState(true)
+  const wasAtBottomRef = useRef<boolean>(true)
   const ensuredChatIdsRef = useRef<Set<string>>(new Set())
   const loadedChatIdsRef = useRef<Set<string>>(new Set())
 
@@ -273,8 +274,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     })()
   }, [selectedChatId])
 
-  // Auto-scroll only the ScrollArea viewport (not the entire page),
-  // and only when the user is already near the bottom.
+  // Only auto-scroll when the user was at the bottom prior to updates
   useEffect(() => {
     if (!scrollViewportRef.current && messagesContainerRef.current) {
       const viewport = messagesContainerRef.current.closest('[data-slot="scroll-area-viewport"]') as HTMLElement | null
@@ -284,10 +284,10 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     const viewport = scrollViewportRef.current
     if (!viewport) return
 
-    if (isAtBottom) {
-      viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' })
+    if (wasAtBottomRef.current) {
+      viewport.scrollTop = viewport.scrollHeight
     }
-  }, [currentMessages, isAtBottom])
+  }, [currentMessages])
 
   // Track whether the user is near the bottom of the message list and set up listener per chat.
   useEffect(() => {
@@ -302,7 +302,9 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     const onScroll = () => {
       const threshold = 48
       const distanceFromBottom = target.scrollHeight - (target.scrollTop + target.clientHeight)
-      setIsAtBottom(distanceFromBottom <= threshold)
+      const atBottom = distanceFromBottom <= threshold
+      wasAtBottomRef.current = atBottom
+      setIsAtBottom(atBottom)
     }
 
     // Initialize once when chat changes
