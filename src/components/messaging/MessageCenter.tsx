@@ -89,6 +89,9 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   const [activePanel, setActivePanel] = useState<'chats' | 'requests'>(initialView)
   const [newMessage, setNewMessage] = useState('')
   const [attachments, setAttachments] = useState<Array<{ file: File; url: string }>>([])
+  const [pendingBlocks, setPendingBlocks] = useState<Array<{ id: string; type: 'text' | 'images'; senderId: string; senderName: string; content?: string; images?: string[]; timestamp: Date }>>([])
+  const [imageViewer, setImageViewer] = useState<{ urls: string[]; index: number } | null>(null)
+  const [attachments, setAttachments] = useState<Array<{ file: File; url: string }>>([])
   const [imageViewer, setImageViewer] = useState<{ urls: string[]; index: number } | null>(null)
   const [showQRCode, setShowQRCode] = useState<QRCodeData | null>(null)
   const [selectedDropOffLocation, setSelectedDropOffLocation] = useState('')
@@ -367,14 +370,23 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
           type: a.file.type,
           data: await fileToBase64(a.file),
         })))
-        await messageSocket.sendMessage(chat.remoteRoomId, caption, files)
+        // Add pending block
+        const tempId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+        setPendingBlocks(prev => [...prev, { id: tempId, type: 'images', senderId: currentUser.id, senderName: currentUser.name, images: attachments.map(a => a.url), content: caption, timestamp: new Date() }])
         setAttachments([])
         setNewMessage('')
+        await messageSocket.sendMessage(chat.remoteRoomId, caption, files)
+        // Clear pending
+        setPendingBlocks(prev => prev.filter(p => p.id !== tempId))
         return
       }
       if (hasText) {
-        dispatchMessage(selectedChat.id, caption)
+        // Add pending text bubble
+        const tempId = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+        setPendingBlocks(prev => [...prev, { id: tempId, type: 'text', senderId: currentUser.id, senderName: currentUser.name, content: caption, timestamp: new Date() }])
         setNewMessage('')
+        await dispatchMessage(selectedChat.id, caption)
+        setPendingBlocks(prev => prev.filter(p => p.id !== tempId))
       }
     } catch (e: any) {
       toast.error(e?.message || 'Failed to send')
@@ -913,6 +925,36 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                                   </div>
                                 )
                               })}
+                              {pendingBlocks.map((p) => (
+                                p.type === 'images' ? (
+                                  <div key={p.id} className="flex justify-end opacity-60">
+                                    <div className="max-w-[70%] rounded-lg p-2 bg-muted">
+                                      <div className="grid grid-cols-2 gap-2">
+                                        {(p.images || []).map((url, i) => (
+                                          <img key={`${url}_${i}`} src={url} className="w-28 h-28 object-cover rounded" />
+                                        ))}
+                                      </div>
+                                      {p.content && (
+                                        <p className="text-xs mt-2 text-foreground whitespace-pre-line">{p.content}</p>
+                                      )}
+                                      <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                                        <span>{p.senderName}</span>
+                                        <span>Sending…</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div key={p.id} className="flex justify-end">
+                                    <div className="max-w-[70%] rounded-lg p-3 bg-primary text-primary-foreground opacity-60">
+                                      <p className="text-small whitespace-pre-line">{p.content}</p>
+                                      <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                                        <span>{p.senderName}</span>
+                                        <span>Sending…</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              ))}
                               <div ref={messagesEndRef} />
                             </div>
                           </ScrollArea>

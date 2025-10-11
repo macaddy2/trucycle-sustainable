@@ -62,7 +62,7 @@ class MessageSocket {
     return new Promise<DMRoom>((resolve, reject) => {
       const timeout = setTimeout(() => {
         cleanup(); reject(new Error('Timed out joining room'))
-      }, 4000)
+      }, 8000)
       function onJoined(room: DMRoom) { cleanup(); resolve(room) }
       function cleanup() { clearTimeout(timeout); s.off('room:joined', onJoined) }
       s.once('room:joined', onJoined)
@@ -74,7 +74,9 @@ class MessageSocket {
     const s = await this.ensureConnected()
     if (!s) throw new Error('Socket not connected')
     return new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => { cleanup(); reject(new Error('Timed out waiting for ack')) }, 4000)
+      const isLarge = Array.isArray(files) && files.length > 0
+      const timeoutMs = isLarge ? 25000 : 10000
+      const timeout = setTimeout(() => { cleanup(); reject(new Error('Timed out waiting for ack')) }, timeoutMs)
       function onSent() { cleanup(); resolve() }
       function cleanup() { clearTimeout(timeout); s.off('message:sent', onSent) }
       s.once('message:sent', onSent)
@@ -113,4 +115,3 @@ export async function fileToBase64(file: File | Blob): Promise<string> {
     reader.readAsDataURL(file as any)
   })
 }
-
