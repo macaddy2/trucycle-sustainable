@@ -21,6 +21,8 @@ import type {
   CreateClaimDto,
   CreateClaimResponse,
   ApproveClaimResponse,
+  CollectItemDto,
+  CollectItemResponse,
   // messaging
   DMRoom,
   ListRoomMessagesResponse,
@@ -240,6 +242,15 @@ export async function approveClaim(id: string) {
   return request<ApiEnvelope<ApproveClaimResponse>>(`/claims/${id}/approve`, {
     method: 'PATCH',
     auth: true,
+  })
+}
+
+export async function collectItem(itemId: string, dto?: CollectItemDto) {
+  // Request body is required by OpenAPI; send empty object if none
+  return request<ApiEnvelope<CollectItemResponse>>(`/items/${itemId}/collect`, {
+    method: 'POST',
+    auth: true,
+    body: dto ?? {},
   })
 }
 

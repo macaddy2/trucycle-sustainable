@@ -229,6 +229,24 @@ export interface ApproveClaimResponse {
   approved_at?: string
 }
 
+// New: collection
+export interface CollectItemDto {
+  shop_id?: string
+}
+
+export interface CollectItemResponse {
+  id: string
+  status: ClaimStatusApi | 'complete'
+  scan_type?: string
+  scan_result?: string
+  completed_at?: string
+  scan_events?: Array<{
+    scan_type?: string
+    shop_id?: string
+    scanned_at?: string
+  }>
+}
+
 // Messaging (HTTP endpoints for system/general + room management)
 export interface DMParticipant {
   id: string

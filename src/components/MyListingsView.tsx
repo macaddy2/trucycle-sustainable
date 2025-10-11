@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ChatCircle, CheckCircle, Clock, Package, PencilSimpleLine, Plus, ShieldCheck, X } from '@phosphor-icons/react'
 import { Textarea } from '@/components/ui/textarea'
 import { useMessaging, useExchangeManager, useNotifications } from '@/hooks'
-import { listMyItems, listMyCollectedItems, createOrFindRoom } from '@/lib/api'
+import { listMyItems, listMyCollectedItems, createOrFindRoom, collectItem } from '@/lib/api'
 import { messageSocket } from '@/lib/messaging/socket'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import type { ManagedListing } from '@/types/listings'
@@ -125,6 +125,7 @@ export function MyListingsView({
   const [editForm, setEditForm] = useState<EditableListingFields | null>(null)
 
   const sortedListings = useMemo(() => {
+    // Show all items for donors and collectors; order by newest first
     return [...listings].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }, [listings])
 
@@ -287,35 +288,31 @@ export function MyListingsView({
       ? `Plan pickups and drop-offs for the ${sortedListings.length} item${sortedListings.length === 1 ? '' : 's'} in your care (${activeCount} ready to action).`
       : `You currently have ${sortedListings.length} listing${sortedListings.length === 1 ? '' : 's'} (${activeCount} active).`
 
-  const handleMarkCollected = (listingId: string) => {
+  // Mark as collected: donor or collector can finalize after approval
+  const handleMarkCollected = async (listingId: string) => {
     const listing = listings.find(item => item.id === listingId)
     if (!listing) return
 
-    setListings(prev => prev.map(item => (
-      item.id === listingId ? { ...item, status: 'collected' } : item
-    )))
+    try {
+      await collectItem(listingId)
 
-    setGlobalListings(prev => prev.map(item => (
-      item.id === listingId ? { ...item, status: 'collected' } : item
-    )))
+      setListings(prev => prev.map(item => (
+        item.id === listingId ? { ...item, status: 'collected' } : item
+      )))
 
-    const chat = getChatForItem(listingId)
-    if (chat) {
-      updateChatStatus(chat.id, 'completed')
+      setGlobalListings(prev => prev.map(item => (
+        item.id === listingId ? { ...item, status: 'collected' } : item
+      )))
+
+      const chat = getChatForItem(listingId)
+      if (chat) {
+        updateChatStatus(chat.id, 'completed')
+      }
+
+      toast.success('Item marked as collected')
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to mark item as collected')
     }
-
-    const reward = listing.rewardPoints ?? listing.valuation?.rewardPoints ?? 25
-    setCurrentUser(prev => (
-      prev
-        ? {
-            ...prev,
-            rewardsBalance: (prev.rewardsBalance ?? 0) + reward,
-          }
-        : prev
-    ))
-    toast.success('Item marked as collected', {
-      description: `Great work! ${reward} reward points have been added to your account.`,
-    })
   }
 
   const handleOpenListingDetails = (listingId: string) => {
@@ -353,7 +350,8 @@ export function MyListingsView({
       request.collectorAvatar,
       { linkedRequestId: request.id, remoteRoomId: (room as any)?.id },
     )
-    openMessages?.({ chatId })
+    // Prefer routing to remote room id in URL if available for faster targeting
+    openMessages?.({ chatId: (room as any)?.id || chatId })
   }
 
   // Load server-backed data for my listed / collected items
@@ -366,11 +364,15 @@ export function MyListingsView({
           const entries = res?.data?.items || []
           const mapped: ManagedListing[] = entries.map((e: any) => {
             const it = e?.item || {}
+            // Map to UI status; only final 'complete' maps to collected
+            const claimStatus = String(e?.claim_status || '').toLowerCase()
+            const statusFromItem = mapServerStatusToClient(it.status)
+            const statusForUi: ManagedListing['status'] = claimStatus === 'complete' ? 'collected' : statusFromItem
             return {
               id: String(it.id || crypto.randomUUID()),
               title: String(it.title || 'Untitled'),
               description: String(it.description || ''),
-              status: mapServerStatusToClient(it.status),
+              status: statusForUi,
               category: String(it.category || 'Other'),
               createdAt: String(it.created_at || new Date().toISOString()),
               actionType: (it.pickup_option || 'donate') as ManagedListing['actionType'],
@@ -433,6 +435,7 @@ export function MyListingsView({
       return
     }
 
+    // Approval should reflect as claimed and remain visible until manual collection
     setListings(prev => prev.map(item => (item.id === approved.itemId ? { ...item, status: 'claimed' } : item)))
     setGlobalListings(prev => prev.map(item => (item.id === approved.itemId ? { ...item, status: 'claimed' } : item)))
 
@@ -449,6 +452,7 @@ export function MyListingsView({
         approved.collectorAvatar,
         { linkedRequestId: approved.id }
       )
+      // Update chat to reflect arrangement
       updateChatStatus(chatId, 'collection_arranged')
       addNotification({
         userId: approved.collectorId,
@@ -470,32 +474,7 @@ export function MyListingsView({
     }
   }
 
-  const handleCompleteRequest = (request: ClaimRequest) => {
-    const result = completeClaimRequest(request.id)
-    if (!result || result.alreadyCompleted) {
-      return
-    }
-
-    const chat = getChatForItem(request.itemId)
-    if (chat) {
-      updateChatStatus(chat.id, 'completed')
-    }
-
-    handleMarkCollected(request.itemId)
-    addNotification({
-      userId: request.collectorId,
-      type: 'exchange_request',
-      title: 'Collection confirmed',
-      message: `The donor confirmed collection for "${request.itemTitle}".`,
-      urgency: 'low',
-      read: false,
-      metadata: { itemId: request.itemId, itemTitle: request.itemTitle }
-    })
-    if (chat) {
-      openMessages({ chatId: chat.id })
-    }
-    toast.success('Collection confirmed and rewards granted')
-  }
+  // No handleCompleteRequest; approval triggers collection via API
 
   if (!currentUser) {
     return (
@@ -551,6 +530,16 @@ export function MyListingsView({
             const status = statusCopy[listing.status]
             const chat = getChatForItem(listing.id)
             const reward = listing.rewardPoints ?? listing.valuation?.rewardPoints
+            const requests = getRequestsForItem(listing.id)
+            const approvedRequest = requests.find(r => r.status === 'approved')
+            const collectorsBadgeText = listing.status === 'collected'
+              ? 'Collected'
+              : approvedRequest
+                ? 'Collector approved'
+                : (requests.length > 0
+                    ? `${requests.length} collector${requests.length === 1 ? '' : 's'}`
+                    : 'Waiting for collectors')
+            const collectorsBadgeVariant: any = listing.status === 'collected' ? 'default' : (approvedRequest ? 'secondary' : 'outline')
             return (
               <TableRow key={listing.id}>
                 <TableCell>
@@ -595,9 +584,9 @@ export function MyListingsView({
                       Open chat
                     </Button>
                   ) : (
-                    <Badge variant="outline" className="text-xs">Waiting for interest</Badge>
+                    <Badge variant={collectorsBadgeVariant} className="text-xs">{collectorsBadgeText}</Badge>
                   )}
-                  {listing.status !== 'collected' && (
+                  {listing.status === 'claimed' && (
                     <Button size="sm" onClick={() => handleMarkCollected(listing.id)}>
                       <CheckCircle size={14} className="mr-2" />
                       Mark collected
@@ -609,7 +598,7 @@ export function MyListingsView({
           })}
         </TableBody>
         <TableCaption>
-          You decide when to hand over each itemâconfirm collection only when the hand-off is complete to release rewards.
+          Approval completes the hand-off. You can continue chatting for coordination.
         </TableCaption>
       </Table>
     </>
@@ -622,7 +611,16 @@ export function MyListingsView({
         const chat = getChatForItem(listing.id)
         const reward = listing.rewardPoints ?? listing.valuation?.rewardPoints
         const requests = getRequestsForItem(listing.id)
+        const approvedRequest = requests.find(r => r.status === 'approved')
         const pendingRequestsCount = pendingRequestCountByItem[listing.id] ?? 0
+        const collectorsBadgeText = listing.status === 'collected'
+          ? 'Collected'
+          : approvedRequest
+            ? 'Collector approved'
+            : (requests.length > 0
+                ? `${requests.length} collector${requests.length === 1 ? '' : 's'}`
+                : 'Waiting for collectors')
+        const collectorsBadgeVariant: any = listing.status === 'collected' ? 'default' : (approvedRequest ? 'secondary' : 'outline')
         return (
           <Card key={listing.id} className="border-dashed">
             <CardHeader className="space-y-1">
@@ -671,9 +669,9 @@ export function MyListingsView({
                     Continue chat
                   </Button>
                 ) : (
-                  <Badge variant="outline">Waiting for collector</Badge>
+                  <Badge variant={collectorsBadgeVariant}>{collectorsBadgeText}</Badge>
                 )}
-                {listing.status !== 'collected' && (
+                {listing.status === 'claimed' && (
                   <Button size="sm" onClick={() => handleMarkCollected(listing.id)}>
                     <CheckCircle size={14} className="mr-2" />
                     Mark collected
@@ -713,9 +711,9 @@ export function MyListingsView({
                     Continue chat
                   </Button>
                 ) : (
-                  <Badge variant="outline">Waiting for collector</Badge>
+                  <Badge variant={collectorsBadgeVariant}>{collectorsBadgeText}</Badge>
                 )}
-                {listing.status !== 'collected' && (
+                {listing.status === 'claimed' && (
                   <Button size="sm" onClick={() => handleMarkCollected(listing.id)}>
                     <CheckCircle size={14} className="mr-2" />
                     Mark collected
@@ -1044,7 +1042,7 @@ export function MyListingsView({
                               </Button>
                             )}
                             {request.status === 'approved' && (
-                              <Button size="sm" variant="outline" onClick={() => handleCompleteRequest(request)}>
+                              <Button size="sm" variant="outline" onClick={() => handleMarkCollected(request.itemId)}>
                                 Mark collected
                               </Button>
                             )}
