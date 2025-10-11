@@ -52,6 +52,11 @@ export async function kvSet<T>(key: string, value: T): Promise<void> {
 
   try {
     storage.setItem(key, JSON.stringify(value));
+    try {
+      // Notify other listeners in this tab
+      const detail = { key, value } as any;
+      window.dispatchEvent(new CustomEvent('kv-change', { detail }));
+    } catch {}
   } catch (error) {
     console.warn(`kvStore: failed to persist key "${key}"`, error);
   }
@@ -64,4 +69,9 @@ export async function kvDelete(key: string): Promise<void> {
   }
 
   storage.removeItem(key);
+  try {
+    // Notify other listeners about deletion
+    const detail = { key, value: null } as any;
+    window.dispatchEvent(new CustomEvent('kv-change', { detail }));
+  } catch {}
 }

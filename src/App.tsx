@@ -3,8 +3,15 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu'
 import {
   ArrowsClockwise,
   Leaf,
@@ -598,21 +605,52 @@ function App() {
                   </Button>
 
                   <div className="flex items-center space-x-2">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => navigateToTab('profile')}
-                          aria-label="Open profile"
+                          aria-label="Profile menu"
                         >
                           <User size={18} />
                         </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        <span>{userFirstName ? `Open profile (${userFirstName})` : 'Open profile'}</span>
-                      </TooltipContent>
-                    </Tooltip>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuLabel>
+                          {userFirstName ? `Hi, ${userFirstName}` : 'Account'}
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => navigateToTab('profile')}>
+                          My Profile
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => navigateToTab('listings')}>
+                          My Listings
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => navigateToTab('messages')}>
+                          Messages
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setShowShopScanner(true)}>
+                          {user?.partnerAccess ? 'Partner Scanner' : 'QR Activity'}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => window.dispatchEvent(new Event('open-profile-onboarding'))}>
+                          Edit Profile
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={handleToggleUserType}>
+                          {user?.userType === 'donor' ? 'Switch to Collector' : 'Switch to Donor'}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onSelect={() => {
+                            setUser(null as any)
+                            navigateToTab('home')
+                          }}
+                        >
+                          Sign out
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     {userFirstName && (
                       <span className="hidden sm:inline text-sm text-muted-foreground">{userFirstName}</span>
                     )}
