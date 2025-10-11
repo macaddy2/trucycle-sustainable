@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +11,7 @@ import {
   ArrowsClockwise,
   HandHeart,
 } from '@phosphor-icons/react'
+import { listMyItems, type MyListedItem } from '@/lib/api'
 
 interface QRCodeData {
   id: string
@@ -44,11 +45,73 @@ interface ShopScannerOverviewProps {
 export function ShopScannerOverview({ onClose }: ShopScannerOverviewProps) {
   const [currentUser] = useKV<UserProfile | null>('current-user', null)
   const [userQRCodes] = useKV<QRCodeData[]>('user-qr-codes', [])
+  const [serverItems, setServerItems] = useState<MyListedItem[] | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+    async function fetchListed() {
+      setLoading(true)
+      setLoadError(null)
+      try {
+        const res = await listMyItems({ page: 1, limit: 50 })
+        if (!isMounted) return
+        setServerItems(res.data.items || [])
+      } catch (err: any) {
+        // Gracefully fall back to local data if API not configured or unauthorized
+        const msg = typeof err?.message === 'string' ? err.message : 'Unable to load listed items'
+        setLoadError(msg)
+        setServerItems(null)
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    }
+    fetchListed()
+    return () => { isMounted = false }
+  }, [])
+
+  // Map server listed items to the QR activity structure expected by the UI
+  const serverCodes: QRCodeData[] = useMemo(() => {
+    if (!currentUser || !serverItems) return []
+    const now = Date.now()
+    const addHours = (iso: string | undefined, hours: number) => {
+      if (!iso) return new Date(now + hours * 3600_000).toISOString()
+      const t = new Date(iso).getTime()
+      return new Date(t + hours * 3600_000).toISOString()
+    }
+    const mapStatus = (s?: string): QRCodeData['status'] => {
+      const v = String(s || '').toLowerCase()
+      if (v.includes('complete') || v.includes('recycled')) return 'completed'
+      if (v.includes('expired')) return 'expired'
+      if (v.includes('claimed') || v.includes('awaiting_collection')) return 'scanned'
+      return 'active'
+    }
+    return serverItems.map((item) => ({
+      id: `qr-${item.id}`,
+      type: 'donor',
+      itemId: item.id,
+      itemTitle: item.title,
+      userId: currentUser.id,
+      transactionId: item.id,
+      dropOffLocation: item.location?.postcode,
+      metadata: {
+        category: String((item as any).category || (item.metadata as any)?.category || 'Item'),
+        co2Impact: typeof item.estimated_co2_saved_kg === 'number' ? item.estimated_co2_saved_kg : 0,
+        createdAt: item.created_at,
+        expiresAt: addHours(item.created_at, 72),
+        actionType: item.pickup_option,
+      },
+      status: mapStatus(item.status),
+    }))
+  }, [currentUser, serverItems])
 
   const codes = useMemo(() => {
     if (!currentUser) return [] as QRCodeData[]
+    // Prefer server-sourced items mapped to codes when available
+    if (serverCodes.length > 0) return serverCodes
     return userQRCodes.filter((code) => code.userId === currentUser.id)
-  }, [currentUser, userQRCodes])
+  }, [currentUser, userQRCodes, serverCodes])
 
   const activeCodes = codes.filter((code) => code.status === 'active')
   const completedCodes = codes.filter((code) => code.status === 'completed')
@@ -87,6 +150,9 @@ export function ShopScannerOverview({ onClose }: ShopScannerOverviewProps) {
               <p className="max-w-2xl text-sm text-muted-foreground">
                 Track every QR code you&apos;ve generated, keep an eye on expiry times, and download details for your records.
                 Partner shop features unlock when your account is upgraded, but you can still monitor {roleLabel} here.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {loading ? 'Loading your listed items…' : serverItems ? 'Showing data from your listed items.' : loadError ? 'Showing local QR history.' : null}
               </p>
             </div>
             <Button variant="outline" onClick={handleBackToApp} className="self-start md:self-auto">

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { LocationSelector } from '@/components/LocationSelector'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Heart,
@@ -166,6 +167,13 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [selectedCondition, setSelectedCondition] = useState('All')
   const [selectedType, setSelectedType] = useState<'All' | ListingItem['actionType']>('All')
+  const [locationDialogOpen, setLocationDialogOpen] = useState(false)
+  const [locationFilter, setLocationFilter] = useKV<{
+    lat?: number
+    lng?: number
+    label?: string
+    radiusKm: number
+  }>('browse.location', { radiusKm: 10 })
   const {
     submitClaimRequest,
     pendingRequestCountByItem,
@@ -180,10 +188,10 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
     async function load() {
       try {
         const categoryParam = selectedCategory && selectedCategory !== 'All' ? selectedCategory : undefined
-        const coordsLat = (currentUser as any)?.lat ?? (currentUser as any)?.latitude
-        const coordsLng = (currentUser as any)?.lng ?? (currentUser as any)?.longitude
+        const coordsLat = (locationFilter?.lat ?? (currentUser as any)?.lat ?? (currentUser as any)?.latitude) as number | undefined
+        const coordsLng = (locationFilter?.lng ?? (currentUser as any)?.lng ?? (currentUser as any)?.longitude) as number | undefined
         const profilePostcode = currentUser?.postcode && String(currentUser.postcode).trim()
-        const params: any = { radius: 5, limit: 20 }
+        const params: any = { radius: Math.max(1, Number(locationFilter?.radiusKm) || 10), limit: 20 }
         if (typeof coordsLat === 'number' && typeof coordsLng === 'number') {
           params.lat = coordsLat
           params.lng = coordsLng
@@ -209,7 +217,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
     }
     load()
     return () => { cancelled = true }
-  }, [selectedCategory, currentUser])
+  }, [selectedCategory, currentUser, locationFilter?.lat, locationFilter?.lng, locationFilter?.radiusKm])
 
   function mapPublicItemToListingItem(it: any): ListingItem {
     const cond = String(it?.condition || '').toLowerCase()
@@ -426,23 +434,66 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                 </Select>
               </div>
 
-              <div className="flex flex-col justify-between rounded-2xl border border-dashed border-border/60 bg-background/50 p-4 shadow-inner">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quick actions</span>
-                {/* <p className="mt-2 flex-1 text-xs text-muted-foreground">
-                  Reset everything to explore the full catalogue and discover unexpected gems.
-                </p> */}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="mt-4 justify-start px-0 text-sm font-semibold text-primary hover:text-primary"
-                  onClick={() => {
-                    setSelectedCategory('All')
-                    setSelectedCondition('All')
-                    setSelectedType('All')
-                  }}
-                >
-                  Clear filters
-                </Button>
+              <div className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/50 p-4 shadow-inner">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</span>
+                <div className="flex items-start gap-2 rounded-xl border border-border/60 bg-background/70 p-3">
+                  <MapPin size={16} className="mt-0.5 text-primary" />
+                  <div className="text-sm">
+                    <div className="font-medium line-clamp-2">
+                      {locationFilter?.label || (locationFilter?.lat && locationFilter?.lng ? 'Custom location' : 'Anywhere')}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      Radius: {Math.max(1, Number(locationFilter?.radiusKm) || 10)} km
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => setLocationDialogOpen(true)}>
+                    Change
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      if (!navigator.geolocation) return
+                      navigator.geolocation.getCurrentPosition((pos) => {
+                        const { latitude, longitude } = pos.coords
+                        setLocationFilter((prev) => ({
+                          ...prev,
+                          lat: latitude,
+                          lng: longitude,
+                          label: 'Current location',
+                          radiusKm: Math.max(1, Number(prev?.radiusKm) || 10),
+                        }))
+                      })
+                    }}
+                  >
+                    Use my location
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="flex-1 justify-start px-0 text-xs"
+                    onClick={() => setLocationFilter({ radiusKm: 10 })}
+                  >
+                    Clear location
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="flex-1 justify-start px-0 text-xs"
+                    onClick={() => {
+                      setSelectedCategory('All')
+                      setSelectedCondition('All')
+                      setSelectedType('All')
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                </div>
               </div>
             </div>
           </form>
@@ -729,6 +780,18 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
           )}
         </DialogContent>
       </Dialog>
+
+      <LocationSelector
+        open={locationDialogOpen}
+        onOpenChange={setLocationDialogOpen}
+        initialValue={{
+          lat: locationFilter?.lat,
+          lng: locationFilter?.lng,
+          label: locationFilter?.label,
+          radiusKm: Math.max(1, Number(locationFilter?.radiusKm) || 10),
+        }}
+        onApply={(val) => setLocationFilter({ ...val })}
+      />
     </div>
   )
 }

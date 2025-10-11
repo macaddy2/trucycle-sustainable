@@ -20,6 +20,7 @@ import type { ListingValuation, ManagedListing } from '@/types/listings'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { uploadImageToCloudinary } from '@/lib/cloudinary'
 import { createItem } from '@/lib/api'
+import { LocationSelector, type LocationValue } from '@/components/LocationSelector'
 
 const CATEGORIES = [
   'Electronics',
@@ -244,6 +245,7 @@ export function ItemListingForm({
     defaultQuickStartIntent === 'donate' ? 'dropoff' : 'pickup'
   )
   const [showQuickStart, setShowQuickStart] = useState(true)
+  const [browseLocation] = useKV<{ lat?: number; lng?: number; label?: string; radiusKm?: number }>('browse.location', { radiusKm: 10 })
 
   useEffect(() => {
     if (!formContainerRef.current) {
@@ -279,6 +281,8 @@ export function ItemListingForm({
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showDropOffSelector, setShowDropOffSelector] = useState(false)
+  const [showPickupLocationSelector, setShowPickupLocationSelector] = useState(false)
+  const [pickupLocation, setPickupLocation] = useState<{ lat?: number; lng?: number; label?: string; postcode?: string } | null>(null)
   const [generatedQRCode, setGeneratedQRCode] = useState<QRCodeData | null>(null)
   const [lastCreatedListing, setLastCreatedListing] = useState<CreatedListing | null>(null)
   const [classificationResult, setClassificationResult] = useState<ListingClassificationResult | null>(null)
@@ -424,6 +428,23 @@ export function ItemListingForm({
     toast.success('Pickup area updated from your saved profile details')
   }, [defaultPickupAddress])
 
+  async function reverseGeocodePostcode(lat: number, lng: number): Promise<string | undefined> {
+    try {
+      const url = new URL('https://nominatim.openstreetmap.org/reverse')
+      url.searchParams.set('format', 'json')
+      url.searchParams.set('lat', String(lat))
+      url.searchParams.set('lon', String(lng))
+      url.searchParams.set('zoom', '18')
+      url.searchParams.set('addressdetails', '1')
+      const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } })
+      const data = await res.json()
+      const pc = data?.address?.postcode as string | undefined
+      return pc
+    } catch {
+      return undefined
+    }
+  }
+
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
@@ -460,6 +481,24 @@ export function ItemListingForm({
 
     setQuickStartFulfillment(method)
   }, [])
+
+  // Prefill pickup address from Browse location, if present and using pickup flow
+  useEffect(() => {
+    if (effectiveFulfillmentMethod !== 'pickup') return
+    if (!browseLocation?.lat || !browseLocation?.lng) return
+    // Only prefill if user hasn't set one
+    if (!pickupLocation) {
+      const label = browseLocation.label || ''
+      setPickupLocation({ lat: browseLocation.lat, lng: browseLocation.lng, label })
+      if (!formData.location && label) {
+        setFormData(prev => ({ ...prev, location: label }))
+      }
+      // Try to resolve postcode in background
+      reverseGeocodePostcode(browseLocation.lat, browseLocation.lng).then((pc) => {
+        setPickupLocation(prev => ({ ...(prev || {}), postcode: pc }))
+      })
+    }
+  }, [browseLocation?.lat, browseLocation?.lng, browseLocation?.label, effectiveFulfillmentMethod])
 
   const handleQuickStartIntentSelect = useCallback((intent: 'exchange' | 'donate' | 'recycle') => {
     if (intent === 'recycle') {
@@ -650,7 +689,7 @@ export function ItemListingForm({
       // Derive postcode (required by API)
       const explicitPostcode = isDropoff
         ? (formData.dropOffLocation?.postcode || '')
-        : (user?.postcode || '')
+        : (pickupLocation?.postcode || user?.postcode || '')
 
       const postcode = explicitPostcode || extractPostcode(addressLine)
       if (!postcode) {
@@ -888,6 +927,26 @@ export function ItemListingForm({
           selectedLocation={formData.dropOffLocation}
           onSelect={handleDropOffSelection}
           onClose={() => setShowDropOffSelector(false)}
+        />
+      )}
+      {showPickupLocationSelector && (
+        <LocationSelector
+          open={showPickupLocationSelector}
+          onOpenChange={setShowPickupLocationSelector}
+          initialValue={{
+            lat: pickupLocation?.lat,
+            lng: pickupLocation?.lng,
+            label: pickupLocation?.label || formData.location || '',
+            radiusKm: 5,
+          }}
+          onApply={async (val) => {
+            // Resolve postcode via reverse geocode
+            const pc = await reverseGeocodePostcode(val.lat, val.lng)
+            setPickupLocation({ lat: val.lat, lng: val.lng, label: val.label, postcode: pc })
+            if (val.label) {
+              setFormData(prev => ({ ...prev, location: val.label }))
+            }
+          }}
         />
       )}
       <div ref={formContainerRef} id="listing-form-start" className="space-y-8">
@@ -1231,21 +1290,38 @@ export function ItemListingForm({
                   )}
                 </div>
               ) : (
-                <div className="mt-2 space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <MapPin size={16} className="text-muted-foreground" />
-                    <Input
-                      id="location"
-                      placeholder="e.g., Camden, London NW1"
-                      value={formData.location}
-                      onChange={(e) => handleInputChange('location', e.target.value)}
-                    />
+                <div className="mt-2 space-y-3">
+                  <div className="rounded-xl border border-border/60 bg-background/70 p-3">
+                    <div className="flex items-start gap-2">
+                      <MapPin size={16} className="mt-0.5 text-primary" />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">
+                          {pickupLocation?.label || formData.location || 'No place selected'}
+                        </div>
+                        {pickupLocation?.postcode && (
+                          <div className="text-xs text-muted-foreground">Postcode: {pickupLocation.postcode}</div>
+                        )}
+                      </div>
+                      <Button type="button" variant="outline" size="sm" onClick={() => setShowPickupLocationSelector(true)}>
+                        Change
+                      </Button>
+                    </div>
                   </div>
-                  {defaultPickupAddress && (
-                    <Button type="button" variant="ghost" size="sm" onClick={handleUseDefaultPickup}>
-                      My default pickup address
+
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => setShowPickupLocationSelector(true)}>
+                      <MapPin size={16} className="mr-2" /> Select on map
                     </Button>
-                  )}
+                    {defaultPickupAddress && (
+                      <Button type="button" variant="ghost" size="sm" onClick={handleUseDefaultPickup}>
+                        My default pickup address
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="text-xs text-muted-foreground">
+                    Address statement will be saved as address_line and postcode for your listing. Exact details are only shared after approval.
+                  </div>
                 </div>
               )}
               <p className="text-sm text-muted-foreground mt-1">
