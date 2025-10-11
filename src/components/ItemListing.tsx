@@ -620,8 +620,12 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>By {item.ownerName}</span>
                     <span className="inline-flex items-center gap-1">
-                      <Package size={12} />
-                      {itemRequests.length} request{itemRequests.length === 1 ? '' : 's'}
+                      <span>Donor rating</span>
+                      {typeof item.ownerRating === 'number' ? (
+                        <RatingDisplay rating={item.ownerRating} totalRatings={12} size="sm" showCount={false} />
+                      ) : (
+                        <span className="text-muted-foreground">N/A</span>
+                      )}
                     </span>
                   </div>
 
@@ -741,13 +745,13 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                     ) : activeItemIsOwner ? (
                       <div className="space-y-3">
                         <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 text-sm">
-                          <p className="font-medium">Interested collectors</p>
+                          <p className="font-medium">Requests</p>
                           <p className="text-xs text-muted-foreground mt-1">
                             {activeItemPendingCount > 0
-                              ? `${activeItemPendingCount} collector${activeItemPendingCount > 1 ? 's are' : ' is'} waiting for your approval.`
+                              ? `${activeItemPendingCount} pending ${activeItemPendingCount > 1 ? 'requests' : 'request'} awaiting your review.`
                               : activeItemRequests.length > 0
                               ? 'No pending decisions. You can review previous requests below.'
-                              : 'No one has requested this item yet.'}
+                              : 'No requests yet.'}
                           </p>
                         </div>
                         <Button
@@ -759,10 +763,10 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                           }}
                         >
                           {activeItemPendingCount > 0
-                            ? `Review ${activeItemPendingCount} active request${activeItemPendingCount > 1 ? 's' : ''}`
+                            ? `Review ${activeItemPendingCount} pending request${activeItemPendingCount > 1 ? 's' : ''}`
                             : activeItemRequests.length > 0
-                            ? 'View interested collectors'
-                            : 'Wait for new requests'}
+                            ? 'View requests'
+                            : 'Manage requests'}
                         </Button>
                       </div>
                     ) : (

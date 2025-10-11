@@ -421,7 +421,7 @@
     },
     "/shops/nearby": {
       "get": {
-        "operationId": "ShopsController_nearby",
+        "operationId": "shopsNearby",
         "summary": "Find nearby shops by coordinates",
         "parameters": [
           {
@@ -441,9 +441,10 @@
             }
           },
           {
-            "name": "radius",
+            "name": "radius_m",
             "required": false,
             "in": "query",
+            "description": "Search radius in meters (default ~5500m)",
             "schema": {
               "type": "number"
             }
@@ -460,8 +461,8 @@
                     "message": "OK",
                     "data": [
                       {
-                        "id": "shop-id",
-                        "name": "Recycle Center",
+                        "id": "b84e...-uuid",
+                        "name": "Partner Shop",
                         "distanceMeters": 250
                       }
                     ]
@@ -473,6 +474,193 @@
         },
         "tags": [
           "shops"
+        ]
+      }
+    },
+    "/shops": {
+      "post": {
+        "operationId": "createShop",
+        "summary": "Create a new shop (partner-managed)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Shop details",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateShopDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Shop created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "id": "uuid",
+                    "name": "Shop A",
+                    "address_line": "1 High St",
+                    "postcode": "AB12 3CD",
+                    "latitude": 51.5,
+                    "longitude": -0.12,
+                    "active": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "shops"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/shops/me": {
+      "get": {
+        "operationId": "listMyShops",
+        "summary": "List shops owned by the authenticated partner",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List of owned shops",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": [
+                    {
+                      "id": "uuid",
+                      "name": "Shop A"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "shops"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/shops/{id}": {
+      "get": {
+        "operationId": "getShop",
+        "summary": "Get public shop details by id",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shop",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "id": "uuid",
+                    "name": "Shop A"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "shops"
+        ]
+      },
+      "patch": {
+        "operationId": "updateShop",
+        "summary": "Update a shop (owner or admin)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Fields to update",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShopDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated shop",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "id": "uuid",
+                    "name": "Updated Name"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "shops"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteShop",
+        "summary": "Archive a shop (owner or admin)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Shop archived"
+          }
+        },
+        "tags": [
+          "shops"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
         ]
       }
     },
@@ -1110,6 +1298,70 @@
         "responses": {
           "204": {
             "description": "Item deleted"
+          }
+        },
+        "tags": [
+          "items"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/items/{id}/collect": {
+      "post": {
+        "operationId": "collectItem",
+        "summary": "Mark an item as collected (donor or collector)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Optional shop id for donation drop-offs",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Claim completion registered with outcome and scan history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "OK",
+                    "data": {
+                      "id": "claim-id",
+                      "status": "complete",
+                      "scan_type": "CLAIM_OUT",
+                      "scan_result": "completed",
+                      "completed_at": "2024-06-01T11:00:00.000Z",
+                      "scan_events": [
+                        {
+                          "scan_type": "CLAIM_OUT",
+                          "shop_id": "SHOP123",
+                          "scanned_at": "2024-06-01T11:00:00.000Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2601,6 +2853,83 @@
           "new_password"
         ]
       },
+      "CreateShopDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Shop name",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "address_line": {
+            "type": "string",
+            "description": "Street address or landmark",
+            "maxLength": 255
+          },
+          "postcode": {
+            "type": "string",
+            "description": "Postal code",
+            "maxLength": 32
+          },
+          "latitude": {
+            "type": "number",
+            "description": "Latitude (WGS84)",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "description": "Longitude (WGS84)",
+            "minimum": -180,
+            "maximum": 180
+          }
+        },
+        "required": [
+          "name",
+          "address_line",
+          "postcode",
+          "latitude",
+          "longitude"
+        ]
+      },
+      "UpdateShopDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Shop name",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "address_line": {
+            "type": "string",
+            "description": "Street address or landmark",
+            "maxLength": 255
+          },
+          "postcode": {
+            "type": "string",
+            "description": "Postal code",
+            "maxLength": 32
+          },
+          "latitude": {
+            "type": "number",
+            "description": "Latitude (WGS84)",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "description": "Longitude (WGS84)",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Active flag"
+          }
+        }
+      },
       "CreateItemImageDto": {
         "type": "object",
         "properties": {
@@ -2832,6 +3161,15 @@
           "size_height",
           "weight_kg"
         ]
+      },
+      "CollectItemDto": {
+        "type": "object",
+        "properties": {
+          "shop_id": {
+            "type": "string",
+            "description": "Shop identifier for donation drop-offs (required if item has a drop-off location)"
+          }
+        }
       },
       "DropoffScanDto": {
         "type": "object",

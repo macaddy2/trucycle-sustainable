@@ -43,6 +43,7 @@ import { NotificationList, type Notification } from './components/NotificationLi
 import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
+import { messageSocket } from '@/lib/messaging/socket'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import { useRecommendationNotifications, useNotifications, useExchangeManager, usePresence } from '@/hooks'
 import type { ListingCompletionDetails } from './components/ItemListingForm'
@@ -102,6 +103,12 @@ function App() {
   const { getRequestsForDonor } = useExchangeManager()
   // Keep messaging presence tracking alive across the app
   usePresence(user?.id ?? null)
+  // Disconnect messaging socket when user signs out
+  useEffect(() => {
+    if (!user) {
+      messageSocket.disconnect()
+    }
+  }, [user])
   const pendingListingRequests = useMemo(() => {
     if (!user) return 0
     return getRequestsForDonor(user.id).filter((r) => r.status === 'pending').length
@@ -127,6 +134,19 @@ function App() {
     return allTabs.has(seg) ? seg : 'home'
   }, [allTabs, baseNormalized])
 
+  const parseMessageChatIdFromPath = useCallback((pathname: string): string | undefined => {
+    let path = pathname
+    if (baseNormalized && path.startsWith(baseNormalized)) {
+      path = path.slice(baseNormalized.length)
+    }
+    path = path.replace(/^\/+|\/+$/g, '')
+    const parts = path.split('/')
+    if (parts[0]?.toLowerCase() === 'messages' && parts[1]) {
+      return parts[1]
+    }
+    return undefined
+  }, [baseNormalized])
+
   const tabToPath = useCallback((tab: string) => {
     const seg = (tab || 'home').toLowerCase()
     const segment = seg === 'home' ? 'home' : seg
@@ -139,6 +159,18 @@ function App() {
     const withQuery = `${targetPath}${window.location.search}${window.location.hash}`
     if (window.location.pathname !== targetPath) {
       window.history.pushState({ tab: nextTab }, '', withQuery)
+    }
+  }, [tabToPath])
+
+  const navigateToMessages = useCallback((chatId?: string) => {
+    setCurrentTabState('messages')
+    const basePath = tabToPath('messages')
+    const targetPath = chatId ? `${basePath}/${chatId}` : basePath
+    const withQuery = `${targetPath}${window.location.search}${window.location.hash}`
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ tab: 'messages', chatId }, '', withQuery)
+    } else {
+      window.history.replaceState({ tab: 'messages', chatId }, '', withQuery)
     }
   }, [tabToPath])
 
@@ -184,14 +216,26 @@ function App() {
     if (initial !== currentTab) {
       setCurrentTabState(initial)
     }
+    const chatIdFromPath = parseMessageChatIdFromPath(window.location.pathname)
+    if (initial === 'messages') {
+      setMessageCenterChatId(chatIdFromPath)
+    }
     const canonical = tabToPath(initial)
     const withQuery = `${canonical}${window.location.search}${window.location.hash}`
-    if (window.location.pathname !== canonical) {
+    // Don't overwrite deep link that includes chat id
+    if (!chatIdFromPath && window.location.pathname !== canonical) {
       window.history.replaceState({ tab: initial }, '', withQuery)
     }
     const onPop = () => {
       const t = pathToTab(window.location.pathname)
       setCurrentTabState(t)
+      if (t === 'messages') {
+        const id = parseMessageChatIdFromPath(window.location.pathname)
+        setMessageCenterChatId(id)
+      } else {
+        setMessageCenterChatId(undefined)
+        setMessageCenterItemId(undefined)
+      }
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
@@ -207,8 +251,8 @@ function App() {
     setMessageCenterItemId(options?.itemId)
     setMessageCenterChatId(options?.chatId)
     setNotificationsOpen(false)
-    navigateToTab('messages')
-  }, [navigateToTab, setNotificationsOpen])
+    navigateToMessages(options?.chatId)
+  }, [navigateToMessages, setNotificationsOpen])
 
   const handleDemoGuideComplete = useCallback(() => {
     setShowDemoGuide(false)

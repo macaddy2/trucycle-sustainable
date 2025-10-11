@@ -13,7 +13,8 @@ import {
   MapPin,
   Package,
   CalendarCheck,
-  Paperclip
+  Paperclip,
+  ArrowLeft
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useMessaging, useExchangeManager, usePresence } from '@/hooks'
@@ -65,6 +66,34 @@ const formatRelativeTime = (date: Date | string) => {
 
 export function MessageCenter({ open = false, onOpenChange, itemId, chatId, initialView = 'chats', mode = 'modal' }: MessageCenterProps) {
   const isPage = mode === 'page'
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(max-width: 768px)').matches
+  })
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mql = window.matchMedia('(max-width: 768px)')
+    const handler = (e: MediaQueryListEvent | MediaQueryList) => setIsMobile((e as any).matches)
+    try {
+      mql.addEventListener('change', handler as any)
+      return () => mql.removeEventListener('change', handler as any)
+    } catch {
+      // Safari fallback
+      mql.addListener(handler as any)
+      return () => mql.removeListener(handler as any)
+    }
+  }, [])
+  const baseNormalized = useMemo(() => {
+    const base = (import.meta as any)?.env?.BASE_URL || '/'
+    return String(base).replace(/\/$/, '')
+  }, [])
+  const pushMessagesPath = useCallback((id?: string) => {
+    if (!isPage) return
+    const base = `${baseNormalized}/messages`
+    const target = id ? `${base}/${id}` : base
+    const withQuery = `${target}${window.location.search}${window.location.hash}`
+    window.history.pushState({ tab: 'messages', chatId: id }, '', withQuery)
+  }, [baseNormalized, isPage])
   const handleDialogOpenChange = useCallback((value: boolean) => onOpenChange?.(value), [onOpenChange])
   const {
     currentUser,
@@ -234,19 +263,55 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     setActivePanel(initialView)
   }, [initialView])
 
+  // On mobile page view, clear selection when URL chatId is cleared
   useEffect(() => {
-    if (chatId) {
-      setSelectedChatId(chatId)
+    if (isPage && isMobile && !chatId) {
+      setSelectedChatId(null)
+    }
+  }, [chatId, isPage, isMobile])
+
+  // Apply chatId from props when it changes; supports both local chat ids and remote room ids
+  const lastChatIdPropRef = useRef<string | undefined>(undefined)
+  const attemptedRoomLookupRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!chatId) {
+      lastChatIdPropRef.current = undefined
+      return
+    }
+    if (chatId === lastChatIdPropRef.current) return
+
+    // First try direct match by local chat id
+    const byLocal = normalizedChats.find(c => c.id === chatId)
+    if (byLocal) {
+      setSelectedChatId(byLocal.id)
+      lastChatIdPropRef.current = chatId
       return
     }
 
-    if (itemId && normalizedChats.length > 0) {
+    // Then try match by remote room id
+    const byRemote = normalizedChats.find(c => c.remoteRoomId === chatId)
+    if (byRemote) {
+      setSelectedChatId(byRemote.id)
+      lastChatIdPropRef.current = chatId
+      return
+    }
+
+    // If not found yet, ask the messaging store to refresh active rooms once
+    if (!attemptedRoomLookupRef.current.has(chatId)) {
+      attemptedRoomLookupRef.current.add(chatId)
+      ;(async () => { try { await refreshActiveRooms() } catch {} })()
+    }
+  }, [chatId, normalizedChats, refreshActiveRooms])
+
+  // Only auto-select from itemId if user hasn't chosen a chat yet
+  useEffect(() => {
+    if (itemId && !selectedChatId && normalizedChats.length > 0) {
       const existingChat = normalizedChats.find(chat => chat.itemId === itemId)
       if (existingChat) {
         setSelectedChatId(existingChat.id)
       }
     }
-  }, [chatId, itemId, normalizedChats])
+  }, [itemId, normalizedChats, selectedChatId])
 
   useEffect(() => {
     if (activePanel === 'requests') {
@@ -530,6 +595,9 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     if (chatForRequest) {
       setActivePanel('chats')
       setSelectedChatId(chatForRequest.id)
+      if (isPage) {
+        pushMessagesPath(chatForRequest.remoteRoomId || chatForRequest.id)
+      }
     } else {
       toast.info('Start the exchange to open a chat with this collector')
     }
@@ -804,7 +872,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                   </div>
                 ) : (
                   <div className="flex flex-1 min-h-0">
-                    <div className="w-1/3 border-r border-border flex flex-col min-h-0">
+                    <div className={`${isPage && isMobile ? (selectedChatId ? 'hidden' : 'w-full') : 'w-1/3'} ${isPage && isMobile ? '' : 'border-r border-border'} flex flex-col min-h-0`}>
                       <ScrollArea className="flex-1 min-h-0">
                         {normalizedChats.length === 0 ? (
                           <div className="p-6 text-center text-sm text-muted-foreground space-y-2">
@@ -818,7 +886,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                               <Card
                                 key={chat.id}
                                 className={`cursor-pointer transition-colors ${selectedChatId === chat.id ? 'bg-muted border-primary' : 'hover:bg-muted/50'}`}
-                                onClick={() => setSelectedChatId(chat.id)}
+                                onClick={() => { setSelectedChatId(chat.id); if (isPage) { pushMessagesPath(chat.remoteRoomId || chat.id) } }}
                               >
                                 <CardContent className="p-3">
                                   <div className="flex items-start space-x-3">
@@ -870,11 +938,21 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                       </ScrollArea>
                     </div>
       
-                    <div className="flex-1 flex flex-col min-h-0">
+                    <div className={`${isPage && isMobile ? (selectedChatId ? 'flex w-full' : 'hidden') : 'flex-1 flex'} flex-col min-h-0`}>
                       {selectedChat ? (
                         <>
                           <div className="p-4 border-b border-border flex items-center justify-between">
                             <div className="flex items-center gap-3">
+                              {isPage && isMobile && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="Back to chats"
+                                  onClick={() => { setSelectedChatId(null); if (isPage) pushMessagesPath(undefined) }}
+                                >
+                                  <ArrowLeft size={18} />
+                                </Button>
+                              )}
                               <Avatar>
                                 <AvatarImage src={currentUser.id === selectedChat.donorId ? selectedChat.collectorAvatar : selectedChat.donorAvatar} />
                                 <AvatarFallback>
@@ -1054,11 +1132,28 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                           </div>
                         </>
                       ) : (
-                        <div className="flex-1 flex items-center justify-center">
-                          <div className="text-center space-y-2 text-muted-foreground">
-                            <Package size={48} className="mx-auto text-muted-foreground" />
-                            <p className="font-medium text-foreground">Select a conversation</p>
-                            <p className="text-sm">Choose a chat from the sidebar to start messaging</p>
+                        <div className="flex-1 flex flex-col">
+                          {isPage && isMobile && (
+                            <div className="p-4 border-b border-border flex items-center">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Back to chats"
+                                onClick={() => { setSelectedChatId(null); if (isPage) pushMessagesPath(undefined) }}
+                              >
+                                <ArrowLeft size={18} />
+                              </Button>
+                              <span className="ml-2 text-sm text-muted-foreground">Chats</span>
+                            </div>
+                          )}
+                          <div className="flex-1 flex items-center justify-center">
+                            <div className="text-center space-y-2 text-muted-foreground">
+                              <Package size={48} className="mx-auto text-muted-foreground" />
+                              <p className="font-medium text-foreground">{chatId ? 'Loading conversation…' : 'Select a conversation'}</p>
+                              {!chatId && (
+                                <p className="text-sm">Choose a chat from the {isPage && isMobile ? 'list' : 'sidebar'} to start messaging</p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )}
