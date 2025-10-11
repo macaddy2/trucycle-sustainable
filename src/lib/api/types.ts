@@ -164,7 +164,7 @@ export interface MyListedItem {
     longitude?: number
   }
   created_at: string
-  claim?: unknown | null
+  claim?: MyListedItemClaim | null
 }
 
 export interface MyListedItemsResponse {
@@ -196,6 +196,20 @@ export type ClaimStatusApi =
   | 'complete'
   | 'rejected'
   | 'cancelled'
+
+export interface ClaimCollectorSummary {
+  id: string
+  name?: string | null
+  profile_image?: string | null
+}
+
+export interface MyListedItemClaim {
+  id: string
+  status: ClaimStatusApi
+  approved_at?: string | null
+  completed_at?: string | null
+  collector: ClaimCollectorSummary
+}
 
 export interface CreateClaimDto {
   item_id: string

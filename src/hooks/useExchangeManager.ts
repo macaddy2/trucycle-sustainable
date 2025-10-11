@@ -1,10 +1,11 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import type { ManagedListing } from '@/types/listings'
 import { kvGet, kvSet } from '@/lib/kvStore'
 import type { QRCodeData } from '@/components/QRCode'
-import { createClaim, approveClaim } from '@/lib/api'
+import { createClaim, approveClaim, listMyItems } from '@/lib/api'
+import type { MyListedItem, ClaimStatusApi } from '@/lib/api'
 
 export interface ClaimRequest {
   id: string
@@ -40,7 +41,63 @@ export function useExchangeManager() {
   const [collectedItems, setCollectedItems] = useState<Record<string, CollectedItemRecord>>({})
   const [userListings, setUserListings] = useKV<ManagedListing[]>('user-listings', [])
   const [globalListings, setGlobalListings] = useKV<ManagedListing[]>('global-listings', [])
+  const [currentUser] = useKV<{ id: string; name: string; userType: 'donor' | 'collector' } | null>('current-user', null)
   const [, setUserQrCodes] = useKV<QRCodeData[]>('user-qr-codes', [])
+
+  // Map backend claim status to local UI request status
+  const mapClaimStatus = useCallback((s: ClaimStatusApi | string | undefined): ClaimRequest['status'] => {
+    const v = String(s || '').toLowerCase()
+    if (v === 'pending_approval' || v === 'pending') return 'pending'
+    if (v === 'approved' || v === 'awaiting_collection') return 'approved'
+    if (v === 'complete' || v === 'completed') return 'completed'
+    if (v === 'rejected' || v === 'cancelled' || v === 'declined') return 'declined'
+    return 'pending'
+  }, [])
+
+  // Seed claim requests from server "my listed items" for donors
+  useEffect(() => {
+    let cancelled = false
+    async function loadServerClaims() {
+      try {
+        if (!currentUser || currentUser.userType !== 'donor') return
+        const res = await listMyItems({ limit: 50 })
+        const items: MyListedItem[] = Array.isArray(res?.data?.items) ? res.data.items : []
+        const mapped: ClaimRequest[] = items
+          .filter((it) => !!it?.claim)
+          .map((it) => {
+            const c = it.claim!
+            return {
+              id: String(c.id),
+              itemId: String(it.id),
+              itemTitle: String(it.title || 'Untitled'),
+              itemImage: Array.isArray(it.images) && it.images[0]?.url ? String(it.images[0].url) : undefined,
+              donorId: String(currentUser.id),
+              donorName: String(currentUser.name || 'You'),
+              collectorId: String(c.collector?.id || ''),
+              collectorName: String(c.collector?.name || 'Collector'),
+              collectorAvatar: c.collector?.profile_image || undefined,
+              note: undefined,
+              status: mapClaimStatus(c.status),
+              createdAt: String(it.created_at || new Date().toISOString()),
+              decisionAt: (c.completed_at || c.approved_at || undefined) || undefined,
+            } as ClaimRequest
+          })
+
+        if (cancelled) return
+        // Merge by id with any existing in-session requests (server wins)
+        setClaimRequests((prev) => {
+          const byId = new Map<string, ClaimRequest>()
+          for (const r of prev) byId.set(r.id, r)
+          for (const r of mapped) byId.set(r.id, r)
+          return Array.from(byId.values())
+        })
+      } catch {
+        // silently ignore; UI will fall back to local state
+      }
+    }
+    loadServerClaims()
+    return () => { cancelled = true }
+  }, [currentUser, mapClaimStatus])
 
   const submitClaimRequest = useCallback(
     async (

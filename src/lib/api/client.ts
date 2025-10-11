@@ -170,7 +170,13 @@ function toQuery(params: Record<string, any> | undefined): string {
   const sp = new URLSearchParams()
   Object.entries(params).forEach(([k, v]) => {
     if (v === undefined || v === null || v === '') return
-    sp.append(k, String(v))
+    if (k === 'limit') {
+      const num = Number(v)
+      const capped = Number.isFinite(num) ? Math.min(num, 50) : 50
+      sp.append(k, String(capped))
+    } else {
+      sp.append(k, String(v))
+    }
   })
   const qs = sp.toString()
   return qs ? `?${qs}` : ''
