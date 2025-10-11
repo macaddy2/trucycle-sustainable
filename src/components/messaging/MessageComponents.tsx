@@ -64,11 +64,6 @@ export function MessageNotification({ onOpenMessages }: MessageNotificationProps
           >
             <ChatCircle size={16} className="mr-2" />
             Messages
-            {pendingRequests > 0 && (
-              <Badge variant="outline" className="ml-2 hidden sm:inline-flex text-xs">
-                {pendingRequests} requests
-              </Badge>
-            )}
             {totalUnread > 0 && (
               <Badge
                 variant="destructive"

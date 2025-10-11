@@ -17,7 +17,8 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useMessaging, useExchangeManager } from '@/hooks'
-import { sendGeneralMessage, sendImageMessage } from '@/lib/api'
+import { sendGeneralMessage } from '@/lib/api'
+import { messageSocket, fileToBase64 } from '@/lib/messaging/socket'
 import { useKV } from '@/hooks/useKV'
 import type { ManagedListing } from '@/types/listings'
 import type { Chat as MessagingChat, Message as MessagingMessage } from '@/hooks/useMessaging'
@@ -87,6 +88,8 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [activePanel, setActivePanel] = useState<'chats' | 'requests'>(initialView)
   const [newMessage, setNewMessage] = useState('')
+  const [attachments, setAttachments] = useState<Array<{ file: File; url: string }>>([])
+  const [imageViewer, setImageViewer] = useState<{ urls: string[]; index: number } | null>(null)
   const [showQRCode, setShowQRCode] = useState<QRCodeData | null>(null)
   const [selectedDropOffLocation, setSelectedDropOffLocation] = useState('')
   const [selectedRequestItem, setSelectedRequestItem] = useState<string | null>(itemId ?? null)
@@ -344,36 +347,101 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     } catch {}
   }, [normalizedChats])
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!selectedChat) return
-    if (!newMessage.trim()) return
-    dispatchMessage(selectedChat.id, newMessage.trim())
-    setNewMessage('')
+    const chat = normalizedChats.find(c => c.id === selectedChat.id)
+    const caption = newMessage.trim() || undefined
+    const hasText = Boolean(caption)
+    const hasFiles = attachments.length > 0
+    if (!hasText && !hasFiles) return
+
+    try {
+      if (hasFiles && chat?.remoteRoomId) {
+        const totalBytes = attachments.reduce((sum, a) => sum + a.file.size, 0)
+        if (totalBytes > 3 * 1024 * 1024) {
+          toast.error('Total attachments must be ≤ 3MB')
+          return
+        }
+        const files = await Promise.all(attachments.map(async (a) => ({
+          name: a.file.name,
+          type: a.file.type,
+          data: await fileToBase64(a.file),
+        })))
+        await messageSocket.sendMessage(chat.remoteRoomId, caption, files)
+        setAttachments([])
+        setNewMessage('')
+        return
+      }
+      if (hasText) {
+        dispatchMessage(selectedChat.id, caption)
+        setNewMessage('')
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to send')
+    }
   }
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const handlePickImage = () => fileInputRef.current?.click()
-  const handleImageSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+  const handleImageSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
     event.target.value = ''
-    if (!file || !selectedChat) return
-    if (!file.type.startsWith('image/')) {
-      toast.error('Only image files are supported')
-      return
+    if (files.length === 0) return
+    const onlyImages = files.filter(f => f.type.startsWith('image/'))
+    if (onlyImages.length !== files.length) toast.error('Only image files are supported')
+    const next = [...attachments]
+    for (const f of onlyImages) {
+      const total = next.reduce((s, a) => s + a.file.size, 0) + f.size
+      if (total > 3 * 1024 * 1024) {
+        toast.error('Total attachments must be ≤ 3MB')
+        break
+      }
+      next.push({ file: f, url: URL.createObjectURL(f) })
     }
-    if (file.size > 3 * 1024 * 1024) {
-      toast.error('Image is too large. Max 3MB')
-      return
+    setAttachments(next)
+  }
+  const removeAttachment = (i: number) => {
+    setAttachments(prev => {
+      const copy = [...prev]
+      const removed = copy.splice(i, 1)
+      if (removed[0]) URL.revokeObjectURL(removed[0].url)
+      return copy
+    })
+  }
+  const openImageViewer = (urls: string[], index: number) => setImageViewer({ urls, index })
+  const closeImageViewer = () => setImageViewer(null)
+
+  const groupedMessages = (list: MessagingMessage[]) => {
+    const blocks: Array<
+      | { type: 'images'; senderId: string; senderName?: string; images: string[]; caption?: string; timestamp: Date }
+      | { type: 'message'; message: MessagingMessage }
+    > = []
+    let i = 0
+    while (i < list.length) {
+      const m = list[i]
+      if (m.type === 'image' && m.metadata?.imageUrl) {
+        const imgs: string[] = [m.metadata.imageUrl]
+        const senderId = m.senderId
+        const senderName = m.senderName
+        const ts0 = new Date(m.timestamp)
+        let caption: string | undefined = m.content || undefined
+        let j = i + 1
+        while (j < list.length) {
+          const n = list[j]
+          if (n.type !== 'image' || n.senderId !== senderId || !n.metadata?.imageUrl) break
+          const dt = Math.abs(new Date(n.timestamp).getTime() - ts0.getTime())
+          if (dt > 2 * 60 * 1000) break
+          imgs.push(n.metadata.imageUrl)
+          j++
+        }
+        blocks.push({ type: 'images', senderId, senderName, images: imgs, caption, timestamp: ts0 })
+        i = j
+        continue
+      }
+      blocks.push({ type: 'message', message: m })
+      i++
     }
-    try {
-      const chat = normalizedChats.find(c => c.id === selectedChat.id)
-      if (!chat?.remoteRoomId) return
-      const caption = newMessage.trim() || undefined
-      await sendImageMessage(chat.remoteRoomId, file, caption)
-      if (caption) setNewMessage('')
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to send image')
-    }
+    return blocks
   }
 
   const shareLocation = useCallback(() => {
@@ -804,34 +872,47 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
       
                           <ScrollArea className="flex-1 min-h-0 p-4">
                             <div ref={messagesContainerRef} className="space-y-4">
-                              {currentMessages.map(message => (
-                                <div
-                                  key={message.id}
-                                  className={`flex ${message.senderId === currentUser.id ? 'justify-end' : 'justify-start'}`}
-                                >
-                                  <div
-                                    className={`max-w-[70%] rounded-lg p-3 ${
-                                      message.senderId === currentUser.id
-                                        ? 'bg-primary text-primary-foreground'
-                                        : message.type === 'system'
-                                        ? 'bg-muted text-muted-foreground'
-                                        : 'bg-muted text-foreground'
-                                    } ${message.type === 'system' ? 'mx-auto text-center' : ''}`}
-                                  >
-                                    {message.type === 'location' && message.metadata?.location && (
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <MapPin size={16} />
-                                        <span className="text-small">Location shared</span>
+                              {groupedMessages(currentMessages).map((block, idx) => {
+                                if (block.type === 'images') {
+                                  const align = block.senderId === currentUser.id ? 'justify-end' : 'justify-start'
+                                  return (
+                                    <div key={`imggrp_${idx}`} className={`flex ${align}`}>
+                                      <div className="max-w-[70%] rounded-lg p-2 bg-muted">
+                                        <div className="grid grid-cols-2 gap-2">
+                                          {block.images.map((url, i) => (
+                                            <img key={`${url}_${i}`} src={url} onClick={() => openImageViewer(block.images, i)} className="w-28 h-28 object-cover rounded cursor-pointer" />
+                                          ))}
+                                        </div>
+                                        {block.caption && (
+                                          <p className="text-xs mt-2 text-foreground whitespace-pre-line">{block.caption}</p>
+                                        )}
+                                        <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                                          <span>{block.senderName || 'User'}</span>
+                                          <span>{formatRelativeTime(block.timestamp)}</span>
+                                        </div>
                                       </div>
-                                    )}
-                                    <p className="text-small whitespace-pre-line">{message.content}</p>
-                                    <div className="flex items-center justify-between mt-2 text-xs opacity-70">
-                                      <span>{message.type !== 'system' ? message.senderName : 'System'}</span>
-                                      <span>{formatRelativeTime(message.timestamp)}</span>
+                                    </div>
+                                  )
+                                }
+                                const m = block.message
+                                return (
+                                  <div key={m.id} className={`flex ${m.senderId === currentUser.id ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[70%] rounded-lg p-3 ${m.senderId === currentUser.id ? 'bg-primary text-primary-foreground' : m.type === 'system' ? 'bg-muted text-muted-foreground' : 'bg-muted text-foreground'} ${m.type === 'system' ? 'mx-auto text-center' : ''}`}>
+                                      {m.type === 'location' && m.metadata?.location && (
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <MapPin size={16} />
+                                          <span className="text-small">Location shared</span>
+                                        </div>
+                                      )}
+                                      <p className="text-small whitespace-pre-line">{m.content}</p>
+                                      <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                                        <span>{m.type !== 'system' ? m.senderName : 'System'}</span>
+                                        <span>{formatRelativeTime(m.timestamp)}</span>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              ))}
+                                )
+                              })}
                               <div ref={messagesEndRef} />
                             </div>
                           </ScrollArea>
@@ -881,6 +962,16 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                               <Button type="button" variant="outline" size="icon" onClick={handlePickImage} title="Attach image">
                                 <Paperclip size={16} />
                               </Button>
+                              {attachments.length > 0 && (
+                                <div className="flex gap-2 overflow-x-auto py-1">
+                                  {attachments.map((a, i) => (
+                                    <div key={i} className="relative">
+                                      <img src={a.url} className="w-12 h-12 object-cover rounded" onClick={() => openImageViewer(attachments.map(x => x.url), i)} />
+                                      <button className="absolute -top-1 -right-1 bg-black/60 text-white rounded-full w-5 h-5 text-xs" onClick={() => removeAttachment(i)}>×</button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                               <Input
                                 placeholder="Type your message..."
                                 value={newMessage}
@@ -893,7 +984,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                                 }}
                                 className="flex-1"
                               />
-                              <Button onClick={handleSendMessage} disabled={!newMessage.trim()} size="icon" title="Send">
+                              <Button onClick={handleSendMessage} disabled={!newMessage.trim() && attachments.length === 0} size="icon" title="Send">
                                 <PaperPlaneTilt size={16} />
                               </Button>
                             </div>
@@ -986,6 +1077,16 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
           <DialogTitle>Message Center</DialogTitle>
         </DialogHeader>
         {renderBody()}
+        {imageViewer && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+            <div className="relative max-w-3xl w-full px-4">
+              <img src={imageViewer.urls[imageViewer.index]} className="max-h-[80vh] w-full object-contain rounded" />
+              <div className="absolute top-2 right-2">
+                <Button size="sm" variant="secondary" onClick={closeImageViewer}>Close</Button>
+              </div>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )
