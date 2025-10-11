@@ -160,26 +160,8 @@ export function useMessaging() {
     }
 
     setChats(prev => [...prev, newChat])
-
-    // Send initial system message
-    const systemMessage: Message = {
-      id: `sys_${Date.now()}_init`,
-      chatId,
-      senderId: 'system',
-      senderName: 'TruCycle',
-      content: `Chat started for "${itemTitle}". Please coordinate pickup details safely and responsibly.`,
-      timestamp: new Date(),
-      type: 'system',
-      status: 'delivered',
-      metadata: { systemAction: 'chat_created' }
-    }
-
-    setMessages(prev => ({
-      ...prev,
-      [chatId]: [systemMessage]
-    }))
-
-    toast.success('Chat created! You can now message about this item.')
+    // No local system inserts; rely on server events/history
+    toast.success('Chat is ready. You can now message about this item.')
     return chatId
   }
 
@@ -256,6 +238,97 @@ export function useMessaging() {
     })
     toast.success('Chat deleted')
   }
+
+  const getChatById = (chatId: string) => {
+    return chats.find(chat => chat.id === chatId)
+  }
+
+  const getMessagesForChat = (chatId: string) => {
+    return messages[chatId] || []
+  }
+
+  const getTotalUnreadCount = () => {
+    return chats.reduce((total, chat) => total + chat.unreadCount, 0)
+  }
+
+  const getChatForItem = (itemId: string) => {
+    return chats.find(chat => chat.itemId === itemId)
+  }
+
+  return {
+    chats,
+    messages,
+    currentUser,
+    createOrGetChat,
+    sendMessage,
+    markMessagesAsRead,
+    updateChatStatus,
+    deleteChat,
+    getChatById,
+    getMessagesForChat,
+    getTotalUnreadCount,
+    getChatForItem,
+    linkChatToRoom: (chatId: string, remoteRoomId: string) => {
+      setChats(prev => prev.map(c => c.id === chatId ? { ...c, remoteRoomId } : c))
+    },
+    ensureRemoteRoomForChat: async (chatId: string) => {
+      const chat = chats.find(c => c.id === chatId)
+      if (!currentUser || !chat) return null
+      if (chat.remoteRoomId) {
+        try { await messageSocket.joinRoom(currentUser.id === chat.donorId ? chat.collectorId : chat.donorId) } catch {}
+        return chat.remoteRoomId
+      }
+      const otherUserId = currentUser.id === chat.donorId ? chat.collectorId : chat.donorId
+      try {
+        const res = await createOrFindRoom(otherUserId)
+        const roomId = res?.data?.id
+        if (roomId) {
+          setChats(prev => prev.map(c => c.id === chatId ? { ...c, remoteRoomId: roomId } : c))
+          try { await messageSocket.joinRoom(otherUserId) } catch {}
+          return roomId
+        }
+      } catch {}
+      return null
+    },
+    loadHistoryForChat: async (chatId: string) => {
+      const chat = chats.find(c => c.id === chatId)
+      if (!chat?.remoteRoomId) return
+      try {
+        const res = await listRoomMessages(chat.remoteRoomId, { limit: 50 })
+        const items = res?.data?.messages || []
+        if (!Array.isArray(items) || items.length === 0) return
+        const mapped: Message[] = items.map((m) => {
+          const isSystem = m.category === 'general'
+          const isImage = Boolean(m.imageUrl)
+          const type: Message['type'] = isSystem ? 'system' : (isImage ? 'image' : 'text')
+          const senderId = m.sender?.id || 'system'
+          const senderName = m.sender ? [m.sender.firstName, m.sender.lastName].filter(Boolean).join(' ') || 'User' : 'System'
+          const content = m.text || m.caption || (m.imageUrl ? 'Image' : '')
+          return {
+            id: m.id,
+            chatId,
+            senderId,
+            senderName,
+            content,
+            timestamp: new Date(m.createdAt as any),
+            type,
+            status: 'delivered',
+            metadata: m.imageUrl ? { imageUrl: m.imageUrl } : undefined,
+          }
+        })
+        // Deduplicate by message id when merging
+        setMessages(prev => {
+          const existing = prev[chatId] || []
+          const seen = new Set(existing.map(x => x.id))
+          const merged = [...existing, ...mapped.filter(x => !seen.has(x.id))]
+          return { ...prev, [chatId]: merged }
+        })
+      } catch {}
+    }
+  }
+}
+
+export type { Message, Chat }
 
 
 export type { Message, Chat }
