@@ -91,8 +91,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   const [attachments, setAttachments] = useState<Array<{ file: File; url: string }>>([])
   const [pendingBlocks, setPendingBlocks] = useState<Array<{ id: string; type: 'text' | 'images'; senderId: string; senderName: string; content?: string; images?: string[]; timestamp: Date }>>([])
   const [imageViewer, setImageViewer] = useState<{ urls: string[]; index: number } | null>(null)
-  const [attachments, setAttachments] = useState<Array<{ file: File; url: string }>>([])
-  const [imageViewer, setImageViewer] = useState<{ urls: string[]; index: number } | null>(null)
+  
   const [showQRCode, setShowQRCode] = useState<QRCodeData | null>(null)
   const [selectedDropOffLocation, setSelectedDropOffLocation] = useState('')
   const [selectedRequestItem, setSelectedRequestItem] = useState<string | null>(itemId ?? null)
