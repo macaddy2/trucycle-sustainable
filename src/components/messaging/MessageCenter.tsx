@@ -16,6 +16,7 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { useMessaging, useExchangeManager } from '@/hooks'
+import { sendGeneralMessage } from '@/lib/api'
 import { useKV } from '@/hooks/useKV'
 import type { ManagedListing } from '@/types/listings'
 import type { Chat as MessagingChat, Message as MessagingMessage } from '@/hooks/useMessaging'
@@ -69,7 +70,9 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     sendMessage: dispatchMessage,
     markMessagesAsRead,
     updateChatStatus,
-    createOrGetChat
+    createOrGetChat,
+    ensureRemoteRoomForChat,
+    loadHistoryForChat
   } = useMessaging()
   const {
     confirmClaimRequest,
@@ -91,6 +94,8 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const scrollViewportRef = useRef<HTMLElement | null>(null)
   const [isAtBottom, setIsAtBottom] = useState(true)
+  const ensuredChatIdsRef = useRef<Set<string>>(new Set())
+  const loadedChatIdsRef = useRef<Set<string>>(new Set())
 
   const normalizeChat = useCallback((chat: MessagingChat): MessagingChat => ({
     ...chat,
@@ -242,6 +247,32 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     markMessagesAsRead(selectedChatId)
   }, [markMessagesAsRead, selectedChatId])
 
+  // Ensure remote room exists (run once per chat id)
+  useEffect(() => {
+    if (!selectedChatId) return
+    if (ensuredChatIdsRef.current.has(selectedChatId)) return
+    ;(async () => {
+      try {
+        await ensureRemoteRoomForChat(selectedChatId)
+      } finally {
+        ensuredChatIdsRef.current.add(selectedChatId)
+      }
+    })()
+  }, [selectedChatId])
+
+  // Load initial history (run once per chat id)
+  useEffect(() => {
+    if (!selectedChatId) return
+    if (loadedChatIdsRef.current.has(selectedChatId)) return
+    ;(async () => {
+      try {
+        await loadHistoryForChat(selectedChatId)
+      } finally {
+        loadedChatIdsRef.current.add(selectedChatId)
+      }
+    })()
+  }, [selectedChatId])
+
   // Auto-scroll only the ScrollArea viewport (not the entire page),
   // and only when the user is already near the bottom.
   useEffect(() => {
@@ -289,9 +320,17 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     viewport.scrollTop = viewport.scrollHeight
   }, [selectedChatId])
 
-  const sendSystemMessage = useCallback((chatIdValue: string, content: string, action: string) => {
+  const sendSystemMessage = useCallback(async (chatIdValue: string, content: string, action: string) => {
     dispatchMessage(chatIdValue, content, 'system', { systemAction: action })
-  }, [dispatchMessage])
+    try {
+      const chat = normalizedChats.find(c => c.id === chatIdValue)
+      if (chat?.remoteRoomId) {
+        await sendGeneralMessage(chat.remoteRoomId, { text: content, title: action })
+      }
+    } catch {
+      // ignore backend send failure; local system message already displayed
+    }
+  }, [dispatchMessage, normalizedChats])
 
   const handleSendMessage = () => {
     if (!selectedChat) return
@@ -503,25 +542,10 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                       {normalizedChats.length} active conversation{normalizedChats.length === 1 ? '' : 's'}
                     </p>
                   </div>
-      
-                  {currentUser.userType === 'donor' && (
-                    <Tabs value={activePanel} onValueChange={(value) => setActivePanel(value as 'chats' | 'requests')}>
-                      <TabsList>
-                        <TabsTrigger value="chats">Chats</TabsTrigger>
-                        <TabsTrigger value="requests">
-                          Requests
-                          {pendingRequestsCount > 0 && (
-                            <Badge variant="destructive" className="ml-2 text-xs">
-                              {pendingRequestsCount}
-                            </Badge>
-                          )}
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                  )}
+                  {/* Requests tab removed: requests are managed in My Listings */}
                 </div>
       
-                {activePanel === 'requests' && currentUser.userType === 'donor' ? (
+                {false ? (
                   <div className="flex flex-1 min-h-0">
                     {groupedRequests.length === 0 ? (
                       <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground space-y-4">

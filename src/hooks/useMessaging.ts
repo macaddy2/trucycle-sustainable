@@ -1,5 +1,9 @@
+import { useEffect } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
+import { messageSocket } from '@/lib/messaging/socket'
+import { createOrFindRoom, listRoomMessages } from '@/lib/api'
+import type { DMMessageView } from '@/lib/api/types'
 
 interface UserProfile {
   id: string
@@ -47,6 +51,7 @@ interface Chat {
   collectorName: string
   collectorAvatar?: string
   linkedRequestId?: string
+  remoteRoomId?: string
   status: 'active' | 'collection_arranged' | 'completed' | 'cancelled'
   lastMessage?: Message
   unreadCount: number
@@ -59,6 +64,50 @@ export function useMessaging() {
   const [chats, setChats] = useKV<Chat[]>('user-chats', [])
   const [messages, setMessages] = useKV<Record<string, Message[]>>('chat-messages', {})
 
+  // Connect WS and handle incoming events
+  useEffect(() => {
+    if (!currentUser) return
+    messageSocket.connect()
+
+    const handleIncoming = (m: DMMessageView) => {
+      const chat = chats.find(c => c.remoteRoomId === m.roomId)
+      if (!chat) return
+      const chatId = chat.id
+      const isSystem = m.category === 'general'
+      const isImage = Boolean(m.imageUrl)
+      const type: Message['type'] = isSystem ? 'system' : (isImage ? 'image' : 'text')
+      const senderId = m.sender?.id || 'system'
+      const senderName = m.sender ? [m.sender.firstName, m.sender.lastName].filter(Boolean).join(' ') || 'User' : 'System'
+      const content = m.text || m.caption || (m.imageUrl ? 'Image' : '')
+      const incoming: Message = {
+        id: m.id,
+        chatId,
+        senderId,
+        senderName,
+        content,
+        timestamp: new Date(m.createdAt as any),
+        type,
+        status: 'delivered',
+        metadata: m.imageUrl ? { imageUrl: m.imageUrl } : undefined,
+      }
+      setMessages(prev => ({ ...prev, [chatId]: [...(prev[chatId] || []), incoming] }))
+      setChats(prev => prev.map(c => c.id === chatId ? { ...c, lastMessage: incoming, unreadCount: c.unreadCount + 1, updatedAt: new Date() } : c))
+    }
+
+    const handleRoomActivity = (p: { roomId: string; updatedAt: string }) => {
+      const chat = chats.find(c => c.remoteRoomId === p.roomId)
+      if (!chat) return
+      setChats(prev => prev.map(c => c.id === chat.id ? { ...c, updatedAt: new Date(p.updatedAt) } : c))
+    }
+
+    messageSocket.onMessageNew(handleIncoming)
+    messageSocket.onRoomActivity(handleRoomActivity)
+    return () => {
+      messageSocket.offMessageNew(handleIncoming)
+      messageSocket.offRoomActivity(handleRoomActivity)
+    }
+  }, [currentUser, chats, setMessages, setChats])
+
   const createOrGetChat = async (
     itemId: string,
     itemTitle: string,
@@ -69,7 +118,7 @@ export function useMessaging() {
     collectorId: string,
     collectorName: string,
     collectorAvatar: string | undefined,
-    options?: { linkedRequestId?: string }
+    options?: { linkedRequestId?: string; remoteRoomId?: string }
   ) => {
     // Check if chat already exists
     const existingChat = chats.find(chat =>
@@ -103,6 +152,7 @@ export function useMessaging() {
       collectorName,
       collectorAvatar,
       linkedRequestId: options?.linkedRequestId,
+      remoteRoomId: options?.remoteRoomId,
       status: 'active',
       unreadCount: 0,
       createdAt: new Date(),
@@ -173,6 +223,16 @@ export function useMessaging() {
           }
         : chat
     ))
+
+    // Send over WS if linked to a server room (text only here)
+    try {
+      const chat = chats.find(c => c.id === chatId)
+      if (chat?.remoteRoomId && type === 'text') {
+        await messageSocket.sendMessage(chat.remoteRoomId, content)
+      }
+    } catch {
+      // ignore WS errors for now
+    }
 
     // Simulate message delivery (in real app, this would be handled by backend)
     setTimeout(() => {
@@ -298,7 +358,64 @@ export function useMessaging() {
     getChatById,
     getMessagesForChat,
     getTotalUnreadCount,
-    getChatForItem
+    getChatForItem,
+    linkChatToRoom: (chatId: string, remoteRoomId: string) => {
+      setChats(prev => prev.map(c => c.id === chatId ? { ...c, remoteRoomId } : c))
+    },
+    ensureRemoteRoomForChat: async (chatId: string) => {
+      const chat = chats.find(c => c.id === chatId)
+      if (!currentUser || !chat) return null
+      if (chat.remoteRoomId) {
+        try { await messageSocket.joinRoom(currentUser.id === chat.donorId ? chat.collectorId : chat.donorId) } catch {}
+        return chat.remoteRoomId
+      }
+      const otherUserId = currentUser.id === chat.donorId ? chat.collectorId : chat.donorId
+      try {
+        const res = await createOrFindRoom(otherUserId)
+        const roomId = res?.data?.id
+        if (roomId) {
+          setChats(prev => prev.map(c => c.id === chatId ? { ...c, remoteRoomId: roomId } : c))
+          try { await messageSocket.joinRoom(otherUserId) } catch {}
+          return roomId
+        }
+      } catch {}
+      return null
+    },
+    loadHistoryForChat: async (chatId: string) => {
+      const chat = chats.find(c => c.id === chatId)
+      if (!chat?.remoteRoomId) return
+      try {
+        const res = await listRoomMessages(chat.remoteRoomId, { limit: 50 })
+        const items = res?.data?.messages || []
+        if (!Array.isArray(items) || items.length === 0) return
+        const mapped: Message[] = items.map((m) => {
+          const isSystem = m.category === 'general'
+          const isImage = Boolean(m.imageUrl)
+          const type: Message['type'] = isSystem ? 'system' : (isImage ? 'image' : 'text')
+          const senderId = m.sender?.id || 'system'
+          const senderName = m.sender ? [m.sender.firstName, m.sender.lastName].filter(Boolean).join(' ') || 'User' : 'System'
+          const content = m.text || m.caption || (m.imageUrl ? 'Image' : '')
+          return {
+            id: m.id,
+            chatId,
+            senderId,
+            senderName,
+            content,
+            timestamp: new Date(m.createdAt as any),
+            type,
+            status: 'delivered',
+            metadata: m.imageUrl ? { imageUrl: m.imageUrl } : undefined,
+          }
+        })
+        // Deduplicate by message id when merging
+        setMessages(prev => {
+          const existing = prev[chatId] || []
+          const seen = new Set(existing.map(x => x.id))
+          const merged = [...existing, ...mapped.filter(x => !seen.has(x.id))]
+          return { ...prev, [chatId]: merged }
+        })
+      } catch {}
+    }
   }
 }
 

@@ -21,9 +21,13 @@ import type {
   CreateClaimDto,
   CreateClaimResponse,
   ApproveClaimResponse,
+  // messaging
+  DMRoom,
+  ListRoomMessagesResponse,
+  DMMessageView,
 } from './types'
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '') || ''
+export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '') || ''
 
 const TOKENS_KEY = 'auth.tokens'
 
@@ -63,10 +67,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   const url = `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  }
+  const headers: Record<string, string> = { ...options.headers }
 
   if (options.auth) {
     const tokens = await getTokens()
@@ -75,10 +76,15 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     }
   }
 
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
+  if (!isFormData) {
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json'
+  }
+
   const res = await fetch(url, {
     method: options.method ?? (options.body ? 'POST' : 'GET'),
     headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    body: options.body ? (isFormData ? (options.body as any) : JSON.stringify(options.body)) : undefined,
   })
 
   let payload: any = undefined
@@ -233,6 +239,57 @@ export async function createClaim(dto: CreateClaimDto) {
 export async function approveClaim(id: string) {
   return request<ApiEnvelope<ApproveClaimResponse>>(`/claims/${id}/approve`, {
     method: 'PATCH',
+    auth: true,
+  })
+}
+
+// MESSAGING ENDPOINTS (system/general over HTTP; direct chat via WebSocket later)
+export async function createOrFindRoom(otherUserId: string) {
+  return request<ApiEnvelope<DMRoom>>('/messages/rooms', {
+    method: 'POST',
+    auth: true,
+    body: { otherUserId },
+  })
+}
+
+export async function listActiveRooms() {
+  return request<ApiEnvelope<DMRoom[]>>('/messages/rooms/active', { auth: true })
+}
+
+export async function listRoomMessages(roomId: string, params?: { limit?: number; cursor?: string }) {
+  const qs = toQuery(params as any)
+  return request<ApiEnvelope<ListRoomMessagesResponse>>(`/messages/rooms/${roomId}/messages${qs}`, { auth: true })
+}
+
+export async function sendGeneralMessage(roomId: string, payload: { title?: string; text: string }) {
+  return request<ApiEnvelope<DMMessageView>>(`/messages/rooms/${roomId}/messages/general`, {
+    method: 'POST',
+    auth: true,
+    body: payload,
+  })
+}
+
+export async function sendImageMessage(roomId: string, file: File | Blob, caption?: string) {
+  const form = new FormData()
+  form.append('image', file)
+  if (caption) form.append('caption', caption)
+  return request<ApiEnvelope<DMMessageView>>(`/messages/rooms/${roomId}/messages/image`, {
+    method: 'POST',
+    auth: true,
+    body: form,
+  })
+}
+
+export async function deleteRoom(roomId: string) {
+  return request<ApiEnvelope<{ success: boolean }>>(`/messages/rooms/${roomId}`, {
+    method: 'DELETE',
+    auth: true,
+  })
+}
+
+export async function clearRoomMessages(roomId: string) {
+  return request<ApiEnvelope<{ success: boolean }>>(`/messages/rooms/${roomId}/messages`, {
+    method: 'DELETE',
     auth: true,
   })
 }

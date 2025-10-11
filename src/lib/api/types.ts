@@ -228,3 +228,37 @@ export interface ApproveClaimResponse {
   status: ClaimStatusApi
   approved_at?: string
 }
+
+// Messaging (HTTP endpoints for system/general + room management)
+export interface DMParticipant {
+  id: string
+  firstName?: string | null
+  lastName?: string | null
+  profileImageUrl?: string | null
+  online?: boolean
+}
+
+export interface DMMessageView {
+  id: string
+  roomId: string
+  direction: 'incoming' | 'outgoing' | 'general' | string
+  category: 'direct' | 'general' | string
+  imageUrl?: string | null
+  caption?: string | null
+  text?: string | null
+  createdAt: string
+  sender: DMParticipant
+}
+
+export interface DMRoom {
+  id: string
+  participants: DMParticipant[]
+  lastMessage?: DMMessageView
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface ListRoomMessagesResponse {
+  messages: DMMessageView[]
+  nextCursor?: string | null
+}

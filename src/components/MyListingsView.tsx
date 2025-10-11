@@ -14,7 +14,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ChatCircle, CheckCircle, Clock, Package, PencilSimpleLine, Plus, ShieldCheck, X } from '@phosphor-icons/react'
 import { Textarea } from '@/components/ui/textarea'
 import { useMessaging, useExchangeManager, useNotifications } from '@/hooks'
-import { listMyItems, listMyCollectedItems } from '@/lib/api'
+import { listMyItems, listMyCollectedItems, createOrFindRoom } from '@/lib/api'
+import { messageSocket } from '@/lib/messaging/socket'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import type { ManagedListing } from '@/types/listings'
 
@@ -320,6 +321,39 @@ export function MyListingsView({
   const handleOpenListingDetails = (listingId: string) => {
     setSelectedListingId(listingId)
     setShowDetailModal(true)
+  }
+
+  const handleOpenConversation = async (request: ClaimRequest) => {
+    let room: any = null
+    try {
+      // Ensure a server-side direct room exists with the collector
+      const otherUserId = currentUser?.userType === 'donor' ? request.collectorId : request.donorId
+      const roomRes = await createOrFindRoom(otherUserId)
+      room = roomRes?.data
+      try { await messageSocket.joinRoom(otherUserId) } catch {}
+    } catch (e: any) {
+      // Non-fatal: still open local chat for UX continuity
+      toast.error(e?.message || 'Unable to open conversation room. Opening local chat...')
+    }
+
+    // Open or create a local chat and navigate to Messages
+    const listing = listings.find((l) => l.id === request.itemId)
+    const donorId = currentUser?.userType === 'donor' ? currentUser.id : request.donorId
+    const donorName = currentUser?.userType === 'donor' ? (currentUser.name) : request.donorName
+
+    const chatId = await createOrGetChat(
+      request.itemId,
+      listing?.title || request.itemTitle,
+      listing?.photos?.[0],
+      donorId,
+      donorName,
+      undefined,
+      request.collectorId,
+      request.collectorName,
+      request.collectorAvatar,
+      { linkedRequestId: request.id, remoteRoomId: (room as any)?.id },
+    )
+    openMessages?.({ chatId })
   }
 
   // Load server-backed data for my listed / collected items
@@ -1017,9 +1051,9 @@ export function MyListingsView({
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => openMessages(requestChat ? { chatId: requestChat.id } : { itemId: request.itemId, initialView: 'requests' })}
+                              onClick={() => (requestChat ? openMessages?.({ chatId: requestChat.id }) : handleOpenConversation(request))}
                             >
-                              View conversation
+                              Open Conversation
                             </Button>
                           </div>
                         </div>

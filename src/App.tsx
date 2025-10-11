@@ -44,7 +44,7 @@ import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
-import { useInitializeSampleData, useRecommendationNotifications, useNotifications } from '@/hooks'
+import { useInitializeSampleData, useRecommendationNotifications, useNotifications, useExchangeManager } from '@/hooks'
 import type { ListingCompletionDetails } from './components/ItemListingForm'
 
 interface UserProfile {
@@ -100,6 +100,11 @@ function App() {
     unreadCount: recommendationUnreadCount,
     markAsRead: markRecommendationAsRead,
   } = useRecommendationNotifications(user ?? null)
+  const { getRequestsForDonor } = useExchangeManager()
+  const pendingListingRequests = useMemo(() => {
+    if (!user) return 0
+    return getRequestsForDonor(user.id).filter((r) => r.status === 'pending').length
+  }, [user, getRequestsForDonor])
 
   const allTabs = useMemo(() => new Set([
     'home', 'browse', 'listings', 'messages', 'dropoff', 'impact', 'profile', 'list'
@@ -348,7 +353,8 @@ function App() {
       const detail = (event as CustomEvent<{ request: ClaimRequest }>).detail
       if (user && detail.request.donorId === user.id) {
         toast.info(`${detail.request.collectorName} wants "${detail.request.itemTitle}"`)
-        handleOpenMessages({ itemId: detail.request.itemId, initialView: 'requests' })
+        // Navigate to listings to manage requests there
+        navigateToTab('listings')
       }
     }
 
@@ -554,6 +560,11 @@ function App() {
                     <TabsTrigger key={value} value={value} className="flex items-center space-x-2 px-3 sm:px-4 py-1.5">
                       <Icon size={16} />
                       <span className="hidden lg:inline">{label}</span>
+                      {value === 'listings' && user?.userType === 'donor' && pendingListingRequests > 0 && (
+                        <Badge variant="destructive" className="ml-1 text-[10px]">
+                          {pendingListingRequests}
+                        </Badge>
+                      )}
                     </TabsTrigger>
                   ))}
                 </TabsList>
@@ -678,6 +689,11 @@ function App() {
                 <TabsTrigger key={value} value={value} className="flex items-center space-x-2 py-2">
                   <Icon size={16} />
                   <span className="hidden sm:inline">{label}</span>
+                  {value === 'listings' && user?.userType === 'donor' && pendingListingRequests > 0 && (
+                    <Badge variant="destructive" className="ml-1 text-[10px]">
+                      {pendingListingRequests}
+                    </Badge>
+                  )}
                 </TabsTrigger>
               ))}
             </TabsList>
