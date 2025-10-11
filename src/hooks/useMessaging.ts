@@ -52,6 +52,8 @@ interface Chat {
   collectorAvatar?: string
   linkedRequestId?: string
   remoteRoomId?: string
+  // Online status of the other participant (derived from presence)
+  otherOnline?: boolean
   status: 'active' | 'collection_arranged' | 'completed' | 'cancelled'
   lastMessage?: Message
   unreadCount: number
@@ -100,11 +102,20 @@ export function useMessaging() {
       setChats(prev => prev.map(c => c.id === chat.id ? { ...c, updatedAt: new Date(p.updatedAt) } : c))
     }
 
+    const handlePresence = (p: { userId: string; online: boolean }) => {
+      setChats(prev => prev.map(c => {
+        const otherId = currentUser?.id === c.donorId ? c.collectorId : c.donorId
+        return otherId === p.userId ? { ...c, otherOnline: p.online } : c
+      }))
+    }
+
     messageSocket.onMessageNew(handleIncoming)
     messageSocket.onRoomActivity(handleRoomActivity)
+    messageSocket.onPresenceUpdate(handlePresence)
     return () => {
       messageSocket.offMessageNew(handleIncoming)
       messageSocket.offRoomActivity(handleRoomActivity)
+      messageSocket.offPresenceUpdate(handlePresence)
     }
   }, [currentUser, chats, setMessages, setChats])
 
@@ -153,6 +164,7 @@ export function useMessaging() {
       collectorAvatar,
       linkedRequestId: options?.linkedRequestId,
       remoteRoomId: options?.remoteRoomId,
+      otherOnline: undefined,
       status: 'active',
       unreadCount: 0,
       createdAt: new Date(),
@@ -292,6 +304,7 @@ export function useMessaging() {
             collectorAvatar: undefined,
             linkedRequestId: undefined,
             remoteRoomId: r.id,
+            otherOnline: Boolean(other?.online),
             status: 'active',
             lastMessage: last,
             unreadCount: 0,

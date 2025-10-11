@@ -16,7 +16,7 @@ import {
   Paperclip
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
-import { useMessaging, useExchangeManager } from '@/hooks'
+import { useMessaging, useExchangeManager, usePresence } from '@/hooks'
 import { sendGeneralMessage } from '@/lib/api'
 import { messageSocket, fileToBase64 } from '@/lib/messaging/socket'
 import { useKV } from '@/hooks/useKV'
@@ -85,6 +85,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     getRequestsForDonor,
     getRewardBalance
   } = useExchangeManager()
+  const { isOnline } = usePresence(currentUser?.id)
 
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [activePanel, setActivePanel] = useState<'chats' | 'requests'>(initialView)
@@ -830,9 +831,16 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
       
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center justify-between">
-                                        <p className="text-small font-medium truncate">
-                                          {currentUser.id === chat.donorId ? chat.collectorName : chat.donorName}
-                                        </p>
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          {(() => {
+                                            const otherId = currentUser.id === chat.donorId ? chat.collectorId : chat.donorId
+                                            const online = typeof chat.otherOnline === 'boolean' ? chat.otherOnline : isOnline(otherId)
+                                            return <span className={`${online ? 'bg-green-500' : 'bg-slate-300'} inline-block w-2 h-2 rounded-full`}></span>
+                                          })()}
+                                          <p className="text-small font-medium truncate">
+                                            {currentUser.id === chat.donorId ? chat.collectorName : chat.donorName}
+                                          </p>
+                                        </div>
                                         {chat.unreadCount > 0 && (
                                           <Badge variant="destructive" className="text-xs">
                                             {chat.unreadCount}
@@ -874,9 +882,16 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                                 </AvatarFallback>
                               </Avatar>
                               <div>
-                                <h3 className="font-medium">
-                                  {currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName}
-                                </h3>
+                                <div className="flex items-center gap-2">
+                                  {(() => {
+                                    const otherId = currentUser.id === selectedChat.donorId ? selectedChat.collectorId : selectedChat.donorId
+                                    const online = typeof selectedChat.otherOnline === 'boolean' ? selectedChat.otherOnline : isOnline(otherId)
+                                    return <span className={`${online ? 'bg-green-500' : 'bg-slate-300'} inline-block w-2 h-2 rounded-full`}></span>
+                                  })()}
+                                  <h3 className="font-medium">
+                                    {currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName}
+                                  </h3>
+                                </div>
                                 <p className="text-small text-muted-foreground">
                                   About: {selectedChat.itemTitle}
                                 </p>

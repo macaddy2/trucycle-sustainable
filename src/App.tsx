@@ -44,7 +44,7 @@ import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
-import { useRecommendationNotifications, useNotifications, useExchangeManager } from '@/hooks'
+import { useRecommendationNotifications, useNotifications, useExchangeManager, usePresence } from '@/hooks'
 import type { ListingCompletionDetails } from './components/ItemListingForm'
 
 interface UserProfile {
@@ -100,6 +100,8 @@ function App() {
     markAsRead: markRecommendationAsRead,
   } = useRecommendationNotifications(user ?? null)
   const { getRequestsForDonor } = useExchangeManager()
+  // Keep messaging presence tracking alive across the app
+  usePresence(user?.id ?? null)
   const pendingListingRequests = useMemo(() => {
     if (!user) return 0
     return getRequestsForDonor(user.id).filter((r) => r.status === 'pending').length
@@ -669,6 +671,105 @@ function App() {
                 </div>
               )}
 
+            </div>
+
+            {/* Mobile Actions (Profile, Messages, Notifications, QR) */}
+            <div className="flex md:hidden items-center space-x-2">
+              {user ? (
+                <div className="flex items-center space-x-1">
+                  <MessageNotification onOpenMessages={handleOpenMessages} />
+
+                  <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="relative"
+                        title={totalUnreadNotifications > 0 ? `${totalUnreadNotifications} new notification${totalUnreadNotifications === 1 ? '' : 's'}` : 'Notifications'}
+                      >
+                        <Bell size={16} />
+                        {totalUnreadNotifications > 0 && (
+                          <Badge
+                            variant="destructive"
+                            className="absolute -top-1.5 -right-1.5 text-[10px] w-4.5 h-4.5 p-0 flex items-center justify-center"
+                          >
+                            {totalUnreadNotifications > 99 ? '99+' : totalUnreadNotifications}
+                          </Badge>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[320px] p-0" align="end">
+                      <NotificationList
+                        notifications={trayNotifications.map(({ notification }) => notification)}
+                        onMarkAsRead={handleNotificationMarkAsRead}
+                        onMarkAllAsRead={hasUnreadNotifications ? handleNotificationsMarkAll : undefined}
+                        onDeleteNotification={handleNotificationDelete}
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowShopScanner(true)}
+                    title={user?.partnerAccess ? 'Open partner shop scanner' : 'View your QR activity'}
+                    className={user?.partnerAccess ? 'border-primary/50 text-primary' : undefined}
+                  >
+                    <QrCode size={16} />
+                  </Button>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Profile menu"
+                      >
+                        <User size={18} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>
+                        {userFirstName ? `Hi, ${userFirstName}` : 'Account'}
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => navigateToTab('profile')}>
+                        My Profile
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => navigateToTab('listings')}>
+                        My Listings
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => navigateToTab('messages')}>
+                        Messages
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setShowShopScanner(true)}>
+                        {user?.partnerAccess ? 'Partner Scanner' : 'QR Activity'}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => window.dispatchEvent(new Event('open-profile-onboarding'))}>
+                        Edit Profile
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={handleToggleUserType}>
+                        {user?.userType === 'donor' ? 'Switch to Collector' : 'Switch to Donor'}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onSelect={() => {
+                          setUser(null as any)
+                          navigateToTab('home')
+                        }}
+                      >
+                        Sign out
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ) : (
+                <Button size="sm" onClick={handleSignIn}>
+                  Get Started
+                </Button>
+              )}
             </div>
           </div>
         </div>
