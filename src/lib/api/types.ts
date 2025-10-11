@@ -188,3 +188,29 @@ export interface MyCollectedItemsResponse {
   items: MyCollectedItemEntry[]
   pagination: { page: number; limit: number; total: number; total_pages: number }
 }
+
+// Claims
+export type ClaimStatusApi =
+  | 'pending_approval'
+  | 'approved'
+  | 'complete'
+  | 'rejected'
+  | 'cancelled'
+
+export interface CreateClaimDto {
+  item_id: string
+}
+
+export interface CreateClaimResponse {
+  id: string
+  item_id: string
+  collector_id?: string
+  status: ClaimStatusApi
+  created_at?: string
+}
+
+export interface ApproveClaimResponse {
+  id: string
+  status: ClaimStatusApi
+  approved_at?: string
+}

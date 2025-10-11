@@ -17,6 +17,10 @@ import type {
   CreateItemResponse,
   MyListedItemsResponse,
   MyCollectedItemsResponse,
+  // claims
+  CreateClaimDto,
+  CreateClaimResponse,
+  ApproveClaimResponse,
 } from './types'
 
 const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '') || ''
@@ -209,4 +213,20 @@ export async function listMyCollectedItems(params?: {
 }) {
   const qs = toQuery(params)
   return request<ApiEnvelope<MyCollectedItemsResponse>>(`/items/me/collected${qs}`, { auth: true })
+}
+
+// CLAIMS ENDPOINTS
+export async function createClaim(dto: CreateClaimDto) {
+  return request<ApiEnvelope<CreateClaimResponse>>('/claims', {
+    method: 'POST',
+    auth: true,
+    body: dto,
+  })
+}
+
+export async function approveClaim(id: string) {
+  return request<ApiEnvelope<ApproveClaimResponse>>(`/claims/${id}/approve`, {
+    method: 'PATCH',
+    auth: true,
+  })
 }

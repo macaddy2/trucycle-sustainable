@@ -1,9 +1,10 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import type { ManagedListing } from '@/types/listings'
 import { kvGet, kvSet } from '@/lib/kvStore'
 import type { QRCodeData } from '@/components/QRCode'
+import { createClaim, approveClaim } from '@/lib/api'
 
 export interface ClaimRequest {
   id: string
@@ -33,46 +34,48 @@ interface CompleteRequestResult {
 }
 
 export function useExchangeManager() {
-  const [claimRequests, setClaimRequests] = useKV<ClaimRequest[]>('claim-requests', [])
-  const [donorRewards, setDonorRewards] = useKV<Record<string, number>>('donor-rewards', {})
-  const [collectedItems, setCollectedItems] = useKV<Record<string, CollectedItemRecord>>('collected-items', {})
+  // Stop persisting demo claims/rewards/collections; hold minimal session state only
+  const [claimRequests, setClaimRequests] = useState<ClaimRequest[]>([])
+  const [donorRewards, setDonorRewards] = useState<Record<string, number>>({})
+  const [collectedItems, setCollectedItems] = useState<Record<string, CollectedItemRecord>>({})
   const [userListings, setUserListings] = useKV<ManagedListing[]>('user-listings', [])
   const [globalListings, setGlobalListings] = useKV<ManagedListing[]>('global-listings', [])
   const [, setUserQrCodes] = useKV<QRCodeData[]>('user-qr-codes', [])
 
-  const submitClaimRequest = useCallback((
-    payload: Omit<ClaimRequest, 'id' | 'status' | 'createdAt' | 'decisionAt'>,
-  ): ClaimRequest | null => {
-    const existing = claimRequests.find(
-      request =>
-        request.itemId === payload.itemId &&
-        request.collectorId === payload.collectorId &&
-        request.status !== 'completed',
-    )
+  const submitClaimRequest = useCallback(
+    async (
+      payload: Omit<ClaimRequest, 'id' | 'status' | 'createdAt' | 'decisionAt'>,
+    ): Promise<ClaimRequest | null> => {
+      try {
+        // Call backend to create claim
+        const result = await createClaim({ item_id: payload.itemId })
+        const data = result?.data
+        const newRequest: ClaimRequest = {
+          ...payload,
+          id: String(data?.id || `claim_${Date.now()}`),
+          status: 'pending', // backend uses 'pending_approval'
+          createdAt: String(data?.created_at || new Date().toISOString()),
+        }
 
-    if (existing) {
-      toast.info('You have already requested this item. The donor will review your request shortly.')
-      return existing
-    }
+        // Keep lightweight in-session list for UX; do not persist
+        setClaimRequests(prev => [...prev, newRequest])
 
-    const newRequest: ClaimRequest = {
-      ...payload,
-      id: `claim_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    }
+        toast.success('Request sent! The donor will review your request.')
 
-    setClaimRequests(prev => [...prev, newRequest])
-    toast.success('Request sent! The donor will review your interest.')
+        window.dispatchEvent(
+          new CustomEvent('exchange-claim-requested', {
+            detail: { request: newRequest },
+          }),
+        )
 
-    window.dispatchEvent(
-      new CustomEvent('exchange-claim-requested', {
-        detail: { request: newRequest },
-      }),
-    )
-
-    return newRequest
-  }, [claimRequests, setClaimRequests])
+        return newRequest
+      } catch (e: any) {
+        toast.error(e?.message || 'Failed to submit claim')
+        return null
+      }
+    },
+    [],
+  )
 
   const createQrCodesForExchange = useCallback(async (
     listing: ManagedListing,
@@ -131,40 +134,48 @@ export function useExchangeManager() {
     })
   }, [setUserQrCodes])
 
-  const confirmClaimRequest = useCallback(async (requestId: string): Promise<ClaimRequest | null> => {
-    const target = claimRequests.find(request => request.id === requestId)
-    if (!target) return null
-
-    const decisionTimestamp = new Date().toISOString()
-
-    const updatedRequests = claimRequests.map(request => {
-      if (request.id === requestId) {
-        return { ...request, status: 'approved', decisionAt: decisionTimestamp }
+  const confirmClaimRequest = useCallback(
+    async (requestId: string): Promise<ClaimRequest | null> => {
+      // Try to find local record for richer UI context
+      const target = claimRequests.find(request => request.id === requestId) || null
+      try {
+        await approveClaim(requestId)
+      } catch (e: any) {
+        toast.error(e?.message || 'Failed to approve claim')
+        return null
       }
 
-      if (request.itemId === target.itemId && request.status === 'pending') {
-        return { ...request, status: 'declined', decisionAt: decisionTimestamp }
+      const decisionTimestamp = new Date().toISOString()
+      let approvedRequest: ClaimRequest | null = null
+
+      // Update local in-session list for UX only
+      setClaimRequests(prev => prev.map(req => {
+        if (req.id === requestId) {
+          approvedRequest = { ...req, status: 'approved', decisionAt: decisionTimestamp }
+          return approvedRequest
+        }
+        // For the same item, mark other pending ones as declined locally
+        if (target && req.itemId === target.itemId && req.status === 'pending') {
+          return { ...req, status: 'declined', decisionAt: decisionTimestamp }
+        }
+        return req
+      }))
+
+      if (approvedRequest) {
+        toast.success(`${approvedRequest.collectorName} has been approved for this exchange.`)
+
+        const relatedListing = globalListings.find(listing => listing.id === approvedRequest!.itemId)
+          || userListings.find(listing => listing.id === approvedRequest!.itemId)
+
+        if (relatedListing) {
+          await createQrCodesForExchange(relatedListing, approvedRequest)
+        }
       }
 
-      return request
-    })
-
-    setClaimRequests(updatedRequests)
-
-    const approvedRequest = updatedRequests.find(request => request.id === requestId) || null
-    if (approvedRequest) {
-      toast.success(`${approvedRequest.collectorName} has been approved for this exchange.`)
-
-      const relatedListing = globalListings.find(listing => listing.id === approvedRequest.itemId)
-        || userListings.find(listing => listing.id === approvedRequest.itemId)
-
-      if (relatedListing) {
-        await createQrCodesForExchange(relatedListing, approvedRequest)
-      }
-    }
-
-    return approvedRequest
-  }, [claimRequests, setClaimRequests, globalListings, userListings, createQrCodesForExchange])
+      return approvedRequest
+    },
+    [claimRequests, globalListings, userListings, createQrCodesForExchange],
+  )
 
   const completeClaimRequest = useCallback((requestId: string, rewardPoints = 25): CompleteRequestResult | null => {
     const target = claimRequests.find(request => request.id === requestId)

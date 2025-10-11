@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress'
 import { Plus, Camera, MapPin, Recycle, Heart, ArrowsClockwise, Truck, Storefront, X } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
-import { kvGet, kvSet } from '@/lib/kvStore'
+// Removed demo local KV persistence
 import { DropOffLocationSelector } from './DropOffLocationSelector'
 import type { DropOffLocation } from './dropOffLocations'
 import { sendListingSubmissionEmails } from '@/lib/emailAlerts'
@@ -230,7 +230,7 @@ export function ItemListingForm({
   onIntentHandled
 }: ItemListingFormProps) {
   const [user] = useKV('current-user', null)
-  const [, setListings] = useKV<ManagedListing[]>('user-listings', [])
+  // Removed local demo listings persistence
   const [currentStep, setCurrentStep] = useState(1)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const formContainerRef = useRef<HTMLDivElement>(null)
@@ -740,24 +740,7 @@ export function ItemListingForm({
         co2Impact: typeof server?.estimated_co2_saved_kg === 'number' ? server!.estimated_co2_saved_kg! : carbonImpact
       }
 
-      // Persist locally for the rest of the UI flows
-      setListings(currentListings => [...currentListings, newListing])
-
-      const globalListings = await kvGet('global-listings') || []
-      await kvSet('global-listings', [...globalListings, newListing])
-
-      // Update user's carbon footprint based on action type
-      if (user.carbonFootprint) {
-        const updatedUser = {
-          ...user,
-          carbonFootprint: {
-            ...user.carbonFootprint,
-            totalSaved: user.carbonFootprint.totalSaved + carbonImpact,
-            itemsProcessed: user.carbonFootprint.itemsProcessed + 1
-          }
-        }
-        await kvSet('current-user', updatedUser)
-      }
+      // Do not persist to local demo stores; rely on API-driven views
 
       toast.success('Item listed successfully!')
 
@@ -809,36 +792,7 @@ export function ItemListingForm({
 
       // Photos now point to permanent Cloudinary URLs
 
-      if (fulfillmentMethod === 'dropoff' && formData.dropOffLocation) {
-        const emailLog = await kvGet('email-log') || []
-        const partnerEmail = `${formData.dropOffLocation.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '')}@partner.trucycle`
-
-        const emailEntries = [
-          {
-            id: `email-${Date.now()}-user`,
-            to: user.email,
-            subject: `Drop-off scheduled: ${newListing.title}`,
-            context: 'dropoff_confirmation',
-            createdAt: new Date().toISOString()
-          },
-          {
-            id: `email-${Date.now()}-partner`,
-            to: partnerEmail,
-            subject: `New TruCycle drop-off from ${user.name || 'TruCycle user'}`,
-            body: `${user.name || 'A TruCycle user'} is planning to drop off "${newListing.title}" at your location (${formData.dropOffLocation.address}). Please prepare to scan their QR code upon arrival.`,
-            context: 'partner_notification',
-            createdAt: new Date().toISOString(),
-            locationId: formData.dropOffLocation.id
-          }
-        ]
-
-        await kvSet('email-log', [...emailLog, ...emailEntries])
-        toast.success('Email confirmations sent', {
-          description: `We notified you and ${formData.dropOffLocation.name} about this drop-off.`
-        })
-      }
+      // Partner/shop email logging previously wrote to local demo KV; removed
 
       // Reset form
       setFormData({

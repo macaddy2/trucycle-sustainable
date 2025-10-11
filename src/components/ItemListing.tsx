@@ -310,7 +310,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
   }
 
 
-  const handleRequestClaim = (item: ListingItem) => {
+  const handleRequestClaim = async (item: ListingItem) => {
     if (!currentUser) {
       toast.error('Please sign in to request this item')
       return
@@ -321,7 +321,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
       return
     }
 
-    const request = submitClaimRequest({
+    const request = await submitClaimRequest({
       itemId: item.id,
       itemTitle: item.title,
       itemImage: item.photos[0],
