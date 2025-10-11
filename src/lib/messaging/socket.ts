@@ -75,7 +75,7 @@ class MessageSocket {
     if (!s) throw new Error('Socket not connected')
     return new Promise<void>((resolve, reject) => {
       const isLarge = Array.isArray(files) && files.length > 0
-      const timeoutMs = isLarge ? 25000 : 10000
+      const timeoutMs = isLarge ? 60000 : 10000
       const timeout = setTimeout(() => { cleanup(); reject(new Error('Timed out waiting for ack')) }, timeoutMs)
       function onSent() { cleanup(); resolve() }
       function cleanup() { clearTimeout(timeout); s.off('message:sent', onSent) }

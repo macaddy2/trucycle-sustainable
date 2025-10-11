@@ -24,6 +24,7 @@ import type { ManagedListing } from '@/types/listings'
 import type { Chat as MessagingChat, Message as MessagingMessage } from '@/hooks/useMessaging'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import { QRCodeGenerator, QRCodeDisplay, QRCodeData } from '../QRCode'
+import { LocationSelector } from '@/components/LocationSelector'
 
 interface MessageCenterProps {
   open?: boolean
@@ -91,6 +92,12 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   const [attachments, setAttachments] = useState<Array<{ file: File; url: string }>>([])
   const [pendingBlocks, setPendingBlocks] = useState<Array<{ id: string; type: 'text' | 'images'; senderId: string; senderName: string; content?: string; images?: string[]; timestamp: Date }>>([])
   const [imageViewer, setImageViewer] = useState<{ urls: string[]; index: number } | null>(null)
+  const [showScheduleSheet, setShowScheduleSheet] = useState(false)
+  const [scheduleDateTime, setScheduleDateTime] = useState<string>('')
+  const [scheduleLocation, setScheduleLocation] = useState<{ lat?: number; lng?: number; label?: string } | null>(null)
+  const [showLocationSheet, setShowLocationSheet] = useState(false)
+  const [inlineLocationPickerOpen, setInlineLocationPickerOpen] = useState(false)
+  const [locationValue, setLocationValue] = useState<{ lat?: number; lng?: number; label?: string; radiusKm: number }>({ radiusKm: 10 })
   
   const [showQRCode, setShowQRCode] = useState<QRCodeData | null>(null)
   const [selectedDropOffLocation, setSelectedDropOffLocation] = useState('')
@@ -401,13 +408,20 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     const onlyImages = files.filter(f => f.type.startsWith('image/'))
     if (onlyImages.length !== files.length) toast.error('Only image files are supported')
     const next = [...attachments]
+    let skipped = 0
     for (const f of onlyImages) {
-      const total = next.reduce((s, a) => s + a.file.size, 0) + f.size
+      const url = URL.createObjectURL(f)
+      next.push({ file: f, url })
+      const total = next.reduce((s, a) => s + a.file.size, 0)
       if (total > 3 * 1024 * 1024) {
-        toast.error('Total attachments must be ≤ 3MB')
-        break
+        // remove last if over limit
+        const removed = next.pop()
+        if (removed) URL.revokeObjectURL(removed.url)
+        skipped++
       }
-      next.push({ file: f, url: URL.createObjectURL(f) })
+    }
+    if (skipped > 0) {
+      toast.info(`Removed ${skipped} attachment${skipped > 1 ? 's' : ''} to stay under 3MB total`)
     }
     setAttachments(next)
   }
@@ -572,15 +586,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
       {
         label: 'Schedule Pickup',
         icon: CalendarCheck,
-        action: () => {
-          if (!selectedChat) return
-          sendSystemMessage(
-            selectedChat.id,
-            'Pickup has been scheduled for tomorrow at 2 PM.',
-            'pickup_scheduled'
-          )
-          toast.success('Pickup details shared')
-        },
+        action: () => setShowScheduleSheet(true),
         color: 'text-orange-600',
         visible: Boolean(selectedChat)
       }
@@ -997,6 +1003,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                                 ref={fileInputRef}
                                 type="file"
                                 accept="image/*"
+                                multiple
                                 className="hidden"
                                 onChange={handleImageSelected}
                               />
@@ -1112,23 +1119,142 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="max-w-5xl h-[640px] max-h-[85vh] p-0 overflow-hidden">
-        <DialogHeader className="sr-only">
-          <DialogTitle>Message Center</DialogTitle>
-        </DialogHeader>
-        {renderBody()}
-        {imageViewer && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-            <div className="relative max-w-3xl w-full px-4">
-              <img src={imageViewer.urls[imageViewer.index]} className="max-h-[80vh] w-full object-contain rounded" />
-              <div className="absolute top-2 right-2">
-                <Button size="sm" variant="secondary" onClick={closeImageViewer}>Close</Button>
-              </div>
+    <>
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+        <DialogContent className="max-w-5xl h-[640px] max-h-[85vh] p-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Message Center</DialogTitle>
+          </DialogHeader>
+          {renderBody()}
+        </DialogContent>
+      </Dialog>
+
+      {imageViewer && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]">
+          <div className="relative max-w-3xl w-full px-4">
+            <img src={imageViewer.urls[imageViewer.index]} className="max-h-[80vh] w-full object-contain rounded" />
+            <div className="absolute top-2 right-2">
+              <Button size="sm" variant="secondary" onClick={closeImageViewer}>Close</Button>
             </div>
           </div>
+        </div>
+      )}
+
+      {showLocationSheet && (
+          <div className="fixed inset-0 z-50">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setShowLocationSheet(false)} />
+            <div className="absolute inset-x-0 bottom-0 bg-background border-t border-border rounded-t-2xl p-4 shadow-lg max-h-[80vh] overflow-auto">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-medium">Share location</h4>
+                <Button variant="ghost" size="sm" onClick={() => setShowLocationSheet(false)}>Close</Button>
+              </div>
+              <div className="space-y-3">
+                <div className="text-sm text-muted-foreground">Pick a place using OpenStreetMap</div>
+                <Button variant="outline" onClick={() => setInlineLocationPickerOpen(true)}>Open map selector</Button>
+                {locationValue.lat && locationValue.lng && (
+                  <div className="rounded-md border p-3 text-sm">
+                    <div className="font-medium">{locationValue.label || 'Selected location'}</div>
+                    <div className="text-xs text-muted-foreground">Lat {locationValue.lat?.toFixed(5)}, Lng {locationValue.lng?.toFixed(5)}</div>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    onClick={() => {
+                      if (!selectedChat || !locationValue.lat || !locationValue.lng) return
+                      dispatchMessage(selectedChat.id, locationValue.label || 'Shared location', 'location', {
+                        location: { lat: locationValue.lat, lng: locationValue.lng, address: locationValue.label || 'Selected location' }
+                      })
+                      toast.success('Location shared')
+                      setShowLocationSheet(false)
+                    }}
+                    disabled={!locationValue.lat || !locationValue.lng}
+                  >
+                    Share
+                  </Button>
+                  <Button variant="outline" className="flex-1" onClick={() => setShowLocationSheet(false)}>Cancel</Button>
+                </div>
+              </div>
+            </div>
+            <LocationSelector
+              open={inlineLocationPickerOpen}
+              onOpenChange={setInlineLocationPickerOpen}
+              initialValue={locationValue}
+              onApply={(val) => setLocationValue(val)}
+            />
+          </div>
         )}
-      </DialogContent>
-    </Dialog>
+
+      {showScheduleSheet && (
+          <div className="fixed inset-0 z-50">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setShowScheduleSheet(false)} />
+            <div className="absolute inset-x-0 bottom-0 bg-background border-t border-border rounded-t-2xl p-4 shadow-lg max-h-[80vh] overflow-auto">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-medium">Schedule pickup</h4>
+                <Button variant="ghost" size="sm" onClick={() => setShowScheduleSheet(false)}>Close</Button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-muted-foreground">Pickup time</label>
+                  <Input type="datetime-local" value={scheduleDateTime} onChange={(e) => setScheduleDateTime(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-xs text-muted-foreground">Location</div>
+                  {scheduleLocation?.label ? (
+                    <div className="rounded-md border p-3 text-sm">
+                      <div className="font-medium">{scheduleLocation.label}</div>
+                      {typeof scheduleLocation.lat === 'number' && typeof scheduleLocation.lng === 'number' && (
+                        <div className="text-xs text-muted-foreground">Lat {scheduleLocation.lat.toFixed(5)}, Lng {scheduleLocation.lng.toFixed(5)}</div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">No location chosen</div>
+                  )}
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setInlineLocationPickerOpen(true)}>Choose on map</Button>
+                    <Button
+                      onClick={() => {
+                        if (!navigator.geolocation) return
+                        navigator.geolocation.getCurrentPosition((pos) => {
+                          setScheduleLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, label: 'Current location' })
+                          toast.success('Using current location')
+                        })
+                      }}
+                    >
+                      Use my location
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    disabled={!scheduleDateTime || !scheduleLocation}
+                    onClick={() => {
+                      if (!selectedChat) return
+                      const dt = new Date(scheduleDateTime)
+                      const when = isNaN(dt.getTime()) ? scheduleDateTime : dt.toLocaleString()
+                      const where = scheduleLocation?.label || 'Selected location'
+                      sendSystemMessage(selectedChat.id, `Pickup has been scheduled for ${when} at ${where}.`, 'pickup_scheduled')
+                      toast.success('Pickup details shared')
+                      setShowScheduleSheet(false)
+                    }}
+                  >
+                    Share schedule
+                  </Button>
+                  <Button variant="outline" className="flex-1" onClick={() => setShowScheduleSheet(false)}>Cancel</Button>
+                </div>
+              </div>
+            </div>
+            <LocationSelector
+              open={inlineLocationPickerOpen}
+              onOpenChange={(open) => {
+                setInlineLocationPickerOpen(open)
+              }}
+              initialValue={{ lat: scheduleLocation?.lat, lng: scheduleLocation?.lng, label: scheduleLocation?.label, radiusKm: 5 }}
+              onApply={(val: any) => setScheduleLocation({ lat: val.lat, lng: val.lng, label: val.label })}
+            />
+          </div>
+        )}
+    </>
   )
 }
