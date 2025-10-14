@@ -28,6 +28,11 @@ import type {
   DMRoom,
   ListRoomMessagesResponse,
   DMMessageView,
+  // shops
+  CreateShopDto,
+  NearbyShop,
+  ShopDto,
+  ListMyShopItemsResponse,
 } from './types'
 
 export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '') || ''
@@ -187,7 +192,7 @@ function toQuery(params: Record<string, any> | undefined): string {
       const num = Number(v)
       const capped = Number.isFinite(num) ? Math.min(num, 50) : 50
       sp.append(k, String(capped))
-    } else if (k === 'lat' || k === 'lng' || k === 'latitude' || k === 'longitude') {
+    } else if (k === 'lat' || k === 'lng' || k === 'lon' || k === 'latitude' || k === 'longitude') {
       if (typeof v === 'number' && Number.isFinite(v)) {
         sp.append(k, v.toFixed(7))
       } else {
@@ -314,4 +319,35 @@ export async function clearRoomMessages(roomId: string) {
     method: 'DELETE',
     auth: true,
   })
+}
+
+// SHOPS ENDPOINTS
+export async function shopsNearby(params?: { lon?: number; lat?: number; postcode?: string; radius_m?: number }) {
+  const qs = toQuery(params as any)
+  return request<ApiEnvelope<NearbyShop[]>>(`/shops/nearby${qs}`)
+}
+
+export async function listMyShops() {
+  return request<ApiEnvelope<ShopDto[]>>('/shops/me', { auth: true })
+}
+
+export async function createShop(dto: CreateShopDto) {
+  return request<ApiEnvelope<ShopDto>>('/shops', {
+    method: 'POST',
+    auth: true,
+    body: dto,
+  })
+}
+
+export async function listPartnerItems(params?: {
+  status?: string
+  pickup_option?: PickupOption
+  category?: string
+  created_from?: string
+  created_to?: string
+  limit?: number
+  page?: number
+}) {
+  const qs = toQuery(params as any)
+  return request<ApiEnvelope<ListMyShopItemsResponse>>(`/shops/me/items${qs}`, { auth: true })
 }
