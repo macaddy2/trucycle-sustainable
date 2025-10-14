@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { ArrowRight, EnvelopeSimple, Lock } from '@phosphor-icons/react'
-import { login as apiLogin, tokens, type MinimalUser } from '@/lib/api'
+import { login as apiLogin, tokens, me as apiMe, type MinimalUser } from '@/lib/api'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
@@ -14,6 +14,8 @@ interface PartnerLoginPageProps {
 
 export function PartnerLoginPage({ onNavigate }: PartnerLoginPageProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isChecking, setIsChecking] = useState(false)
+  const [shouldShowUpgrade, setShouldShowUpgrade] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -23,15 +25,41 @@ export function PartnerLoginPage({ onNavigate }: PartnerLoginPageProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     let mounted = true
-    tokens.get().then(t => {
-      if (!mounted) return
-      setIsAuthenticated(Boolean(t?.accessToken))
-    }).catch(() => {
-      if (!mounted) return
-      setIsAuthenticated(false)
-    })
+    tokens.get()
+      .then(async (t) => {
+        if (!mounted) return
+        const hasToken = Boolean(t?.accessToken)
+        setIsAuthenticated(hasToken)
+        if (!hasToken) {
+          setShouldShowUpgrade(false)
+          return
+        }
+        // When already authenticated, confirm partner access via auth/me
+        setIsChecking(true)
+        try {
+          const res = await apiMe()
+          const user = res?.data?.user as MinimalUser & { roles?: string[]; role?: string }
+          const hasPartnerRole = (Array.isArray(user?.roles) && user.roles.includes('partner')) || user?.role === 'partner'
+          if (hasPartnerRole) {
+            setPartner(user)
+            onNavigate('home', true)
+          } else {
+            setShouldShowUpgrade(true)
+          }
+        } catch (err) {
+          // If auth/me fails, fall back to showing upgrade prompt
+          setShouldShowUpgrade(true)
+        } finally {
+          if (mounted) setIsChecking(false)
+        }
+      })
+      .catch(() => {
+        if (!mounted) return
+        setIsAuthenticated(false)
+        setShouldShowUpgrade(false)
+      })
     return () => { mounted = false }
-  }, [])
+  }, [onNavigate, setPartner])
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -65,14 +93,25 @@ export function PartnerLoginPage({ onNavigate }: PartnerLoginPageProps) {
   }
 
   if (isAuthenticated) {
-    return (
-      <UpgradePrompt
-        onContinue={() => onNavigate('register')}
-        onCancel={() => {
-          window.location.href = '/home'
-        }}
-      />
-    )
+    if (isChecking) {
+      return (
+        <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-4 py-16 text-center text-sm text-muted-foreground">
+          Checking partner access...
+        </div>
+      )
+    }
+    if (shouldShowUpgrade) {
+      return (
+        <UpgradePrompt
+          onContinue={() => onNavigate('register')}
+          onCancel={() => {
+            window.location.href = '/home'
+          }}
+        />
+      )
+    }
+    // If not checking and not showing upgrade, we've navigated away.
+    return null
   }
 
   return (
