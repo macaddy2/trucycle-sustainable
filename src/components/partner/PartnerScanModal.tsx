@@ -181,7 +181,12 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
           if (ctx) {
             ctx.drawImage(video, 0, 0, vw, vh)
             const imageData = ctx.getImageData(0, 0, vw, vh)
-            const result = jsQR(imageData.data as unknown as Uint8ClampedArray, vw, vh, { inversionAttempts: 'dontInvert' })
+            const result = jsQR(
+              imageData.data as unknown as Uint8ClampedArray,
+              vw,
+              vh,
+              { inversionAttempts: 'attemptBoth' }
+            )
             const value = result?.data
             if (value && value !== input) setInput(value)
           }
