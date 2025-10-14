@@ -76,18 +76,26 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
   }
 
   const fetchItem = useCallback(async (id: string) => {
+    let viewData: any = null
+    let itemData: any = null
     try {
-      const [viewRes, itemRes] = await Promise.all([
-        qrViewItem(id),
-        getItemById(id).catch(() => undefined),
-      ])
-      setItemView(viewRes?.data ?? null)
-      setItemDetails((itemRes as any)?.data ?? null)
-      setItemId(id)
+      const viewRes = await qrViewItem(id)
+      viewData = viewRes?.data ?? null
     } catch (err: any) {
-      console.error('Failed to fetch item context', err)
-      toast.error(err?.message || 'Unable to fetch item details')
+      console.error('Failed to fetch QR item context', err)
+      toast.error(err?.message || 'Unable to fetch item context')
     }
+    try {
+      const itemRes = await getItemById(id)
+      itemData = (itemRes as any)?.data ?? null
+    } catch (err: any) {
+      console.error('Failed to fetch item details', err)
+      const message = err?.message || 'Item not found'
+      toast.error(message)
+    }
+    setItemView(viewData)
+    setItemDetails(itemData)
+    setItemId(id)
   }, [])
 
   // Auto-search when input is long enough (>= UUID length)
