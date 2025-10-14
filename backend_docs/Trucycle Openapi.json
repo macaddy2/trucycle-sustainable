@@ -32,11 +32,12 @@
     "/auth/register": {
       "post": {
         "operationId": "AuthController_register",
-        "summary": "Register a new user account",
+        "summary": "Register a new user account (optionally create first partner shop)",
+        "description": "Include a `shop` object to register as a partner and create the first shop.",
         "parameters": [],
         "requestBody": {
           "required": true,
-          "description": "User registration payload",
+          "description": "User registration payload. Include `shop` when registering as Partner.",
           "content": {
             "application/json": {
               "schema": {
@@ -60,7 +61,35 @@
                         "firstName": "Jane",
                         "lastName": "Doe",
                         "email": "jane@example.com",
-                        "status": "pending"
+                        "status": "pending",
+                        "roles": [
+                          "partner"
+                        ]
+                      },
+                      "shop": {
+                        "id": "b84e...-uuid",
+                        "name": "Jane's Outlet",
+                        "phone_number": "+44 20 7946 0958",
+                        "address_line": "1 High St",
+                        "postcode": "AB12 3CD",
+                        "latitude": 51.5,
+                        "longitude": -0.12,
+                        "opening_hours": {
+                          "days": [
+                            "Mon",
+                            "Tue",
+                            "Wed",
+                            "Thu",
+                            "Fri"
+                          ],
+                          "open_time": "09:00",
+                          "close_time": "17:00"
+                        },
+                        "acceptable_categories": [
+                          "furniture",
+                          "electronics"
+                        ],
+                        "active": true
                       }
                     }
                   }
@@ -502,10 +531,26 @@
                   "example": {
                     "id": "uuid",
                     "name": "Shop A",
+                    "phone_number": "+44 20 7946 0958",
                     "address_line": "1 High St",
                     "postcode": "AB12 3CD",
                     "latitude": 51.5,
                     "longitude": -0.12,
+                    "opening_hours": {
+                      "days": [
+                        "Mon",
+                        "Tue",
+                        "Wed",
+                        "Thu",
+                        "Fri"
+                      ],
+                      "open_time": "09:00",
+                      "close_time": "17:00"
+                    },
+                    "acceptable_categories": [
+                      "furniture",
+                      "electronics"
+                    ],
                     "active": true
                   }
                 }
@@ -2744,6 +2789,105 @@
       }
     },
     "schemas": {
+      "OpeningHoursDto": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "description": "Days shop is open",
+            "example": [
+              "Mon",
+              "Tue",
+              "Wed",
+              "Thu",
+              "Fri"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "open_time": {
+            "type": "string",
+            "description": "Opening time (HH:mm)",
+            "example": "09:00"
+          },
+          "close_time": {
+            "type": "string",
+            "description": "Closing time (HH:mm)",
+            "example": "17:00"
+          }
+        },
+        "required": [
+          "days",
+          "open_time",
+          "close_time"
+        ]
+      },
+      "CreateShopDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Shop name",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "phone_number": {
+            "type": "string",
+            "description": "Shop contact phone number",
+            "maxLength": 32,
+            "example": "+44 20 7946 0958"
+          },
+          "address_line": {
+            "type": "string",
+            "description": "Street address or landmark",
+            "maxLength": 255
+          },
+          "postcode": {
+            "type": "string",
+            "description": "Postal code",
+            "maxLength": 32
+          },
+          "latitude": {
+            "type": "number",
+            "description": "Latitude (WGS84)",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "description": "Longitude (WGS84)",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "opening_hours": {
+            "description": "Opening days and times",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OpeningHoursDto"
+              }
+            ]
+          },
+          "acceptable_categories": {
+            "description": "Acceptable item categories",
+            "example": [
+              "furniture",
+              "electronics"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "address_line",
+          "postcode",
+          "latitude",
+          "longitude"
+        ]
+      },
       "RegisterDto": {
         "type": "object",
         "properties": {
@@ -2771,6 +2915,14 @@
               "admin",
               "finance",
               "partner"
+            ]
+          },
+          "shop": {
+            "description": "Partner shop details (required when registering as a partner)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CreateShopDto"
+              }
             ]
           }
         },
@@ -2853,46 +3005,6 @@
           "new_password"
         ]
       },
-      "CreateShopDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Shop name",
-            "minLength": 2,
-            "maxLength": 120
-          },
-          "address_line": {
-            "type": "string",
-            "description": "Street address or landmark",
-            "maxLength": 255
-          },
-          "postcode": {
-            "type": "string",
-            "description": "Postal code",
-            "maxLength": 32
-          },
-          "latitude": {
-            "type": "number",
-            "description": "Latitude (WGS84)",
-            "minimum": -90,
-            "maximum": 90
-          },
-          "longitude": {
-            "type": "number",
-            "description": "Longitude (WGS84)",
-            "minimum": -180,
-            "maximum": 180
-          }
-        },
-        "required": [
-          "name",
-          "address_line",
-          "postcode",
-          "latitude",
-          "longitude"
-        ]
-      },
       "UpdateShopDto": {
         "type": "object",
         "properties": {
@@ -2901,6 +3013,11 @@
             "description": "Shop name",
             "minLength": 2,
             "maxLength": 120
+          },
+          "phone_number": {
+            "type": "string",
+            "description": "Shop contact phone number",
+            "maxLength": 32
           },
           "address_line": {
             "type": "string",
@@ -2927,6 +3044,21 @@
           "active": {
             "type": "boolean",
             "description": "Active flag"
+          },
+          "opening_hours": {
+            "description": "Opening days and times",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OpeningHoursDto"
+              }
+            ]
+          },
+          "acceptable_categories": {
+            "description": "Acceptable item categories",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -3284,6 +3416,11 @@
           "phone": {
             "type": "object",
             "description": "Phone number",
+            "maxLength": 32
+          },
+          "postcode": {
+            "type": "object",
+            "description": "Postcode",
             "maxLength": 32
           }
         }
