@@ -511,6 +511,18 @@ function App() {
 
 
   const handleSearch = () => {
+    // If a donor searches from the homepage, switch to collector mode and go to Browse with the query.
+    if (user?.userType === 'donor') {
+      const updatedUser = { ...user, userType: 'collector' as const }
+      setUser(updatedUser)
+      // Wait for UI to reflect mode change so Browse tab/content exists, then navigate and scroll.
+      setTimeout(() => {
+        navigateToTab('browse')
+        document.getElementById('item-listing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 0)
+      return
+    }
+
     const fallbackTab = hasBrowseTab
       ? 'browse'
       : navTabs.find((tab) => tab.value === 'listings')?.value ?? navTabs[0]?.value ?? currentTab
@@ -828,8 +840,32 @@ function App() {
           {hasHomeTab && (
             <TabsContent value="home">
               <Homepage
-                onExploreBrowse={() => navigateToTab(hasBrowseTab ? 'browse' : 'listings')}
-                onStartListing={() => handleStartListing()}
+                onExploreBrowse={() => {
+                  if (user?.userType === 'donor') {
+                    const updated = { ...user, userType: 'collector' as const }
+                    setUser(updated)
+                    setTimeout(() => {
+                      navigateToTab('browse')
+                      document.getElementById('item-listing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }, 0)
+                  } else {
+                    navigateToTab(hasBrowseTab ? 'browse' : 'listings')
+                    if (hasBrowseTab) {
+                      document.getElementById('item-listing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }
+                  }
+                }}
+                onStartListing={() => {
+                  if (user?.userType === 'collector') {
+                    const updated = { ...user, userType: 'donor' as const }
+                    setUser(updated)
+                    setTimeout(() => {
+                      handleStartListing('donate')
+                    }, 0)
+                  } else {
+                    handleStartListing('donate')
+                  }
+                }}
                 onViewImpact={() => navigateToTab('impact')}
                 onViewPartners={() => {
                   if (hasDropOffTab) {
@@ -865,7 +901,14 @@ function App() {
 
           <TabsContent value="listings">
             <MyListingsView
-              onAddNewItem={() => handleStartListing()}
+              onAddNewItem={() => {
+                // From My Collected Items, adding an item should switch to donor mode and open the listing flow.
+                if (user) {
+                  const next = user.userType === 'collector' ? { ...user, userType: 'donor' as const } : user
+                  if (next !== user) setUser(next)
+                }
+                handleStartListing('donate')
+              }}
               onOpenMessages={handleOpenMessages}
             />
           </TabsContent>
