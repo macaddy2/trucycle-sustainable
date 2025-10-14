@@ -24,6 +24,7 @@ import type { VerificationLevel } from './verificationBadgeUtils'
 import { RatingDisplay } from './RatingSystem'
 import { toast } from 'sonner'
 import { searchItems } from '@/lib/api'
+import BrowseSkeleton from '@/components/skeletons/BrowseSkeleton'
 
 interface UserProfile {
   id: string
@@ -168,6 +169,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
   const [selectedCondition, setSelectedCondition] = useState('All')
   const [selectedType, setSelectedType] = useState<'All' | ListingItem['actionType']>('All')
   const [locationDialogOpen, setLocationDialogOpen] = useState(false)
+  const [loading, setLoading] = useState<boolean>(false)
   const [locationFilter, setLocationFilter] = useKV<{
     lat?: number
     lng?: number
@@ -187,6 +189,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
     let cancelled = false
     async function load() {
       try {
+        setLoading(true)
         const categoryParam = selectedCategory && selectedCategory !== 'All' ? selectedCategory : undefined
         const coordsLat = (locationFilter?.lat ?? (currentUser as any)?.lat ?? (currentUser as any)?.latitude) as number | undefined
         const coordsLng = (locationFilter?.lng ?? (currentUser as any)?.lng ?? (currentUser as any)?.longitude) as number | undefined
@@ -213,6 +216,8 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
           setItems([])
           toast.error(e?.message || 'Failed to load items')
         }
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
     load()
@@ -502,7 +507,13 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
         </CardContent>
       </Card>
 
-      {filteredItems.length === 0 ? (
+      {loading ? (
+        <Card>
+          <CardContent className="py-6">
+            <BrowseSkeleton />
+          </CardContent>
+        </Card>
+      ) : filteredItems.length === 0 ? (
         <Card>
           <CardContent className="text-center py-12">
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">

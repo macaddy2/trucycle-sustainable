@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
+import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { MapPin, Clock, Phone, NavigationArrow, Storefront, XCircle } from '@phosphor-icons/react'
@@ -85,12 +85,15 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
 
                 <MapContainer
                   center={[activeLocation.coordinates.lat, activeLocation.coordinates.lng]}
-                  zoom={12}
-                  scrollWheelZoom={false}
+                  zoom={15}
+                  minZoom={2}
+                  maxZoom={19}
+                  scrollWheelZoom={true}
+                  zoomControl={true}
                   className="h-[320px] w-full"
                 >
                   <TileLayer
-                    attribution="&copy; <a href='https://www.openstreetmap.org/'>OpenStreetMap</a> contributors"
+                    attribution="&copy; OpenStreetMap contributors"
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
                   {DROP_OFF_LOCATIONS.map(location => {
@@ -105,17 +108,7 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
                           click: () => setActiveLocationId(location.id),
                           dblclick: () => onSelect(location)
                         }}
-                      >
-                        <Popup minWidth={220}>
-                          <div className="space-y-2">
-                            <p className="font-medium">{location.name}</p>
-                            <p className="text-xs text-muted-foreground">{location.address}</p>
-                            <Button size="sm" className="w-full" onClick={() => onSelect(location)}>
-                              Use this location
-                            </Button>
-                          </div>
-                        </Popup>
-                      </Marker>
+                      />
                     )
                   })}
                   <RecenterMap center={[activeLocation.coordinates.lat, activeLocation.coordinates.lng]} />

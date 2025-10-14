@@ -836,6 +836,14 @@ function App() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
+        {currentTab === 'messages' ? (
+          <MessageCenter
+            mode="page"
+            itemId={messageCenterItemId}
+            chatId={messageCenterChatId}
+            initialView={messageCenterView}
+          />
+        ) : (
         <Tabs value={currentTab} onValueChange={navigateToTab}>
           {hasHomeTab && (
             <TabsContent value="home">
@@ -913,16 +921,7 @@ function App() {
             />
           </TabsContent>
 
-          {user && (
-            <TabsContent value="messages">
-              <MessageCenter
-                mode="page"
-                itemId={messageCenterItemId}
-                chatId={messageCenterChatId}
-                initialView={messageCenterView}
-              />
-            </TabsContent>
-          )}
+          
 
           <TabsContent value="list">
             <ItemListingForm
@@ -964,6 +963,7 @@ function App() {
             />
           </TabsContent>
         </Tabs>
+        )}
       </main>
 
       {/* Footer */}

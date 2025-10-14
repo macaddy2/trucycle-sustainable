@@ -1,4 +1,5 @@
 import { kvGet, kvSet, kvDelete } from '@/lib/kvStore'
+import { startLoading, finishLoading } from '@/lib/loadingStore'
 import type {
   ApiEnvelope,
   ForgetPasswordDto,
@@ -83,10 +84,14 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     headers['Content-Type'] = headers['Content-Type'] || 'application/json'
   }
 
+  startLoading()
   const res = await fetch(url, {
     method: options.method ?? (options.body ? 'POST' : 'GET'),
     headers,
     body: options.body ? (isFormData ? (options.body as any) : JSON.stringify(options.body)) : undefined,
+  }).finally(() => {
+    // Ensure we always signal completion regardless of success/failure
+    finishLoading()
   })
 
   let payload: any = undefined

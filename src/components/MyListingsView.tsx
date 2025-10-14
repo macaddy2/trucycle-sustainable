@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useMessaging, useExchangeManager, useNotifications } from '@/hooks'
 import { listMyItems, listMyCollectedItems, createOrFindRoom, collectItem } from '@/lib/api'
 import { messageSocket } from '@/lib/messaging/socket'
+import ListingsSkeleton from '@/components/skeletons/ListingsSkeleton'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import type { ManagedListing } from '@/types/listings'
 
@@ -123,6 +124,7 @@ export function MyListingsView({
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState<EditableListingFields | null>(null)
+  const [loading, setLoading] = useState<boolean>(false)
 
   const sortedListings = useMemo(() => {
     // Show all items for donors and collectors; order by newest first
@@ -358,6 +360,7 @@ export function MyListingsView({
   useEffect(() => {
     let cancelled = false
     async function load() {
+      setLoading(true)
       try {
         if (isCollector) {
           const res = await listMyCollectedItems({ limit: 50 })
@@ -413,6 +416,8 @@ export function MyListingsView({
         // Do not use demo/fallback data
         setListings([])
         toast.error(e?.message || 'Failed to load your items')
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
     load()
@@ -744,11 +749,13 @@ export function MyListingsView({
     </div>
   )
 
-  const content = sortedListings.length === 0
-    ? EmptyState
-    : viewMode === 'table'
-      ? TableView
-      : CardView
+  const content = loading
+    ? <ListingsSkeleton rows={3} />
+    : (sortedListings.length === 0
+      ? EmptyState
+      : viewMode === 'table'
+        ? TableView
+        : CardView)
 
   if (variant === 'dashboard') {
     return (

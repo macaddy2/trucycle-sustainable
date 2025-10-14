@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
+import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -154,12 +154,15 @@ function RecenterMap({ center }: { center: [number, number] }) {
 
                   <MapContainer
                     center={[activeLocation?.coordinates.lat ?? 51.5416, activeLocation?.coordinates.lng ?? -0.143]}
-                    zoom={12}
-                    scrollWheelZoom={false}
+                    zoom={15}
+                    minZoom={2}
+                    maxZoom={19}
+                    scrollWheelZoom={true}
+                    zoomControl={true}
                     className="h-[360px] w-full"
                   >
                     <TileLayer
-                      attribution="&copy; <a href='https://www.openstreetmap.org/'>OpenStreetMap</a> contributors"
+                      attribution="&copy; OpenStreetMap contributors"
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
                     {locations.map(location => (
@@ -170,21 +173,7 @@ function RecenterMap({ center }: { center: [number, number] }) {
                           click: () => setActiveLocationId(location.id),
                         }}
                         icon={activeLocationId === location.id ? activeMarkerIcon : defaultMarkerIcon}
-                      >
-                        <Popup minWidth={240}>
-                          <div className="space-y-2">
-                            <p className="font-semibold">{location.name}</p>
-                            <p className="text-xs text-muted-foreground">{location.address}</p>
-                            <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                              <span>{location.distance}</span>
-                              <span>{location.openHours}</span>
-                            </div>
-                            <Button size="sm" className="w-full" onClick={() => onPlanDropOff?.(location)}>
-                              Choose this Partner Shop
-                            </Button>
-                          </div>
-                        </Popup>
-                      </Marker>
+                      />
                     ))}
                     {activeLocation && (
                       <RecenterMap center={[activeLocation.coordinates.lat, activeLocation.coordinates.lng]} />

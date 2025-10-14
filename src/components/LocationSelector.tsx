@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
-import { MapContainer, Marker, Popup, TileLayer, useMap, Circle } from 'react-leaflet'
+import { MapContainer, Marker, TileLayer, useMap, Circle } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { MapPin, Crosshair, MagnifyingGlass } from '@phosphor-icons/react'
@@ -189,9 +189,9 @@ export function LocationSelector({ open, onOpenChange, initialValue, onApply }: 
             )}
 
             <div className="overflow-hidden rounded-2xl border border-border/60 bg-background">
-              <MapContainer center={center} zoom={12} scrollWheelZoom={false} className="h-[320px] w-full">
+              <MapContainer center={center} zoom={15} minZoom={2} maxZoom={19} scrollWheelZoom={true} zoomControl={true} className="h-[320px] w-full">
                 <TileLayer
-                  attribution="&copy; <a href='https://www.openstreetmap.org/'>OpenStreetMap</a> contributors"
+                  attribution="&copy; OpenStreetMap contributors"
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 {canApply && (
@@ -209,13 +209,7 @@ export function LocationSelector({ open, onOpenChange, initialValue, onApply }: 
                       setLng(Number(pos.lng.toFixed(7)))
                     },
                   }}
-                >
-                  <Popup minWidth={220}>
-                    <div className="space-y-1">
-                      <div className="font-medium">Drag to adjust position</div>
-                    </div>
-                  </Popup>
-                </Marker>
+                />
                 <RecenterMap center={center} />
               </MapContainer>
             </div>

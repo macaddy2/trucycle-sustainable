@@ -26,6 +26,7 @@ import type { Chat as MessagingChat, Message as MessagingMessage } from '@/hooks
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import { QRCodeGenerator, QRCodeDisplay, QRCodeData } from '../QRCode'
 import { LocationSelector } from '@/components/LocationSelector'
+import MessageCenterSkeleton from '@/components/skeletons/MessageCenterSkeleton'
 
 interface MessageCenterProps {
   open?: boolean
@@ -128,6 +129,8 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   const [showLocationSheet, setShowLocationSheet] = useState(false)
   const [inlineLocationPickerOpen, setInlineLocationPickerOpen] = useState(false)
   const [locationValue, setLocationValue] = useState<{ lat?: number; lng?: number; label?: string; radiusKm: number }>({ radiusKm: 10 })
+  const [loadingChats, setLoadingChats] = useState<boolean>(true)
+  const [loadingThread, setLoadingThread] = useState<boolean>(false)
   
   const [showQRCode, setShowQRCode] = useState<QRCodeData | null>(null)
   const [selectedDropOffLocation, setSelectedDropOffLocation] = useState('')
@@ -346,24 +349,41 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     if (!selectedChatId) return
     if (loadedChatIdsRef.current.has(selectedChatId)) return
     ;(async () => {
+      setLoadingThread(true)
       try {
         await loadHistoryForChat(selectedChatId)
       } finally {
         loadedChatIdsRef.current.add(selectedChatId)
+        setLoadingThread(false)
       }
     })()
   }, [selectedChatId])
 
   // Initial load of active rooms from server when MessageCenter mounts
   useEffect(() => {
-    let ran = false
-    if (ran) return
-    ran = true
+    let cancelled = false
     ;(async () => {
-      try { await refreshActiveRooms() } catch {}
+      setLoadingChats(true)
+      try { await refreshActiveRooms() } finally {
+        if (!cancelled) setLoadingChats(false)
+      }
     })()
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // When user signs in after the page has mounted, fetch rooms once
+  useEffect(() => {
+    if (!currentUser) return
+    let cancelled = false
+    ;(async () => {
+      setLoadingChats(true)
+      try { await refreshActiveRooms() } finally {
+        if (!cancelled) setLoadingChats(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [currentUser, refreshActiveRooms])
 
   // Only auto-scroll when the user was at the bottom prior to updates
   useEffect(() => {
@@ -722,7 +742,11 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
 
   const rewardBalance = getRewardBalance(currentUser.id)
 
-  const renderBody = () => (
+  const renderBody = () => {
+    if (loadingChats || (selectedChatId && loadingThread)) {
+      return <MessageCenterSkeleton />
+    }
+    return (
     <>
               <div className={`flex flex-col min-h-0 ${isPage ? 'h-[min(100svh,720px)]' : 'h-full'}`}>
                 <div className="flex items-center justify-between border-b border-border p-4">
@@ -1363,5 +1387,5 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
           </div>
         )}
     </>
-  )
+  )}
 }
