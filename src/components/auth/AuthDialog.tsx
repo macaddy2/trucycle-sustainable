@@ -120,7 +120,7 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
         onOpenChange(false)
       } else {
         const res = await apiLogin({ email: normalizedEmail, password: formData.password })
-        const user = res?.data?.user as { id: string; email: string; firstName?: string; lastName?: string; status?: string; roles?: string[] } | undefined
+        const user = res?.data?.user as { id: string; email: string; firstName?: string; lastName?: string; status?: string; roles?: string[]; role?: string } | undefined
         if (user) {
           const profile: UserProfile = {
             id: user.id,
@@ -129,7 +129,7 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
             userType: 'donor',
             createdAt: new Date().toISOString(),
             verified: user.status === 'active',
-            partnerAccess: Array.isArray(user.roles) ? user.roles.includes('partner') : false,
+            partnerAccess: Array.isArray(user.roles) ? user.roles.includes('partner') : (user.role === 'partner'),
           }
           setUser(profile)
           toast.success(`Welcome back${profile.name ? `, ${profile.name.split(' ')[0]}` : ''}!`)

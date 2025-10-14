@@ -31,7 +31,7 @@ export function VerifyEmailPage() {
       try {
         setStatus('verifying')
         const res = await apiVerify({ token })
-        const user = res?.data?.user as { id: string; email: string; firstName?: string; lastName?: string; status?: string; roles?: string[] } | undefined
+        const user = res?.data?.user as { id: string; email: string; firstName?: string; lastName?: string; status?: string; roles?: string[]; role?: string } | undefined
         if (user) {
           const profile: UserProfile = {
             id: user.id,
@@ -43,7 +43,7 @@ export function VerifyEmailPage() {
             // Derive partner access from roles after verification
             // If roles are missing, default to false
             // (user can later upgrade via Partner portal)
-            partnerAccess: Array.isArray(user.roles) ? user.roles.includes('partner') : false,
+            partnerAccess: Array.isArray(user.roles) ? user.roles.includes('partner') : (user.role === 'partner'),
           }
           setUser(profile)
         }

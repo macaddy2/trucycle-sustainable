@@ -43,9 +43,9 @@ export function PartnerLoginPage({ onNavigate }: PartnerLoginPageProps) {
     setLoading(true)
     try {
       const response = await apiLogin({ email: email.trim().toLowerCase(), password })
-      const user = response?.data?.user as MinimalUser & { roles?: string[] } | undefined
+      const user = response?.data?.user as MinimalUser & { roles?: string[]; role?: string } | undefined
       if (user) {
-        const hasPartnerRole = Array.isArray(user.roles) && user.roles.includes('partner')
+        const hasPartnerRole = (Array.isArray(user.roles) && user.roles.includes('partner')) || user.role === 'partner'
         if (!hasPartnerRole) {
           toast.error('This account does not have partner access. Please upgrade or contact support.')
         } else {

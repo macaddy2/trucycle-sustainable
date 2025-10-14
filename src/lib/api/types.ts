@@ -18,6 +18,7 @@ export interface MinimalUser {
   lastName?: string
   status?: string
   roles?: string[]
+  role?: string
 }
 
 // Auth DTOs from OpenAPI

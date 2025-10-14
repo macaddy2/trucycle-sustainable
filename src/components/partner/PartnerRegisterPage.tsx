@@ -128,16 +128,16 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
           acceptable_categories: categories.length > 0 ? categories : undefined,
         }
         const res = await upgradeToPartner(shopDto)
-        const upgradedUser = (res as any)?.data?.user as MinimalUser & { roles?: string[] } | undefined
+        const upgradedUser = (res as any)?.data?.user as MinimalUser & { roles?: string[]; role?: string } | undefined
         if (upgradedUser) {
-          const hasPartnerRole = Array.isArray(upgradedUser.roles) && upgradedUser.roles.includes('partner')
+          const hasPartnerRole = (Array.isArray(upgradedUser.roles) && upgradedUser.roles.includes('partner')) || upgradedUser.role === 'partner'
           setPartner(upgradedUser)
           if (!hasPartnerRole) {
             console.warn('Upgraded user is missing partner role in response. Proceeding, but access may be limited until next login/me.')
           }
           // Also reflect partner access in the consumer app profile if present
           if (currentUser) {
-            setCurrentUser({ ...currentUser, partnerAccess: hasPartnerRole || true })
+            setCurrentUser({ ...currentUser, partnerAccess: hasPartnerRole })
           }
         }
         toast.success('Upgrade successful! You now have Partner access.')
