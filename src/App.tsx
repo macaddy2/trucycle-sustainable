@@ -677,16 +677,7 @@ function App() {
                         <DropdownMenuItem onSelect={() => navigateToTab('listings')}>
                           My Listings
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => navigateToTab('messages')}>
-                          Messages
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setShowShopScanner(true)}>
-                          {user?.partnerAccess ? 'Partner Scanner' : 'QR Activity'}
-                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onSelect={() => window.dispatchEvent(new Event('open-profile-onboarding'))}>
-                          Edit Profile
-                        </DropdownMenuItem>
                         <DropdownMenuItem onSelect={handleToggleUserType}>
                           {user?.userType === 'donor' ? 'Switch to Collector' : 'Switch to Donor'}
                         </DropdownMenuItem>
@@ -783,16 +774,7 @@ function App() {
                       <DropdownMenuItem onSelect={() => navigateToTab('listings')}>
                         My Listings
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => navigateToTab('messages')}>
-                        Messages
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setShowShopScanner(true)}>
-                        {user?.partnerAccess ? 'Partner Scanner' : 'QR Activity'}
-                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onSelect={() => window.dispatchEvent(new Event('open-profile-onboarding'))}>
-                        Edit Profile
-                      </DropdownMenuItem>
                       <DropdownMenuItem onSelect={handleToggleUserType}>
                         {user?.userType === 'donor' ? 'Switch to Collector' : 'Switch to Donor'}
                       </DropdownMenuItem>
