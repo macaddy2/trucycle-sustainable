@@ -3,6 +3,7 @@ import { PartnerApp, PartnerLoginPage, PartnerRegisterPage } from '@/components/
 import { Toaster } from '@/components/ui/sonner'
 import { useKV } from '@/hooks/useKV'
 import type { MinimalUser } from '@/lib/api'
+import { tokens } from '@/lib/api'
 
 type PartnerRoute = 'home' | 'items' | 'shops' | 'profile' | 'login' | 'register'
 
@@ -16,6 +17,7 @@ const AUTH_ROUTES = new Set<PartnerRoute>(['login', 'register'])
 
 export function PartnerRouter({ basePath, initialPath }: PartnerRouterProps) {
   const [partner] = useKV<MinimalUser | null>('partner-user', null)
+  const [hasAuthToken, setHasAuthToken] = useState<boolean>(false)
   const baseNormalized = useMemo(() => (basePath || '/').replace(/\/$/, ''), [basePath])
 
   const parseRoute = useCallback((pathname: string): PartnerRoute => {
@@ -50,18 +52,31 @@ export function PartnerRouter({ basePath, initialPath }: PartnerRouterProps) {
   }, [baseNormalized])
 
   useEffect(() => {
+    let mounted = true
+    tokens.get().then(t => {
+      if (!mounted) return
+      setHasAuthToken(Boolean(t?.accessToken))
+    }).catch(() => {
+      if (!mounted) return
+      setHasAuthToken(false)
+    })
+
     const handlePop = () => {
       setRoute(parseRoute(window.location.pathname))
     }
     window.addEventListener('popstate', handlePop)
-    return () => window.removeEventListener('popstate', handlePop)
+    return () => {
+      window.removeEventListener('popstate', handlePop)
+      mounted = false
+    }
   }, [parseRoute])
 
   useEffect(() => {
-    if (!partner && !AUTH_ROUTES.has(route)) {
+    // Only force to login when not authenticated at all.
+    if (!partner && !AUTH_ROUTES.has(route) && !hasAuthToken) {
       navigate('login', true)
     }
-  }, [partner, route, navigate])
+  }, [partner, route, navigate, hasAuthToken])
 
   useEffect(() => {
     if (partner && AUTH_ROUTES.has(route)) {
