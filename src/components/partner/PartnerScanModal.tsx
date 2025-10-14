@@ -11,6 +11,7 @@ import { QrCode, CheckCircle, Clock, UserCircle, ArrowClockwise, Camera } from '
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import { getItemById, qrClaimOut, qrDropoffIn, qrViewItem } from '@/lib/api'
+import jsQR from 'jsqr'
 
 interface PartnerScanModalProps {
   open: boolean
@@ -49,6 +50,7 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   // Selected item state
   const [itemId, setItemId] = useState<string | null>(null)
@@ -144,36 +146,58 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
     setSelectedCameraId(deviceId)
   }
 
-  // Simple QR detection using BarcodeDetector if available
+  // QR detection: BarcodeDetector with jsQR fallback
   useEffect(() => {
-    if (!open || !videoRef.current) return
-    const hasDetector = typeof (window as any).BarcodeDetector !== 'undefined'
-    if (!hasDetector) return
-    let mounted = true
-    const Detector = (window as any).BarcodeDetector
-    const detector = new Detector({ formats: ['qr_code'] })
-    setScanning(true)
-    let raf = 0
-    const tick = async () => {
-      if (!mounted || !videoRef.current) return
+    if (!open) return
+    let running = true
+    const tryScan = async () => {
+      if (!running || !videoRef.current) return
+      const video = videoRef.current
+      // Prefer native BarcodeDetector
+      const Detector = (window as any).BarcodeDetector
+      if (Detector) {
+        try {
+          const detector = new Detector({ formats: ['qr_code'] })
+          setScanning(true)
+          const codes = await detector.detect(video as any)
+          if (codes && codes.length > 0) {
+            const value = codes[0]?.rawValue
+            if (value && value !== input) setInput(String(value))
+          }
+        } catch {
+          // fall through to jsQR
+        }
+      }
+      // jsQR fallback
       try {
-        const codes = await detector.detect(videoRef.current as any)
-        if (codes && codes.length > 0) {
-          const value = codes[0].rawValue || codes[0].rawValue
-          if (value) {
-            setInput(String(value))
+        const vw = video.videoWidth
+        const vh = video.videoHeight
+        if (vw && vh) {
+          const canvas = canvasRef.current || document.createElement('canvas')
+          canvasRef.current = canvas
+          canvas.width = vw
+          canvas.height = vh
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, vw, vh)
+            const imageData = ctx.getImageData(0, 0, vw, vh)
+            const result = jsQR(imageData.data as unknown as Uint8ClampedArray, vw, vh, { inversionAttempts: 'dontInvert' })
+            const value = result?.data
+            if (value && value !== input) setInput(value)
           }
         }
-      } catch {}
-      raf = window.setTimeout(tick, 350) as any
+      } catch {
+        // ignore
+      }
+      if (running) setTimeout(tryScan, 350)
     }
-    tick()
+    setScanning(true)
+    tryScan()
     return () => {
-      mounted = false
-      window.clearTimeout(raf)
+      running = false
       setScanning(false)
     }
-  }, [open])
+  }, [open, input])
 
   const handleConfirm = async () => {
     const val = input.trim()
@@ -268,17 +292,12 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
                   <label className="text-sm font-medium text-foreground" htmlFor="dropoff-scan">
                     QR payload or manual code
                   </label>
-                  <div className="flex items-center gap-2">
                     <Input
                       id="dropoff-scan"
                       value={input}
                       onChange={event => setInput(event.target.value)}
                       placeholder='Paste QR payload or item id'
                     />
-                    <Button type="button" variant="outline" size="icon" title="Use camera">
-                      <Camera size={16} />
-                    </Button>
-                  </div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
@@ -301,17 +320,12 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
                   <label className="text-sm font-medium text-foreground" htmlFor="pickup-scan">
                     QR payload or manual code
                   </label>
-                  <div className="flex items-center gap-2">
                     <Input
                       id="pickup-scan"
                       value={input}
                       onChange={event => setInput(event.target.value)}
                       placeholder='Paste QR payload or item id'
                     />
-                    <Button type="button" variant="outline" size="icon" title="Use camera">
-                      <Camera size={16} />
-                    </Button>
-                  </div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
