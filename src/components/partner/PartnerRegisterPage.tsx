@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, ArrowRight, MapPin, Phone, Storefront, User, Compass } from '@phosphor-icons/react'
+import { ArrowLeft, ArrowRight, MapPin, Phone, Storefront, User, Eye, EyeSlash, X } from '@phosphor-icons/react'
 import { register as apiRegister, type RegisterDto } from '@/lib/api'
 import { toast } from 'sonner'
 
@@ -24,14 +24,14 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
     phoneNumber: '',
     addressLine: '',
     postcode: '',
-    latitude: '',
-    longitude: '',
-    openingDays: 'Mon,Tue,Wed,Thu,Fri',
+    openingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as string[],
     openTime: '09:00',
     closeTime: '17:00',
-    categories: 'furniture, electronics',
+    categories: ['furniture', 'electronics'] as string[],
     notes: '',
   })
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const handleChange = (field: keyof typeof form, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -50,27 +50,13 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
       return
     }
 
-    const lat = Number.parseFloat(form.latitude)
-    const lon = Number.parseFloat(form.longitude)
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      toast.error('Provide a valid latitude and longitude for your shop')
-      return
-    }
-
     if (!form.addressLine || !form.postcode || !form.shopName) {
       toast.error('Shop name, address and postcode are required')
       return
     }
 
-    const openingDays = form.openingDays
-      .split(',')
-      .map(day => day.trim())
-      .filter(Boolean)
-
-    const categories = form.categories
-      .split(',')
-      .map(category => category.trim())
-      .filter(Boolean)
+    const openingDays = form.openingDays.filter(Boolean)
+    const categories = form.categories.map(c => c.trim()).filter(Boolean)
 
     const dto: RegisterDto = {
       first_name: form.firstName.trim(),
@@ -83,8 +69,6 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
         phone_number: form.phoneNumber.trim() || undefined,
         address_line: form.addressLine.trim(),
         postcode: form.postcode.trim(),
-        latitude: lat,
-        longitude: lon,
         opening_hours:
           openingDays.length > 0 || form.openTime || form.closeTime
             ? {
@@ -133,35 +117,45 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
                   <User size={16} className="text-primary" />
                   First name
                 </Label>
-                <Input id="partner-firstName" value={form.firstName} onChange={event => handleChange('firstName', event.target.value)} />
+                <Input id="partner-firstName" placeholder="Enter your first name" value={form.firstName} onChange={event => handleChange('firstName', event.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="partner-lastName" className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <User size={16} className="text-primary" />
                   Last name
                 </Label>
-                <Input id="partner-lastName" value={form.lastName} onChange={event => handleChange('lastName', event.target.value)} />
+                <Input id="partner-lastName" placeholder="Enter your last name" value={form.lastName} onChange={event => handleChange('lastName', event.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="partner-email" className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <User size={16} className="text-primary" />
                   Email
                 </Label>
-                <Input id="partner-email" type="email" value={form.email} onChange={event => handleChange('email', event.target.value)} />
+                <Input id="partner-email" type="email" placeholder="Enter your email" value={form.email} onChange={event => handleChange('email', event.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="partner-password" className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <LockIcon />
                   Password
                 </Label>
-                <Input id="partner-password" type="password" value={form.password} onChange={event => handleChange('password', event.target.value)} />
+                <div className="relative">
+                  <Input id="partner-password" type={showPassword ? 'text' : 'password'} placeholder="Create a strong password" value={form.password} onChange={event => handleChange('password', event.target.value)} className="pr-10" />
+                  <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(v => !v)}>
+                    {showPassword ? <EyeSlash size={18} className="text-muted-foreground" /> : <Eye size={18} className="text-muted-foreground" />}
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="partner-confirm" className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <LockIcon />
                   Confirm password
                 </Label>
-                <Input id="partner-confirm" type="password" value={form.confirmPassword} onChange={event => handleChange('confirmPassword', event.target.value)} />
+                <div className="relative">
+                  <Input id="partner-confirm" type={showConfirmPassword ? 'text' : 'password'} placeholder="Re-enter your password" value={form.confirmPassword} onChange={event => handleChange('confirmPassword', event.target.value)} className="pr-10" />
+                  <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowConfirmPassword(v => !v)}>
+                    {showConfirmPassword ? <EyeSlash size={18} className="text-muted-foreground" /> : <Eye size={18} className="text-muted-foreground" />}
+                  </Button>
+                </div>
               </div>
             </section>
 
@@ -176,63 +170,90 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
                     <Storefront size={16} className="text-primary" />
                     Shop name
                   </Label>
-                  <Input id="shop-name" value={form.shopName} onChange={event => handleChange('shopName', event.target.value)} />
+                  <Input id="shop-name" placeholder="e.g., Green Reuse Hub" value={form.shopName} onChange={event => handleChange('shopName', event.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="shop-phone" className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                     <Phone size={16} className="text-primary" />
                     Phone number (optional)
                   </Label>
-                  <Input id="shop-phone" value={form.phoneNumber} onChange={event => handleChange('phoneNumber', event.target.value)} />
+                  <Input id="shop-phone" placeholder="e.g., +44 20 7946 0958" value={form.phoneNumber} onChange={event => handleChange('phoneNumber', event.target.value)} />
                 </div>
                 <div className="space-y-2 lg:col-span-2">
                   <Label htmlFor="shop-address" className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                     <MapPin size={16} className="text-primary" />
                     Address line
                   </Label>
-                  <Input id="shop-address" value={form.addressLine} onChange={event => handleChange('addressLine', event.target.value)} />
+                  <Input id="shop-address" placeholder="e.g., 1 High St" value={form.addressLine} onChange={event => handleChange('addressLine', event.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="shop-postcode" className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                     <MapPin size={16} className="text-primary" />
                     Postcode
                   </Label>
-                  <Input id="shop-postcode" value={form.postcode} onChange={event => handleChange('postcode', event.target.value)} />
+                  <Input id="shop-postcode" placeholder="e.g., AB12 3CD" value={form.postcode} onChange={event => handleChange('postcode', event.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="shop-lat" className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <Compass size={16} className="text-primary" />
-                    Latitude
-                  </Label>
-                  <Input id="shop-lat" value={form.latitude} onChange={event => handleChange('latitude', event.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="shop-lon" className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <Compass size={16} className="text-primary" />
-                    Longitude
-                  </Label>
-                  <Input id="shop-lon" value={form.longitude} onChange={event => handleChange('longitude', event.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="shop-days" className="text-sm font-medium text-muted-foreground">Opening days (comma separated)</Label>
-                  <Input id="shop-days" value={form.openingDays} onChange={event => handleChange('openingDays', event.target.value)} />
+                  <Label className="text-sm font-medium text-muted-foreground">Opening days</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => {
+                      const selected = form.openingDays.includes(day)
+                      return (
+                        <Button
+                          key={day}
+                          type="button"
+                          variant={selected ? 'secondary' : 'outline'}
+                          className={selected ? 'capitalize' : 'capitalize'}
+                          onClick={() => {
+                            setForm(prev => ({
+                              ...prev,
+                              openingDays: selected
+                                ? prev.openingDays.filter(d => d !== day)
+                                : [...prev.openingDays, day],
+                            }))
+                          }}
+                        >
+                          {day}
+                        </Button>
+                      )
+                    })}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="shop-open" className="text-sm font-medium text-muted-foreground">Open time</Label>
-                  <Input id="shop-open" value={form.openTime} onChange={event => handleChange('openTime', event.target.value)} />
+                  <Input id="shop-open" type="time" value={form.openTime} onChange={event => handleChange('openTime', event.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="shop-close" className="text-sm font-medium text-muted-foreground">Close time</Label>
-                  <Input id="shop-close" value={form.closeTime} onChange={event => handleChange('closeTime', event.target.value)} />
+                  <Input id="shop-close" type="time" value={form.closeTime} onChange={event => handleChange('closeTime', event.target.value)} />
                 </div>
                 <div className="space-y-2 lg:col-span-2">
-                  <Label htmlFor="shop-categories" className="text-sm font-medium text-muted-foreground">Accepted categories</Label>
-                  <Textarea
+                  <Label className="text-sm font-medium text-muted-foreground">Acceptable Items</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {form.categories.map((cat, idx) => (
+                      <span key={`${cat}-${idx}`} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-sm">
+                        <span className="capitalize">{cat}</span>
+                        <button type="button" aria-label={`Remove ${cat}`} onClick={() => setForm(prev => ({ ...prev, categories: prev.categories.filter((_, i) => i !== idx) }))} className="text-muted-foreground hover:text-foreground">
+                          <X size={14} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <Input
                     id="shop-categories"
-                    value={form.categories}
-                    onChange={event => handleChange('categories', event.target.value)}
-                    rows={3}
-                    placeholder="furniture, electronics, clothing"
+                    placeholder="Add acceptable items (press Enter)"
+                    onKeyDown={(e) => {
+                      const target = e.target as HTMLInputElement
+                      const value = target.value.trim()
+                      if (!value) return
+                      if (e.key === 'Enter' || e.key === ',') {
+                        e.preventDefault()
+                        if (!form.categories.includes(value)) {
+                          setForm(prev => ({ ...prev, categories: [...prev.categories, value] }))
+                        }
+                        target.value = ''
+                      }
+                    }}
                   />
                 </div>
                 <div className="space-y-2 lg:col-span-2">

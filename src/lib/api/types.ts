@@ -75,8 +75,8 @@ export interface CreateShopDto {
   phone_number?: string | null
   address_line: string
   postcode: string
-  latitude: number
-  longitude: number
+  latitude?: number
+  longitude?: number
   opening_hours?: OpeningHoursDto | null
   acceptable_categories?: string[]
 }
