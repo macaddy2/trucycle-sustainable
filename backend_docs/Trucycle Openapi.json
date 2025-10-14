@@ -351,6 +351,70 @@
         ]
       }
     },
+    "/auth/upgrade-to-partner": {
+      "post": {
+        "operationId": "AuthController_upgradeToPartner",
+        "summary": "Upgrade the current user to Partner (optionally create first shop)",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "description": "Optional partner shop details for first shop creation",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateShopDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User upgraded to partner and optional shop created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "success",
+                    "message": "Upgraded to partner successfully.",
+                    "data": {
+                      "user": {
+                        "id": "uuid",
+                        "email": "jane@example.com",
+                        "roles": [
+                          "partner",
+                          "customer"
+                        ]
+                      },
+                      "shop": {
+                        "id": "b84e...-uuid",
+                        "name": "Jane's Outlet",
+                        "address_line": "1 High St",
+                        "postcode": "AB12 3CD",
+                        "latitude": 51.5,
+                        "longitude": -0.12,
+                        "acceptable_categories": [
+                          "furniture",
+                          "electronics"
+                        ],
+                        "active": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/notifications/send": {
       "post": {
         "operationId": "NotificationsController_send",
@@ -513,6 +577,7 @@
                         "postcode": "AB12 3CD",
                         "latitude": 51.5072,
                         "longitude": -0.1276,
+                        "operational_notes": "Back entrance on Church St. Ring bell.",
                         "opening_hours": {
                           "days": [
                             "Mon",
@@ -538,6 +603,7 @@
                         "postcode": "EF45 6GH",
                         "latitude": 51.51,
                         "longitude": -0.13,
+                        "operational_notes": null,
                         "opening_hours": null,
                         "acceptable_categories": [],
                         "distanceMeters": 980
@@ -597,6 +663,7 @@
                     "postcode": "AB12 3CD",
                     "latitude": 51.5,
                     "longitude": -0.12,
+                    "operational_notes": "Back entrance on Church St. Ring bell.",
                     "opening_hours": {
                       "days": [
                         "Mon",
@@ -3193,6 +3260,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "operational_notes": {
+            "type": "string",
+            "description": "Operational notes or instructions for donors/staff",
+            "maxLength": 2000,
+            "example": "Back entrance on Church St. Ring bell."
           }
         },
         "required": [
@@ -3374,6 +3447,11 @@
             "items": {
               "type": "string"
             }
+          },
+          "operational_notes": {
+            "type": "string",
+            "description": "Operational notes or instructions for donors/staff",
+            "maxLength": 2000
           }
         }
       },
