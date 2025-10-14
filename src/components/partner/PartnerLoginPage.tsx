@@ -43,11 +43,16 @@ export function PartnerLoginPage({ onNavigate }: PartnerLoginPageProps) {
     setLoading(true)
     try {
       const response = await apiLogin({ email: email.trim().toLowerCase(), password })
-      const user = response?.data?.user
+      const user = response?.data?.user as MinimalUser & { roles?: string[] } | undefined
       if (user) {
-        setPartner(user)
-        toast.success('Welcome back, partner!')
-        onNavigate('home', true)
+        const hasPartnerRole = Array.isArray(user.roles) && user.roles.includes('partner')
+        if (!hasPartnerRole) {
+          toast.error('This account does not have partner access. Please upgrade or contact support.')
+        } else {
+          setPartner(user)
+          toast.success('Welcome back, partner!')
+          onNavigate('home', true)
+        }
       } else {
         toast.error('Unable to sign in. Please try again.')
       }

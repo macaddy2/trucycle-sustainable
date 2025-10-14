@@ -14,6 +14,7 @@ type UserProfile = {
   userType: 'donor' | 'collector'
   createdAt: string
   verified?: boolean
+  partnerAccess?: boolean
 }
 
 export function VerifyEmailPage() {
@@ -30,7 +31,7 @@ export function VerifyEmailPage() {
       try {
         setStatus('verifying')
         const res = await apiVerify({ token })
-        const user = res?.data?.user
+        const user = res?.data?.user as { id: string; email: string; firstName?: string; lastName?: string; status?: string; roles?: string[] } | undefined
         if (user) {
           const profile: UserProfile = {
             id: user.id,
@@ -39,6 +40,10 @@ export function VerifyEmailPage() {
             userType: 'donor',
             createdAt: new Date().toISOString(),
             verified: user.status === 'active',
+            // Derive partner access from roles after verification
+            // If roles are missing, default to false
+            // (user can later upgrade via Partner portal)
+            partnerAccess: Array.isArray(user.roles) ? user.roles.includes('partner') : false,
           }
           setUser(profile)
         }
@@ -121,4 +126,3 @@ export function VerifyEmailPage() {
     </div>
   )
 }
-

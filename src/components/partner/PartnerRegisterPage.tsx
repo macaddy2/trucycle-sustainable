@@ -18,6 +18,7 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
   const [loading, setLoading] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [, setPartner] = useKV<MinimalUser | null>('partner-user', null)
+  const [currentUser, setCurrentUser] = useKV<any>('current-user', null)
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -127,9 +128,17 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
           acceptable_categories: categories.length > 0 ? categories : undefined,
         }
         const res = await upgradeToPartner(shopDto)
-        const upgradedUser = (res as any)?.data?.user as MinimalUser | undefined
+        const upgradedUser = (res as any)?.data?.user as MinimalUser & { roles?: string[] } | undefined
         if (upgradedUser) {
+          const hasPartnerRole = Array.isArray(upgradedUser.roles) && upgradedUser.roles.includes('partner')
           setPartner(upgradedUser)
+          if (!hasPartnerRole) {
+            console.warn('Upgraded user is missing partner role in response. Proceeding, but access may be limited until next login/me.')
+          }
+          // Also reflect partner access in the consumer app profile if present
+          if (currentUser) {
+            setCurrentUser({ ...currentUser, partnerAccess: hasPartnerRole || true })
+          }
         }
         toast.success('Upgrade successful! You now have Partner access.')
         onNavigate('home', true)
