@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { ArrowRight, EnvelopeSimple, Lock } from '@phosphor-icons/react'
-import { login as apiLogin, type MinimalUser } from '@/lib/api'
+import { login as apiLogin, tokens, type MinimalUser } from '@/lib/api'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
@@ -13,10 +13,25 @@ interface PartnerLoginPageProps {
 }
 
 export function PartnerLoginPage({ onNavigate }: PartnerLoginPageProps) {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [, setPartner] = useKV<MinimalUser | null>('partner-user', null)
+
+  // If user already has auth tokens (logged in as customer), show upgrade prompt instead of login
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    let mounted = true
+    tokens.get().then(t => {
+      if (!mounted) return
+      setIsAuthenticated(Boolean(t?.accessToken))
+    }).catch(() => {
+      if (!mounted) return
+      setIsAuthenticated(false)
+    })
+    return () => { mounted = false }
+  }, [])
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -42,6 +57,17 @@ export function PartnerLoginPage({ onNavigate }: PartnerLoginPageProps) {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (isAuthenticated) {
+    return (
+      <UpgradePrompt
+        onContinue={() => onNavigate('register')}
+        onCancel={() => {
+          window.location.href = '/home'
+        }}
+      />
+    )
   }
 
   return (
@@ -121,6 +147,29 @@ function BadgeHero() {
     <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-xs uppercase tracking-wide text-primary">
       <span className="font-semibold">Partner portal</span>
       <span className="text-muted-foreground">Drop-off ready</span>
+    </div>
+  )
+}
+
+function UpgradePrompt({ onContinue, onCancel }: { onContinue: () => void; onCancel: () => void }) {
+  return (
+    <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-4 py-16">
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle className="text-h2">Become a TruCycle Partner</CardTitle>
+          <CardDescription>
+            You’re already signed in. Would you like to upgrade your account to add Partner access?
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Button variant="outline" onClick={onCancel}>Not now</Button>
+            <Button onClick={onContinue}>
+              Yes, upgrade and continue <ArrowRight size={16} className="ml-2" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

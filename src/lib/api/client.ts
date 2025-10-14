@@ -33,6 +33,7 @@ import type {
   NearbyShop,
   ShopDto,
   ListMyShopItemsResponse,
+  MinimalUser,
 } from './types'
 
 export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '') || ''
@@ -350,4 +351,14 @@ export async function listPartnerItems(params?: {
 }) {
   const qs = toQuery(params as any)
   return request<ApiEnvelope<ListMyShopItemsResponse>>(`/shops/me/items${qs}`, { auth: true })
+}
+
+// PARTNER UPGRADE
+export async function upgradeToPartner(dto?: CreateShopDto) {
+  // Backend accepts optional CreateShopDto; send empty object when omitted
+  return request<ApiEnvelope<{ user: MinimalUser; shop?: ShopDto }>>('/auth/upgrade-to-partner', {
+    method: 'POST',
+    auth: true,
+    body: dto ?? {},
+  })
 }

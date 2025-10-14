@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { ArrowLeft, ArrowRight, MapPin, Phone, Storefront, User, Eye, EyeSlash, X } from '@phosphor-icons/react'
-import { register as apiRegister, type RegisterDto } from '@/lib/api'
+import { register as apiRegister, upgradeToPartner, tokens, type RegisterDto, type MinimalUser } from '@/lib/api'
+import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
 interface PartnerRegisterPageProps {
@@ -14,6 +15,8 @@ interface PartnerRegisterPageProps {
 
 export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
   const [loading, setLoading] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [, setPartner] = useKV<MinimalUser | null>('partner-user', null)
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -33,6 +36,21 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
+  // Detect if the user is already authenticated (customer) to enable upgrade flow
+  // We only need to know if an access token is present
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    let mounted = true
+    tokens.get().then(t => {
+      if (!mounted) return
+      setIsAuthenticated(Boolean(t?.accessToken))
+    }).catch(() => {
+      if (!mounted) return
+      setIsAuthenticated(false)
+    })
+    return () => { mounted = false }
+  }, [])
+
   const handleChange = (field: keyof typeof form, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
   }
@@ -40,16 +58,19 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (!form.firstName || !form.lastName || !form.email || !form.password || !form.confirmPassword) {
-      toast.error('Please complete all required partner fields')
-      return
+    if (!isAuthenticated) {
+      // Full registration validation
+      if (!form.firstName || !form.lastName || !form.email || !form.password || !form.confirmPassword) {
+        toast.error('Please complete all required partner fields')
+        return
+      }
+      if (form.password !== form.confirmPassword) {
+        toast.error('Passwords do not match')
+        return
+      }
     }
 
-    if (form.password !== form.confirmPassword) {
-      toast.error('Passwords do not match')
-      return
-    }
-
+    // Shop validation (common to both flows)
     if (!form.addressLine || !form.postcode || !form.shopName) {
       toast.error('Shop name, address and postcode are required')
       return
@@ -58,37 +79,63 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
     const openingDays = form.openingDays.filter(Boolean)
     const categories = form.categories.map(c => c.trim()).filter(Boolean)
 
-    const dto: RegisterDto = {
-      first_name: form.firstName.trim(),
-      last_name: form.lastName.trim(),
-      email: form.email.trim().toLowerCase(),
-      password: form.password,
-      role: 'partner',
-      shop: {
-        name: form.shopName.trim(),
-        phone_number: form.phoneNumber.trim() || undefined,
-        address_line: form.addressLine.trim(),
-        postcode: form.postcode.trim(),
-        opening_hours:
-          openingDays.length > 0 || form.openTime || form.closeTime
-            ? {
-                days: openingDays,
-                open_time: form.openTime || undefined,
-                close_time: form.closeTime || undefined,
-              }
-            : undefined,
-        acceptable_categories: categories.length > 0 ? categories : undefined,
-      },
-    }
-
     setLoading(true)
     try {
-      await apiRegister(dto)
-      toast.success('Partner account created! Check your email to verify your access.')
-      onNavigate('login', true)
+      if (!isAuthenticated) {
+        // New partner registration flow
+        const dto: RegisterDto = {
+          first_name: form.firstName.trim(),
+          last_name: form.lastName.trim(),
+          email: form.email.trim().toLowerCase(),
+          password: form.password,
+          role: 'partner',
+          shop: {
+            name: form.shopName.trim(),
+            phone_number: form.phoneNumber.trim() || undefined,
+            address_line: form.addressLine.trim(),
+            postcode: form.postcode.trim(),
+            opening_hours:
+              openingDays.length > 0 || form.openTime || form.closeTime
+                ? {
+                    days: openingDays,
+                    open_time: form.openTime || undefined,
+                    close_time: form.closeTime || undefined,
+                  }
+                : undefined,
+            acceptable_categories: categories.length > 0 ? categories : undefined,
+          },
+        }
+        await apiRegister(dto)
+        toast.success('Partner account created! Check your email to verify your access.')
+        onNavigate('login', true)
+      } else {
+        // Upgrade existing customer to partner with first shop
+        const shopDto = {
+          name: form.shopName.trim(),
+          phone_number: form.phoneNumber.trim() || undefined,
+          address_line: form.addressLine.trim(),
+          postcode: form.postcode.trim(),
+          opening_hours:
+            openingDays.length > 0 || form.openTime || form.closeTime
+              ? {
+                  days: openingDays,
+                  open_time: form.openTime || undefined,
+                  close_time: form.closeTime || undefined,
+                }
+              : undefined,
+          acceptable_categories: categories.length > 0 ? categories : undefined,
+        }
+        const res = await upgradeToPartner(shopDto)
+        const upgradedUser = (res as any)?.data?.user as MinimalUser | undefined
+        if (upgradedUser) {
+          setPartner(upgradedUser)
+        }
+        toast.success('Upgrade successful! You now have Partner access.')
+        onNavigate('home', true)
+      }
     } catch (error: any) {
-      console.error('Partner registration failed', error)
-      toast.error(error?.message || 'Unable to complete partner registration right now.')
+      console.error('Partner registration/upgrade failed', error)
+      toast.error(error?.message || 'Unable to complete this action right now.')
     } finally {
       setLoading(false)
     }
@@ -99,18 +146,21 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
       <div className="mb-6">
         <Button variant="ghost" className="px-0 text-sm text-primary" onClick={() => onNavigate('login')}>
           <ArrowLeft size={16} className="mr-2" />
-          Back to partner login
+          {isAuthenticated ? 'Back' : 'Back to partner login'}
         </Button>
       </div>
       <Card className="border-border">
         <CardHeader>
-          <CardTitle className="text-h2">Become a TruCycle Partner</CardTitle>
+          <CardTitle className="text-h2">{isAuthenticated ? 'Create your first shop' : 'Become a TruCycle Partner'}</CardTitle>
           <CardDescription>
-            Register your organisation, create your first shop, and start receiving community donations within minutes.
+            {isAuthenticated
+              ? 'Tell us about your first shop to enable Partner features on your account.'
+              : 'Register your organisation, create your first shop, and start receiving community donations within minutes.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-8" onSubmit={handleSubmit}>
+            {!isAuthenticated && (
             <section className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="partner-firstName" className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -158,6 +208,7 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
                 </div>
               </div>
             </section>
+            )}
 
             <section className="space-y-4">
               <div>
@@ -274,7 +325,7 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
                 Back to login
               </Button>
               <Button type="submit" disabled={loading}>
-                Complete registration <ArrowRight size={16} className="ml-2" />
+                {isAuthenticated ? 'Create shop and continue' : 'Complete registration'} <ArrowRight size={16} className="ml-2" />
               </Button>
             </div>
           </form>
