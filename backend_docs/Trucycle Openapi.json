@@ -451,22 +451,37 @@
     "/shops/nearby": {
       "get": {
         "operationId": "shopsNearby",
-        "summary": "Find nearby shops by coordinates",
+        "summary": "Find nearby shops by coordinates or postcode",
+        "description": "Provide either lon/lat, or a postcode to geocode. If `postcode` is provided, `lon` and `lat` are ignored.",
         "parameters": [
           {
             "name": "lon",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Longitude in degrees (WGS84)",
             "schema": {
+              "example": -0.1276,
               "type": "number"
             }
           },
           {
             "name": "lat",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Latitude in degrees (WGS84)",
             "schema": {
+              "example": 51.5072,
               "type": "number"
+            }
+          },
+          {
+            "name": "postcode",
+            "required": false,
+            "in": "query",
+            "description": "UK postcode or address to geocode",
+            "schema": {
+              "example": "SW1A 1AA",
+              "type": "string"
             }
           },
           {
@@ -475,6 +490,7 @@
             "in": "query",
             "description": "Search radius in meters (default ~5500m)",
             "schema": {
+              "example": 2000,
               "type": "number"
             }
           }
@@ -490,11 +506,56 @@
                     "message": "OK",
                     "data": [
                       {
-                        "id": "b84e...-uuid",
+                        "id": "b84e0c5d-3f9b-4a6e-9b6b-9a5d4f2b1234",
                         "name": "Partner Shop",
+                        "phone_number": "+44 20 7946 0958",
+                        "address_line": "1 High St",
+                        "postcode": "AB12 3CD",
+                        "latitude": 51.5072,
+                        "longitude": -0.1276,
+                        "opening_hours": {
+                          "days": [
+                            "Mon",
+                            "Tue",
+                            "Wed",
+                            "Thu",
+                            "Fri"
+                          ],
+                          "open_time": "09:00",
+                          "close_time": "17:00"
+                        },
+                        "acceptable_categories": [
+                          "furniture",
+                          "electronics"
+                        ],
                         "distanceMeters": 250
+                      },
+                      {
+                        "id": "0b86d6fb-5b12-4e45-a5ed-93b30fe7518a",
+                        "name": "Another Shop",
+                        "phone_number": null,
+                        "address_line": "2 Market Rd",
+                        "postcode": "EF45 6GH",
+                        "latitude": 51.51,
+                        "longitude": -0.13,
+                        "opening_hours": null,
+                        "acceptable_categories": [],
+                        "distanceMeters": 980
                       }
                     ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "error",
+                    "message": "Either postcode or lon/lat is required"
                   }
                 }
               }
@@ -697,6 +758,260 @@
         "responses": {
           "204": {
             "description": "Shop archived"
+          }
+        },
+        "tags": [
+          "shops"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/shops/me/items": {
+      "get": {
+        "operationId": "listMyShopItems",
+        "summary": "List items across my shops (partner/admin)",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by item status",
+            "schema": {
+              "enum": [
+                "draft",
+                "active",
+                "claimed",
+                "complete",
+                "pending_dropoff",
+                "awaiting_collection",
+                "rejected",
+                "pending_recycle",
+                "pending_recycle_processing",
+                "recycled"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "pickup_option",
+            "required": false,
+            "in": "query",
+            "description": "Filter by pickup option",
+            "schema": {
+              "enum": [
+                "donate",
+                "exchange",
+                "recycle"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "Exact category match (case-insensitive)",
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "created_from",
+            "required": false,
+            "in": "query",
+            "description": "Created at from (ISO8601)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "created_to",
+            "required": false,
+            "in": "query",
+            "description": "Created at to (ISO8601)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Results per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Items and pagination",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "items": [],
+                    "pagination": {
+                      "page": 1,
+                      "limit": 10,
+                      "total": 0,
+                      "total_pages": 0
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "shops"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/shops/{id}/items": {
+      "get": {
+        "operationId": "listShopItems",
+        "summary": "List items associated with a shop (partner/admin)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by item status",
+            "schema": {
+              "enum": [
+                "draft",
+                "active",
+                "claimed",
+                "complete",
+                "pending_dropoff",
+                "awaiting_collection",
+                "rejected",
+                "pending_recycle",
+                "pending_recycle_processing",
+                "recycled"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "pickup_option",
+            "required": false,
+            "in": "query",
+            "description": "Filter by pickup option",
+            "schema": {
+              "enum": [
+                "donate",
+                "exchange",
+                "recycle"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "Exact category match (case-insensitive)",
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "created_from",
+            "required": false,
+            "in": "query",
+            "description": "Created at from (ISO8601)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "created_to",
+            "required": false,
+            "in": "query",
+            "description": "Created at to (ISO8601)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Results per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Items and pagination",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "items": [],
+                    "pagination": {
+                      "page": 1,
+                      "limit": 10,
+                      "total": 0,
+                      "total_pages": 0
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "tags": [
