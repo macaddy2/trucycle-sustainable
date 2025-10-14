@@ -32,12 +32,12 @@
     "/auth/register": {
       "post": {
         "operationId": "AuthController_register",
-        "summary": "Register a new user account (optionally create first partner shop)",
-        "description": "Include a `shop` object to register as a partner and create the first shop.",
+        "summary": "Register a new user account",
+        "description": "To register as a partner you must include a valid `shop` payload. Partner role requires at least one shop and the first shop will be created during registration.",
         "parameters": [],
         "requestBody": {
           "required": true,
-          "description": "User registration payload. Include `shop` when registering as Partner.",
+          "description": "User registration payload. Note: `role`=\"partner\" requires a `shop` object (first shop will be created).",
           "content": {
             "application/json": {
               "schema": {
@@ -332,7 +332,11 @@
                         "email": "jane@example.com",
                         "firstName": "Jane",
                         "lastName": "Doe",
-                        "status": "active"
+                        "status": "active",
+                        "roles": [
+                          "customer",
+                          "partner"
+                        ]
                       }
                     }
                   }
@@ -354,11 +358,12 @@
     "/auth/upgrade-to-partner": {
       "post": {
         "operationId": "AuthController_upgradeToPartner",
-        "summary": "Upgrade the current user to Partner (optionally create first shop)",
+        "summary": "Upgrade the current user to Partner",
+        "description": "Partner role requires at least one shop. If you do not already have a shop, you must provide `shop` details to create your first shop as part of the upgrade.",
         "parameters": [],
         "requestBody": {
           "required": false,
-          "description": "Optional partner shop details for first shop creation",
+          "description": "Partner shop details. Required if the user has no existing shop; optional if at least one shop already exists.",
           "content": {
             "application/json": {
               "schema": {
@@ -1146,7 +1151,7 @@
             "name": "postcode",
             "required": false,
             "in": "query",
-            "description": "Fallback postcode when lat/lng are omitted (forward geocoded via OpenStreetMap)",
+            "description": "Postcode to search near. If provided, it overrides lat/lng (forward geocoded via OpenStreetMap).",
             "schema": {
               "maxLength": 32,
               "type": "string"
@@ -3232,13 +3237,13 @@
           },
           "latitude": {
             "type": "number",
-            "description": "Latitude (WGS84)",
+            "description": "Latitude (WGS84). Ignored when postcode is provided",
             "minimum": -90,
             "maximum": 90
           },
           "longitude": {
             "type": "number",
-            "description": "Longitude (WGS84)",
+            "description": "Longitude (WGS84). Ignored when postcode is provided",
             "minimum": -180,
             "maximum": 180
           },
@@ -3271,9 +3276,7 @@
         "required": [
           "name",
           "address_line",
-          "postcode",
-          "latitude",
-          "longitude"
+          "postcode"
         ]
       },
       "RegisterDto": {
