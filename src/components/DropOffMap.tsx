@@ -6,8 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { MapPin, Clock, Phone, NavigationArrow, Storefront, ArrowRight } from '@phosphor-icons/react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
+import { MapPin, Clock, Phone, NavigationArrow, Storefront, ArrowRight, WarningCircle } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
+import { shopsNearby, type NearbyShop } from '@/lib/api'
+import { toast } from 'sonner'
 import { DROP_OFF_LOCATIONS, type DropOffLocation } from './dropOffLocations'
 
 interface DropOffMapProps {
@@ -19,6 +23,56 @@ const defaultCoordinateFallback = (index: number): { lat: number; lng: number } 
   lat: 51.541 + (index % 3) * 0.01,
   lng: -0.142 + Math.floor(index / 3) * 0.01
 })
+
+function formatDistance(distanceMeters?: number | null): string {
+  if (typeof distanceMeters !== 'number' || !Number.isFinite(distanceMeters) || distanceMeters <= 0) {
+    return 'Distance unavailable'
+  }
+
+  if (distanceMeters >= 1000) {
+    const km = distanceMeters / 1000
+    return `${km >= 10 ? km.toFixed(0) : km.toFixed(1)} km`
+  }
+
+  return `${Math.round(distanceMeters)} m`
+}
+
+function formatOpeningHours(opening?: NearbyShop['opening_hours'] | null): string {
+  if (!opening) return 'Hours not available'
+  const { days, open_time, close_time } = opening
+  const joinedDays = Array.isArray(days) && days.length > 0 ? days.join(' · ') : 'Daily'
+  if (!open_time && !close_time) return joinedDays
+  if (open_time && close_time) return `${joinedDays} ${open_time} - ${close_time}`
+  if (open_time) return `${joinedDays} from ${open_time}`
+  if (close_time) return `${joinedDays} until ${close_time}`
+  return joinedDays
+}
+
+function shopToLocation(shop: NearbyShop, index: number): DropOffLocation {
+  const fallback = defaultCoordinateFallback(index)
+  const coordinates =
+    typeof shop.latitude === 'number' && Number.isFinite(shop.latitude) &&
+    typeof shop.longitude === 'number' && Number.isFinite(shop.longitude)
+      ? { lat: shop.latitude, lng: shop.longitude }
+      : fallback
+
+  const acceptedItems = Array.isArray(shop.acceptable_categories) && shop.acceptable_categories.length > 0
+    ? shop.acceptable_categories
+    : ['General donations']
+
+  return {
+    id: shop.id || `shop-${index}`,
+    name: shop.name || 'TruCycle Partner Shop',
+    address: shop.address_line || 'Address available upon confirmation',
+    postcode: shop.postcode || '—',
+    distance: formatDistance(shop.distanceMeters),
+    openHours: formatOpeningHours(shop.opening_hours),
+    phone: shop.phone_number || 'Contact provided after booking',
+    acceptedItems,
+    specialServices: shop.active === false ? [] : ['Verified partner'],
+    coordinates,
+  }
+}
 
 const defaultMarkerIcon = L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -55,22 +109,78 @@ function RecenterMap({ center }: { center: [number, number] }) {
 }
 
   const [storedLocations] = useKV<DropOffLocation[]>('dropoff-locations', [])
+  const [remoteLocations, setRemoteLocations] = useState<DropOffLocation[]>([])
+  const [loadingNearby, setLoadingNearby] = useState(false)
+  const [nearbyError, setNearbyError] = useState<string | null>(null)
+  const [user] = useKV<{ postcode?: string } | null>('current-user', null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadNearbyShops() {
+      setLoadingNearby(true)
+      setNearbyError(null)
+      try {
+        const postcode = user?.postcode?.trim()
+        const response = await shopsNearby(postcode ? { postcode } : { postcode: 'SW1A 1AA' })
+        const data = Array.isArray((response as any)?.data)
+          ? ((response as any).data as NearbyShop[])
+          : Array.isArray(response)
+            ? (response as NearbyShop[])
+            : (((response as any)?.data ?? []) as NearbyShop[])
+
+        if (!cancelled) {
+          const mapped = data.map((shop, index) => shopToLocation(shop, index))
+          setRemoteLocations(mapped)
+          if (mapped.length === 0 && !postcode) {
+            toast.info('No live partner shops found near the default area. Showing sample locations instead.')
+          }
+        }
+      } catch (error: any) {
+        console.error('Failed to fetch nearby shops', error)
+        if (!cancelled) {
+          const message = error?.message || 'Unable to load nearby partner shops right now.'
+          setNearbyError(message)
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingNearby(false)
+        }
+      }
+    }
+
+    loadNearbyShops()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.postcode])
 
   const locations = useMemo(() => {
     const merged = new Map<string, DropOffLocation>()
-    for (const location of DROP_OFF_LOCATIONS) {
-      merged.set(location.id, location)
-    }
+
+    remoteLocations.forEach((location, index) => {
+      const normalized = {
+        ...location,
+        coordinates: location.coordinates ?? defaultCoordinateFallback(index),
+      }
+      merged.set(normalized.id, normalized)
+    })
 
     for (const location of storedLocations ?? []) {
       merged.set(location.id, {
         ...location,
-        coordinates: location.coordinates ?? defaultCoordinateFallback(merged.size)
+        coordinates: location.coordinates ?? defaultCoordinateFallback(merged.size),
       })
     }
 
+    for (const location of DROP_OFF_LOCATIONS) {
+      if (!merged.has(location.id)) {
+        merged.set(location.id, location)
+      }
+    }
+
     return Array.from(merged.values())
-  }, [storedLocations])
+  }, [remoteLocations, storedLocations])
 
   const [activeLocationId, setActiveLocationId] = useState<string | null>(locations[0]?.id ?? null)
 
@@ -118,11 +228,26 @@ function RecenterMap({ center }: { center: [number, number] }) {
               Tap a location pin to preview opening hours, accepted items, and services. Confirm the Partner Shop to continue your donation.
             </CardDescription>
           </div>
-          <Badge variant="outline" className="w-max">
-            Availability verified hourly
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="w-max">
+              Availability verified hourly
+            </Badge>
+            {loadingNearby && (
+              <Badge variant="secondary" className="animate-pulse">
+                Refreshing partner network…
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          {nearbyError && (
+            <Alert variant="destructive" className="border-destructive/40 bg-destructive/10">
+              <WarningCircle size={18} />
+              <AlertDescription>
+                {nearbyError}
+              </AlertDescription>
+            </Alert>
+          )}
           {locations.length === 0 ? (
             <div className="py-16 text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
@@ -146,9 +271,12 @@ function RecenterMap({ center }: { center: [number, number] }) {
                       </p>
                     </div>
                     {activeLocation && (
-                      <Badge variant="secondary" className="w-max">
-                        {activeLocation.name}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary" className="w-max">
+                          {activeLocation.name}
+                        </Badge>
+                        {loadingNearby && <Skeleton className="h-5 w-24" />}
+                      </div>
                     )}
                   </div>
 

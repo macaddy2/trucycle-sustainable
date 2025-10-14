@@ -26,6 +26,7 @@ export interface RegisterDto {
   email: string
   password: string
   role?: 'customer' | 'collector' | 'facility' | 'admin' | 'finance' | 'partner'
+  shop?: CreateShopDto
 }
 
 export interface LoginDto {
@@ -61,6 +62,59 @@ export interface LoginResponse {
 
 export interface RegisterResponse {
   user: MinimalUser & { status?: string }
+}
+
+export interface OpeningHoursDto {
+  days?: string[]
+  open_time?: string | null
+  close_time?: string | null
+}
+
+export interface CreateShopDto {
+  name: string
+  phone_number?: string | null
+  address_line: string
+  postcode: string
+  latitude: number
+  longitude: number
+  opening_hours?: OpeningHoursDto | null
+  acceptable_categories?: string[]
+}
+
+export interface ShopDto {
+  id: string
+  name: string
+  phone_number?: string | null
+  address_line?: string | null
+  postcode?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  opening_hours?: OpeningHoursDto | null
+  acceptable_categories?: string[]
+  active?: boolean
+  distanceMeters?: number | null
+}
+
+export type NearbyShop = ShopDto
+
+export type PartnerShopSummary = ShopDto
+
+export interface PartnerShopItem {
+  id: string
+  title?: string
+  status?: string
+  pickup_option?: PickupOption
+  category?: string | null
+  created_at?: string
+  updated_at?: string
+  shop?: { id?: string; name?: string | null } | null
+  claim_status?: string | null
+  metadata?: Record<string, unknown> | null
+}
+
+export interface ListMyShopItemsResponse {
+  items: PartnerShopItem[]
+  pagination: { page: number; limit: number; total: number; total_pages: number }
 }
 
 // Item-related types

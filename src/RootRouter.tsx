@@ -1,5 +1,6 @@
 import App from './App'
 import { VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage } from '@/components/auth'
+import { PartnerRouter } from './PartnerRouter'
 
 export default function RootRouter() {
   const base = (import.meta as any).env?.BASE_URL || '/'
@@ -18,6 +19,10 @@ export default function RootRouter() {
   }
   if (path.startsWith('auth/forgot-password')) {
     return <ForgotPasswordPage />
+  }
+
+  if (path.startsWith('partner')) {
+    return <PartnerRouter basePath={baseNormalized} initialPath={path} />
   }
 
   return <App />
