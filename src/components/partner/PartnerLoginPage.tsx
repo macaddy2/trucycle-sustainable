@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { ArrowRight, EnvelopeSimple, Lock } from '@phosphor-icons/react'
 import { login as apiLogin, tokens, me as apiMe, type MinimalUser } from '@/lib/api'
+import { kvSet } from '@/lib/kvStore'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
@@ -41,6 +42,7 @@ export function PartnerLoginPage({ onNavigate }: PartnerLoginPageProps) {
           const user = res?.data?.user as MinimalUser & { roles?: string[]; role?: string }
           const hasPartnerRole = (Array.isArray(user?.roles) && user.roles.includes('partner')) || user?.role === 'partner'
           if (hasPartnerRole) {
+            try { await kvSet<MinimalUser>('partner-user', user) } catch {}
             setPartner(user)
             onNavigate('home', true)
           } else {
@@ -77,6 +79,7 @@ export function PartnerLoginPage({ onNavigate }: PartnerLoginPageProps) {
         if (!hasPartnerRole) {
           toast.error('This account does not have partner access. Please upgrade or contact support.')
         } else {
+          try { await kvSet<MinimalUser>('partner-user', user) } catch {}
           setPartner(user)
           toast.success('Welcome back, partner!')
           onNavigate('home', true)

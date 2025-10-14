@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { ArrowLeft, ArrowRight, MapPin, Phone, Storefront, User, Eye, EyeSlash } from '@phosphor-icons/react'
 import { CATEGORIES } from '@/lib/categories'
 import { register as apiRegister, upgradeToPartner, tokens, type RegisterDto, type MinimalUser } from '@/lib/api'
+import { kvSet } from '@/lib/kvStore'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
@@ -131,6 +132,7 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
         const upgradedUser = (res as any)?.data?.user as MinimalUser & { roles?: string[]; role?: string } | undefined
         if (upgradedUser) {
           const hasPartnerRole = (Array.isArray(upgradedUser.roles) && upgradedUser.roles.includes('partner')) || upgradedUser.role === 'partner'
+          try { await kvSet<MinimalUser>('partner-user', upgradedUser) } catch {}
           setPartner(upgradedUser)
           if (!hasPartnerRole) {
             console.warn('Upgraded user is missing partner role in response. Proceeding, but access may be limited until next login/me.')
