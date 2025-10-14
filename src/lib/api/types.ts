@@ -336,3 +336,49 @@ export interface ListRoomMessagesResponse {
   messages: DMMessageView[]
   nextCursor?: string | null
 }
+
+// QR scanning and item view
+export interface QrItemView {
+  id: string
+  status?: string
+  pickup_option?: PickupOption
+  qr_code?: string | null
+  claim?: { id?: string; status?: string; collector_id?: string | null } | null
+  scan_events?: Array<{ scan_type?: string; shop_id?: string | null; scanned_at?: string }>
+}
+
+export interface QrScanAck {
+  accepted: boolean
+  duplicate?: boolean
+  idempotencyKey?: string
+  direction?: 'in' | 'out'
+}
+
+export interface DropoffScanDto {
+  // Minimal payload for backend acceptance
+  notes?: string
+  shopId?: string
+}
+
+export interface ShopScanDto {
+  // Minimal payload for backend acceptance
+  notes?: string
+  shopId?: string
+}
+
+export interface DropoffInResult {
+  scan_result?: string
+  scan_type?: string
+  item_status?: string
+  scanned_at?: string
+  scan_events?: Array<{ scan_type?: string; shop_id?: string | null; scanned_at?: string }>
+}
+
+export interface ClaimOutResult {
+  id?: string
+  status?: string
+  scan_type?: string
+  scan_result?: string
+  completed_at?: string
+  scan_events?: Array<{ scan_type?: string; shop_id?: string | null; scanned_at?: string }>
+}

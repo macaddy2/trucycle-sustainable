@@ -16,6 +16,7 @@ import type {
   CreateItemDto,
   SearchItemsResponse,
   CreateItemResponse,
+  PublicItem,
   MyListedItemsResponse,
   MyCollectedItemsResponse,
   // claims
@@ -34,6 +35,13 @@ import type {
   ShopDto,
   ListMyShopItemsResponse,
   MinimalUser,
+  // qr
+  QrItemView,
+  QrScanAck,
+  DropoffInResult,
+  ClaimOutResult,
+  DropoffScanDto,
+  ShopScanDto,
 } from './types'
 
 export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '') || ''
@@ -236,6 +244,10 @@ export async function listMyItems(params?: { status?: string; page?: number; lim
   return request<ApiEnvelope<MyListedItemsResponse>>(`/items/me/listed${qs}`, { auth: true })
 }
 
+export async function getItemById(id: string) {
+  return request<ApiEnvelope<PublicItem>>(`/items/${encodeURIComponent(id)}`)
+}
+
 export async function listMyCollectedItems(params?: {
   status?: string
   claim_status?: string
@@ -357,6 +369,36 @@ export async function listPartnerItems(params?: {
 export async function upgradeToPartner(dto?: CreateShopDto) {
   // Backend accepts optional CreateShopDto; send empty object when omitted
   return request<ApiEnvelope<{ user: MinimalUser; shop?: ShopDto }>>('/auth/upgrade-to-partner', {
+    method: 'POST',
+    auth: true,
+    body: dto ?? {},
+  })
+}
+
+// QR ENDPOINTS
+export async function qrScan(payload: { qrPayload: string; direction: 'in' | 'out'; shopId?: string; location?: any }) {
+  const headers: Record<string, string> = {
+    'idempotency-key': (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function')
+      ? (crypto as any).randomUUID()
+      : `idemp-${Date.now()}`,
+  }
+  return request<ApiEnvelope<QrScanAck>>('/qr/scan', { method: 'POST', auth: true, body: payload, headers })
+}
+
+export async function qrViewItem(itemId: string) {
+  return request<ApiEnvelope<QrItemView>>(`/qr/item/${encodeURIComponent(itemId)}/view`, { auth: true })
+}
+
+export async function qrDropoffIn(itemId: string, dto?: DropoffScanDto) {
+  return request<ApiEnvelope<DropoffInResult>>(`/qr/item/${encodeURIComponent(itemId)}/dropoff-in`, {
+    method: 'POST',
+    auth: true,
+    body: dto ?? {},
+  })
+}
+
+export async function qrClaimOut(itemId: string, dto?: ShopScanDto) {
+  return request<ApiEnvelope<ClaimOutResult>>(`/qr/item/${encodeURIComponent(itemId)}/claim-out`, {
     method: 'POST',
     auth: true,
     body: dto ?? {},

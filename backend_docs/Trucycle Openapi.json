@@ -374,7 +374,7 @@
         },
         "responses": {
           "200": {
-            "description": "User upgraded to partner and optional shop created",
+            "description": "User upgraded to partner and optional shop created; returns new tokens",
             "content": {
               "application/json": {
                 "schema": {
@@ -402,6 +402,12 @@
                           "electronics"
                         ],
                         "active": true
+                      },
+                      "tokens": {
+                        "accessToken": "eyJhbGciOi...access",
+                        "refreshToken": "eyJhbGciOi...refresh",
+                        "accessTokenExpiry": "2025-10-31T12:00:00.000Z",
+                        "refreshTokenExpiry": "2025-11-30T12:00:00.000Z"
                       }
                     }
                   }
