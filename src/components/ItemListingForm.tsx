@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { DropOffLocationSelector } from './DropOffLocationSelector'
 import type { DropOffLocation } from './dropOffLocations'
 import { sendListingSubmissionEmails } from '@/lib/emailAlerts'
+import { CATEGORIES } from '@/lib/categories'
 import { classifyListing, type ListingClassificationResult } from '@/lib/ai/classifier'
 import { moderateImages, type ModerationResult } from '@/lib/ai/moderation'
 import { QRCodeDisplay, type QRCodeData } from './QRCode'
@@ -21,17 +22,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { uploadImageToCloudinary } from '@/lib/cloudinary'
 import { createItem } from '@/lib/api'
 import { LocationSelector, type LocationValue } from '@/components/LocationSelector'
-
-const CATEGORIES = [
-  'Electronics',
-  'Furniture',
-  'Clothing',
-  'Books',
-  'Kitchen Items',
-  'Sports Equipment',
-  'Home Decor',
-  'Other'
-]
 
 const CONDITIONS = [
   { value: 'excellent', label: 'Excellent', description: 'Like new, minimal wear' },
@@ -452,8 +442,8 @@ export function ItemListingForm({
           formData.title.trim() !== '' &&
           formData.description.trim() !== '' &&
           formData.photos.length > 0 &&
-          formData.category !== '' &&
-          formData.condition !== ''
+          Boolean(formData.category) &&
+          Boolean(formData.condition)
         )
       case 2: {
         const effectiveMethod = effectiveFulfillmentMethod

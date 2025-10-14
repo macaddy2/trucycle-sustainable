@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, ArrowRight, MapPin, Phone, Storefront, User, Eye, EyeSlash, X } from '@phosphor-icons/react'
+import { ArrowLeft, ArrowRight, MapPin, Phone, Storefront, User, Eye, EyeSlash } from '@phosphor-icons/react'
+import { CATEGORIES } from '@/lib/categories'
 import { register as apiRegister, upgradeToPartner, tokens, type RegisterDto, type MinimalUser } from '@/lib/api'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
@@ -30,7 +31,7 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
     openingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as string[],
     openTime: '09:00',
     closeTime: '17:00',
-    categories: ['furniture', 'electronics'] as string[],
+    categories: [] as string[],
     notes: '',
   })
   const [showPassword, setShowPassword] = useState(false)
@@ -279,33 +280,30 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
                   <Input id="shop-close" type="time" value={form.closeTime} onChange={event => handleChange('closeTime', event.target.value)} />
                 </div>
                 <div className="space-y-2 lg:col-span-2">
-                  <Label className="text-sm font-medium text-muted-foreground">Acceptable Items</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">Acceptable Categories</Label>
                   <div className="flex flex-wrap gap-2">
-                    {form.categories.map((cat, idx) => (
-                      <span key={`${cat}-${idx}`} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-sm">
-                        <span className="capitalize">{cat}</span>
-                        <button type="button" aria-label={`Remove ${cat}`} onClick={() => setForm(prev => ({ ...prev, categories: prev.categories.filter((_, i) => i !== idx) }))} className="text-muted-foreground hover:text-foreground">
-                          <X size={14} />
-                        </button>
-                      </span>
-                    ))}
+                    {CATEGORIES.map(cat => {
+                      const selected = form.categories.includes(cat)
+                      return (
+                        <Button
+                          key={cat}
+                          type="button"
+                          variant={selected ? 'default' : 'outline'}
+                          className="capitalize"
+                          onClick={() => {
+                            setForm(prev => ({
+                              ...prev,
+                              categories: selected
+                                ? prev.categories.filter(c => c !== cat)
+                                : [...prev.categories, cat],
+                            }))
+                          }}
+                        >
+                          {cat}
+                        </Button>
+                      )
+                    })}
                   </div>
-                  <Input
-                    id="shop-categories"
-                    placeholder="Add acceptable items (press Enter)"
-                    onKeyDown={(e) => {
-                      const target = e.target as HTMLInputElement
-                      const value = target.value.trim()
-                      if (!value) return
-                      if (e.key === 'Enter' || e.key === ',') {
-                        e.preventDefault()
-                        if (!form.categories.includes(value)) {
-                          setForm(prev => ({ ...prev, categories: [...prev.categories, value] }))
-                        }
-                        target.value = ''
-                      }
-                    }}
-                  />
                 </div>
                 <div className="space-y-2 lg:col-span-2">
                   <Label htmlFor="shop-notes" className="text-sm font-medium text-muted-foreground">Operational notes (optional)</Label>
