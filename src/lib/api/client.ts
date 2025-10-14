@@ -182,6 +182,12 @@ function toQuery(params: Record<string, any> | undefined): string {
       const num = Number(v)
       const capped = Number.isFinite(num) ? Math.min(num, 50) : 50
       sp.append(k, String(capped))
+    } else if (k === 'lat' || k === 'lng' || k === 'latitude' || k === 'longitude') {
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        sp.append(k, v.toFixed(7))
+      } else {
+        sp.append(k, String(v))
+      }
     } else {
       sp.append(k, String(v))
     }

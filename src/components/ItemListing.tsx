@@ -459,10 +459,12 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                       if (!navigator.geolocation) return
                       navigator.geolocation.getCurrentPosition((pos) => {
                         const { latitude, longitude } = pos.coords
+                        const preciseLat = Number(latitude.toFixed(7))
+                        const preciseLng = Number(longitude.toFixed(7))
                         setLocationFilter((prev) => ({
                           ...prev,
-                          lat: latitude,
-                          lng: longitude,
+                          lat: preciseLat,
+                          lng: preciseLng,
                           label: 'Current location',
                           radiusKm: Math.max(1, Number(prev?.radiusKm) || 10),
                         }))

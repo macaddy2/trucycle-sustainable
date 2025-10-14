@@ -432,8 +432,8 @@ export function ItemListingForm({
     try {
       const url = new URL('https://nominatim.openstreetmap.org/reverse')
       url.searchParams.set('format', 'json')
-      url.searchParams.set('lat', String(lat))
-      url.searchParams.set('lon', String(lng))
+      url.searchParams.set('lat', lat.toFixed(7))
+      url.searchParams.set('lon', lng.toFixed(7))
       url.searchParams.set('zoom', '18')
       url.searchParams.set('addressdetails', '1')
       const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } })
@@ -895,8 +895,10 @@ export function ItemListingForm({
           }}
           onApply={async (val) => {
             // Resolve postcode via reverse geocode
-            const pc = await reverseGeocodePostcode(val.lat, val.lng)
-            setPickupLocation({ lat: val.lat, lng: val.lng, label: val.label, postcode: pc })
+            const lat = typeof val.lat === 'number' ? Number(val.lat.toFixed(7)) : val.lat
+            const lng = typeof val.lng === 'number' ? Number(val.lng.toFixed(7)) : val.lng
+            const pc = await reverseGeocodePostcode(lat, lng)
+            setPickupLocation({ lat, lng, label: val.label, postcode: pc })
             if (val.label) {
               setFormData(prev => ({ ...prev, location: val.label }))
             }

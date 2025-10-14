@@ -73,14 +73,16 @@ export function LocationSelector({ open, onOpenChange, initialValue, onApply }: 
     if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(async (pos) => {
       const { latitude, longitude } = pos.coords
-      setLat(latitude)
-      setLng(longitude)
+      const preciseLat = Number(latitude.toFixed(7))
+      const preciseLng = Number(longitude.toFixed(7))
+      setLat(preciseLat)
+      setLng(preciseLng)
       try {
         // Reverse geocode to friendly label via Nominatim
         const url = new URL('https://nominatim.openstreetmap.org/reverse')
         url.searchParams.set('format', 'json')
-        url.searchParams.set('lat', String(latitude))
-        url.searchParams.set('lon', String(longitude))
+        url.searchParams.set('lat', preciseLat.toFixed(7))
+        url.searchParams.set('lon', preciseLng.toFixed(7))
         url.searchParams.set('zoom', '10')
         url.searchParams.set('addressdetails', '1')
         const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } })
@@ -166,8 +168,8 @@ export function LocationSelector({ open, onOpenChange, initialValue, onApply }: 
                       const la = parseFloat(r.lat)
                       const lo = parseFloat(r.lon)
                       if (!Number.isNaN(la) && !Number.isNaN(lo)) {
-                        setLat(la)
-                        setLng(lo)
+                        setLat(Number(la.toFixed(7)))
+                        setLng(Number(lo.toFixed(7)))
                         setLabel(r.display_name)
                         setResults([])
                         setQuery('')
@@ -203,15 +205,14 @@ export function LocationSelector({ open, onOpenChange, initialValue, onApply }: 
                     dragend: (e) => {
                       const m = e.target as L.Marker
                       const pos = m.getLatLng()
-                      setLat(pos.lat)
-                      setLng(pos.lng)
+                      setLat(Number(pos.lat.toFixed(7)))
+                      setLng(Number(pos.lng.toFixed(7)))
                     },
                   }}
                 >
                   <Popup minWidth={220}>
                     <div className="space-y-1">
                       <div className="font-medium">Drag to adjust position</div>
-                      <div className="text-xs text-muted-foreground">Lat {lat?.toFixed(5)}, Lng {lng?.toFixed(5)}</div>
                     </div>
                   </Popup>
                 </Marker>
@@ -230,7 +231,6 @@ export function LocationSelector({ open, onOpenChange, initialValue, onApply }: 
                     <div className="text-sm font-medium line-clamp-2">
                       {label || 'No place selected'}
                     </div>
-                    <div className="text-xs text-muted-foreground">Lat {lat?.toFixed(5) ?? '—'}, Lng {lng?.toFixed(5) ?? '—'}</div>
                   </div>
                 </div>
               </div>
@@ -283,4 +283,3 @@ export function LocationSelector({ open, onOpenChange, initialValue, onApply }: 
 }
 
 export type { LocationValue }
-

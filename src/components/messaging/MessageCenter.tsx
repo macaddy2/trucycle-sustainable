@@ -545,8 +545,8 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     navigator.geolocation.getCurrentPosition((position) => {
       dispatchMessage(selectedChat.id, 'Shared location', 'location', {
         location: {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
+          lat: Number(position.coords.latitude.toFixed(7)),
+          lng: Number(position.coords.longitude.toFixed(7)),
           address: 'Current location'
         }
       })
@@ -1264,7 +1264,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                 {locationValue.lat && locationValue.lng && (
                   <div className="rounded-md border p-3 text-sm">
                     <div className="font-medium">{locationValue.label || 'Selected location'}</div>
-                    <div className="text-xs text-muted-foreground">Lat {locationValue.lat?.toFixed(5)}, Lng {locationValue.lng?.toFixed(5)}</div>
                   </div>
                 )}
                 <div className="flex gap-2">
@@ -1313,11 +1312,9 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                   {scheduleLocation?.label ? (
                     <div className="rounded-md border p-3 text-sm">
                       <div className="font-medium">{scheduleLocation.label}</div>
-                      {typeof scheduleLocation.lat === 'number' && typeof scheduleLocation.lng === 'number' && (
-                        <div className="text-xs text-muted-foreground">Lat {scheduleLocation.lat.toFixed(5)}, Lng {scheduleLocation.lng.toFixed(5)}</div>
-                      )}
-                    </div>
-                  ) : (
+                      {typeof scheduleLocation.lat === 'number' && typeof scheduleLocation.lng === 'number' && null}
+                  </div>
+                ) : (
                     <div className="text-sm text-muted-foreground">No location chosen</div>
                   )}
                   <div className="flex gap-2">
@@ -1326,7 +1323,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                       onClick={() => {
                         if (!navigator.geolocation) return
                         navigator.geolocation.getCurrentPosition((pos) => {
-                          setScheduleLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, label: 'Current location' })
+                          setScheduleLocation({ lat: Number(pos.coords.latitude.toFixed(7)), lng: Number(pos.coords.longitude.toFixed(7)), label: 'Current location' })
                           toast.success('Using current location')
                         })
                       }}
@@ -1361,7 +1358,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                 setInlineLocationPickerOpen(open)
               }}
               initialValue={{ lat: scheduleLocation?.lat, lng: scheduleLocation?.lng, label: scheduleLocation?.label, radiusKm: 5 }}
-              onApply={(val: any) => setScheduleLocation({ lat: val.lat, lng: val.lng, label: val.label })}
+              onApply={(val: any) => setScheduleLocation({ lat: typeof val.lat === 'number' ? Number(val.lat.toFixed(7)) : val.lat, lng: typeof val.lng === 'number' ? Number(val.lng.toFixed(7)) : val.lng, label: val.label })}
             />
           </div>
         )}
