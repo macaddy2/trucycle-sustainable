@@ -46,7 +46,7 @@ import { MessageCenter, MessageNotification } from './components/messaging'
 import { messageSocket } from '@/lib/messaging/socket'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import { useRecommendationNotifications, useNotifications, useExchangeManager, usePresence } from '@/hooks'
-import type { ListingCompletionDetails } from './components/ItemListingForm'
+import type { ListingCompletionDetails, ListingEditDraft } from './components/ItemListingForm'
 
 interface UserProfile {
   id: string
@@ -83,6 +83,7 @@ function App() {
   const [pendingFulfillmentMethod, setPendingFulfillmentMethod] = useState<'pickup' | 'dropoff' | null>(null)
   const [pendingDropOffLocation, setPendingDropOffLocation] = useState<DropOffLocation | null>(null)
   const [pendingListingIntent, setPendingListingIntent] = useState<'exchange' | 'donate' | 'recycle' | null>(null)
+  const [pendingListingEdit, setPendingListingEdit] = useState<ListingEditDraft | null>(null)
   const [messageCenterView, setMessageCenterView] = useState<'chats' | 'requests'>('chats')
   const [messageCenterItemId, setMessageCenterItemId] = useState<string | undefined>()
   const [messageCenterChatId, setMessageCenterChatId] = useState<string | undefined>()
@@ -920,6 +921,13 @@ function App() {
                 handleStartListing('donate')
               }}
               onOpenMessages={handleOpenMessages}
+              onEditListing={(draft) => {
+                setPendingListingEdit(draft)
+                setPendingListingIntent(null)
+                setPendingFulfillmentMethod(null)
+                setPendingDropOffLocation(null)
+                navigateToTab('list')
+              }}
             />
           </TabsContent>
 
@@ -928,12 +936,14 @@ function App() {
           <TabsContent value="list">
             <ItemListingForm
               onComplete={handleListingComplete}
-              prefillFulfillmentMethod={pendingFulfillmentMethod}
-              prefillDropOffLocation={pendingDropOffLocation}
+              prefillFulfillmentMethod={pendingListingEdit ? null : pendingFulfillmentMethod}
+              prefillDropOffLocation={pendingListingEdit ? null : pendingDropOffLocation}
               onFulfillmentPrefillHandled={() => setPendingFulfillmentMethod(null)}
               onDropOffPrefillHandled={() => setPendingDropOffLocation(null)}
-              initialIntent={pendingListingIntent}
+              initialIntent={pendingListingEdit ? null : pendingListingIntent}
               onIntentHandled={() => setPendingListingIntent(null)}
+              editingListing={pendingListingEdit}
+              onEditingHandled={() => setPendingListingEdit(null)}
             />
           </TabsContent>
 

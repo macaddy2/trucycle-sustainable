@@ -20,7 +20,7 @@ import { QRCodeDisplay, type QRCodeData } from './QRCode'
 import type { ListingValuation, ManagedListing } from '@/types/listings'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { uploadImageToCloudinary } from '@/lib/cloudinary'
-import { createItem } from '@/lib/api'
+import { createItem, updateItem } from '@/lib/api'
 import { LocationSelector, type LocationValue } from '@/components/LocationSelector'
 
 const CONDITIONS = [
@@ -200,6 +200,22 @@ export type ListingCompletionDetails = {
   qrCode: QRCodeData
 }
 
+export interface ListingEditDraft {
+  itemId: string
+  title: string
+  description?: string
+  category: string
+  condition?: 'excellent' | 'good' | 'fair' | 'poor'
+  actionType: 'exchange' | 'donate' | 'recycle'
+  fulfillmentMethod?: 'pickup' | 'dropoff'
+  photos?: string[]
+  location?: string
+  dropOffLocation?: DropOffLocation | null
+  handoverNotes?: string
+  preferPartnerSupport?: boolean
+  postcode?: string
+}
+
 export interface ItemListingFormProps {
   onComplete?: (details: ListingCompletionDetails) => void
   prefillFulfillmentMethod?: 'pickup' | 'dropoff' | null
@@ -208,6 +224,8 @@ export interface ItemListingFormProps {
   onDropOffPrefillHandled?: () => void
   initialIntent?: 'exchange' | 'donate' | 'recycle' | null
   onIntentHandled?: () => void
+  editingListing?: ListingEditDraft | null
+  onEditingHandled?: () => void
 }
 
 export function ItemListingForm({
@@ -217,7 +235,9 @@ export function ItemListingForm({
   onFulfillmentPrefillHandled,
   onDropOffPrefillHandled,
   initialIntent,
-  onIntentHandled
+  onIntentHandled,
+  editingListing,
+  onEditingHandled
 }: ItemListingFormProps) {
   const [user] = useKV('current-user', null)
   // Removed local demo listings persistence
@@ -275,6 +295,7 @@ export function ItemListingForm({
   const [pickupLocation, setPickupLocation] = useState<{ lat?: number; lng?: number; label?: string; postcode?: string } | null>(null)
   const [generatedQRCode, setGeneratedQRCode] = useState<QRCodeData | null>(null)
   const [lastCreatedListing, setLastCreatedListing] = useState<CreatedListing | null>(null)
+  const [editingListingId, setEditingListingId] = useState<string | null>(null)
   const [classificationResult, setClassificationResult] = useState<ListingClassificationResult | null>(null)
   const [classificationLoading, setClassificationLoading] = useState(false)
   const [moderationResult, setModerationResult] = useState<ModerationResult | null>(null)
@@ -310,6 +331,63 @@ export function ItemListingForm({
     const parts = [user.area, user.district, user.postcode].filter((segment): segment is string => Boolean(segment))
     return parts.join(', ')
   }, [user])
+
+  useEffect(() => {
+    if (!editingListing) {
+      return
+    }
+
+    const actionType = editingListing.actionType
+    const method: 'pickup' | 'dropoff' = editingListing.fulfillmentMethod
+      ? editingListing.fulfillmentMethod
+      : actionType === 'donate'
+        ? 'dropoff'
+        : 'pickup'
+
+    const normalizeCondition = (value?: string): 'excellent' | 'good' | 'fair' | 'poor' => {
+      const normal = String(value || '').toLowerCase()
+      if (normal === 'excellent' || normal === 'like_new' || normal === 'new') return 'excellent'
+      if (normal === 'good') return 'good'
+      if (normal === 'poor') return 'poor'
+      return 'fair'
+    }
+
+    setQuickStartIntent(actionType)
+    setQuickStartFulfillment(method)
+    setShowQuickStart(false)
+    setFormData({
+      title: editingListing.title ?? '',
+      description: editingListing.description ?? '',
+      category: editingListing.category || DEFAULT_CATEGORY_BY_INTENT[actionType],
+      condition: normalizeCondition(editingListing.condition),
+      actionType,
+      photos: editingListing.photos ?? [],
+      location: method === 'pickup' ? (editingListing.location ?? '') : '',
+      contactMethod: 'platform',
+      fulfillmentMethod: method,
+      dropOffLocation: method === 'dropoff' ? editingListing.dropOffLocation ?? null : null,
+      handoverNotes: editingListing.handoverNotes ?? '',
+      preferPartnerSupport:
+        typeof editingListing.preferPartnerSupport === 'boolean'
+          ? editingListing.preferPartnerSupport
+          : actionType === 'donate'
+    })
+
+    if (method === 'pickup') {
+      setPickupLocation({
+        label: editingListing.location ?? '',
+        postcode: editingListing.postcode,
+      })
+    } else {
+      setPickupLocation(null)
+    }
+
+    setEditingListingId(editingListing.itemId)
+    setCurrentStep(1)
+    setGeneratedQRCode(null)
+    setLastCreatedListing(null)
+    onEditingHandled?.()
+  }, [editingListing, onEditingHandled])
   const totalSteps = 2
   const progress = (currentStep / totalSteps) * 100
   const { title, description, category, condition, photos } = formData
@@ -529,6 +607,11 @@ export function ItemListingForm({
       return
     }
 
+    if (editingListingId) {
+      onIntentHandled?.()
+      return
+    }
+
     setQuickStartIntent(initialIntent)
     const defaultMethod: 'pickup' | 'dropoff' = initialIntent === 'donate' ? 'dropoff' : 'pickup'
     setQuickStartFulfillment(defaultMethod)
@@ -542,7 +625,7 @@ export function ItemListingForm({
     }))
     handleFulfillmentSelect(defaultMethod)
     onIntentHandled?.()
-  }, [initialIntent, handleFulfillmentSelect, onIntentHandled, defaultPickupAddress])
+  }, [initialIntent, handleFulfillmentSelect, onIntentHandled, defaultPickupAddress, editingListingId])
 
   const handleDropOffSelection = (location: DropOffLocation) => {
     setFormData(prev => ({
@@ -557,14 +640,22 @@ export function ItemListingForm({
 
   useEffect(() => {
     if (!prefillFulfillmentMethod) return
+    if (editingListingId) {
+      onFulfillmentPrefillHandled?.()
+      return
+    }
 
     setQuickStartFulfillment(prefillFulfillmentMethod)
     handleFulfillmentSelect(prefillFulfillmentMethod)
     onFulfillmentPrefillHandled?.()
-  }, [prefillFulfillmentMethod, handleFulfillmentSelect, onFulfillmentPrefillHandled])
+  }, [prefillFulfillmentMethod, handleFulfillmentSelect, onFulfillmentPrefillHandled, editingListingId])
 
   useEffect(() => {
     if (!prefillDropOffLocation) return
+    if (editingListingId) {
+      onDropOffPrefillHandled?.()
+      return
+    }
 
     setFormData(prev => ({
       ...prev,
@@ -575,7 +666,7 @@ export function ItemListingForm({
     setQuickStartFulfillment('dropoff')
     setShowDropOffSelector(false)
     onDropOffPrefillHandled?.()
-  }, [prefillDropOffLocation, onDropOffPrefillHandled])
+  }, [prefillDropOffLocation, onDropOffPrefillHandled, editingListingId])
 
   // No forced fulfillment changes by action type
 
@@ -616,6 +707,7 @@ export function ItemListingForm({
     setIsSubmitting(true)
 
     try {
+      const isEditingExistingListing = Boolean(editingListingId)
       const carbonImpact = estimatedCarbonImpact ?? 2
       const listingValuation = valuationSummary
         ? {
@@ -709,11 +801,14 @@ export function ItemListingForm({
         weight_kg: 0,
       }
 
-      const created = await createItem(payload)
+      const response = isEditingExistingListing
+        ? await updateItem(editingListingId!, payload)
+        : await createItem(payload)
 
-      const server = created?.data
+      const server = response?.data
+      const listingId = String(server?.id || editingListingId || `listing-${Date.now()}`)
       const newListing: CreatedListing = {
-        id: String(server?.id || `listing-${Date.now()}`),
+        id: listingId,
         ...formData,
         fulfillmentMethod,
         dropOffLocation: formData.dropOffLocation,
@@ -727,30 +822,33 @@ export function ItemListingForm({
         rewardPoints,
         moderation,
         aiClassification: classification,
-        co2Impact: typeof server?.estimated_co2_saved_kg === 'number' ? server!.estimated_co2_saved_kg! : carbonImpact
+        co2Impact: typeof server?.estimated_co2_saved_kg === 'number' ? server!.estimated_co2_saved_kg! : carbonImpact,
+        photos: uploadedPhotoUrls,
       }
 
       // Do not persist to local demo stores; rely on API-driven views
 
-      toast.success('Item listed successfully!')
+      toast.success(isEditingExistingListing ? 'Listing updated successfully!' : 'Item listed successfully!')
 
-      const emailResults = await sendListingSubmissionEmails(
-        { name: user.name || 'Donor', email: user.email },
-        formData.fulfillmentMethod === 'dropoff' ? formData.dropOffLocation ?? null : null,
-        {
-          id: newListing.id,
-          title: newListing.title,
-          category: newListing.category,
-          description: newListing.description,
-          fulfillmentMethod: formData.fulfillmentMethod,
-          dropOffLocation: formData.dropOffLocation
+      if (!isEditingExistingListing) {
+        const emailResults = await sendListingSubmissionEmails(
+          { name: user.name || 'Donor', email: user.email },
+          formData.fulfillmentMethod === 'dropoff' ? formData.dropOffLocation ?? null : null,
+          {
+            id: newListing.id,
+            title: newListing.title,
+            category: newListing.category,
+            description: newListing.description,
+            fulfillmentMethod: formData.fulfillmentMethod,
+            dropOffLocation: formData.dropOffLocation
+          }
+        )
+
+        if (emailResults.length > 0) {
+          toast.success('Email alerts sent to donor and partner shop')
+        } else {
+          toast.info('Listing saved. Email alerts could not be sent automatically.')
         }
-      )
-
-      if (emailResults.length > 0) {
-        toast.success('Email alerts sent to donor and partner shop')
-      } else {
-        toast.info('Listing saved. Email alerts could not be sent automatically.')
       }
 
       const qrCodeData: QRCodeData = {
@@ -762,7 +860,7 @@ export function ItemListingForm({
         itemImage: newListing.photos?.[0],
         userId: user.id,
         userName: user.name || 'Anonymous User',
-        transactionId: `TC${Date.now()}${Math.random().toString(36).slice(-6).toUpperCase()}`,
+        transactionId: listingId,
         dropOffLocation: formData.fulfillmentMethod === 'dropoff' && formData.dropOffLocation
           ? `${formData.dropOffLocation.name}, ${formData.dropOffLocation.postcode}`
           : undefined,
@@ -770,15 +868,18 @@ export function ItemListingForm({
           category: formData.category,
           condition: formData.condition,
           co2Impact: carbonImpact,
-          createdAt: new Date().toISOString(),
+          createdAt: server?.created_at || new Date().toISOString(),
           expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
           actionType: formData.actionType || 'donate'
         },
-        status: 'active'
+        status: 'active',
+        qrImageUrl: server?.qr_code || undefined
       }
 
       setGeneratedQRCode(qrCodeData)
       setLastCreatedListing(newListing)
+
+      setEditingListingId(null)
 
       // Photos now point to permanent Cloudinary URLs
 

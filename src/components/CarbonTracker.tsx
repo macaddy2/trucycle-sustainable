@@ -57,8 +57,6 @@ export function CarbonTracker() {
     return () => { cancelled = true }
   }, [setCarbonData])
 
-  const progressPercentage = Math.min((carbonData?.currentMonthSavings || 0) / (carbonData?.monthlyGoal || 1) * 100, 100)
-
   const achievements = [
     {
       title: 'First Exchange',
@@ -146,40 +144,6 @@ export function CarbonTracker() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Monthly Goal Progress */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-h3">Monthly CO2 Savings Goal</CardTitle>
-          <CardDescription>
-            Track your progress towards this month's environmental goal
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-small text-muted-foreground">
-                {carbonData?.currentMonthSavings || 0}kg of {carbonData?.monthlyGoal || 100}kg goal
-              </span>
-              <span className="text-small font-medium">
-                {Math.round(progressPercentage)}%
-              </span>
-            </div>
-            <Progress value={progressPercentage} className="h-2" />
-            <div className="text-center">
-              {progressPercentage >= 100 ? (
-                <Badge className="bg-green-600 text-white">
-                  100% Goal Achieved!
-                </Badge>
-              ) : (
-                <p className="text-small text-muted-foreground">
-                  {Math.max(0, (carbonData?.monthlyGoal || 100) - (carbonData?.currentMonthSavings || 0))}kg to go
-                </p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Achievements */}
       <Card>

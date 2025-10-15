@@ -19,6 +19,7 @@ interface QRCodeData {
   userName: string
   transactionId: string
   dropOffLocation?: string
+  qrImageUrl?: string
   metadata: {
     category: string
     condition: string
@@ -67,6 +68,11 @@ export function QRCodeDisplay({ qrData, onClose }: QRCodeDisplayProps) {
   const [qrImageUrl, setQrImageUrl] = useState<string>('')
 
   useEffect(() => {
+    if (qrData.qrImageUrl) {
+      setQrImageUrl(qrData.qrImageUrl)
+      return
+    }
+
     // Create QR code data string
     const qrDataString = JSON.stringify({
       transactionId: qrData.transactionId,
@@ -227,11 +233,11 @@ export function QRCodeDisplay({ qrData, onClose }: QRCodeDisplayProps) {
                   <img
                     src={qrImageUrl}
                     alt="QR Code"
-                    className="h-60 w-60"
+                    className="h-64 w-64 max-w-full"
                     onError={() => toast.error('Failed to load QR code')}
                   />
                 ) : (
-                  <div className="h-60 w-60 bg-muted rounded-lg flex items-center justify-center">
+                  <div className="h-64 w-64 max-w-full bg-muted rounded-lg flex items-center justify-center">
                     <QrCode size={64} className="text-muted-foreground animate-pulse" />
                   </div>
                 )}

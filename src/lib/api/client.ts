@@ -16,6 +16,8 @@ import type {
   CreateItemDto,
   SearchItemsResponse,
   CreateItemResponse,
+  UpdateItemDto,
+  UpdateItemResponse,
   PublicItem,
   MyListedItemsResponse,
   MyCollectedItemsResponse,
@@ -235,6 +237,14 @@ export async function createItem(dto: CreateItemDto) {
   // IMPORTANT: do NOT include estimated_co2_saved_kg (backend calculates it)
   return request<ApiEnvelope<CreateItemResponse>>('/items', {
     method: 'POST',
+    auth: true,
+    body: dto,
+  })
+}
+
+export async function updateItem(id: string, dto: UpdateItemDto) {
+  return request<ApiEnvelope<UpdateItemResponse>>(`/items/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
     auth: true,
     body: dto,
   })

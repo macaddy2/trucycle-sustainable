@@ -149,6 +149,26 @@ export interface CreateItemDto {
   // IMPORTANT: Intentionally omit estimated_co2_saved_kg (backend computes it)
 }
 
+export interface UpdateItemDto {
+  title?: string
+  description?: string
+  condition?: 'new' | 'like_new' | 'good' | 'fair' | 'poor'
+  category?: string
+  address_line?: string
+  postcode?: string
+  images?: CreateItemImageDto[]
+  dropoff_location_id?: string
+  delivery_preferences?: string
+  metadata?: Record<string, unknown>
+  size_unit?: SizeUnit
+  size_length?: number
+  size_breadth?: number
+  size_height?: number
+  weight_kg?: number
+  estimated_co2_saved_kg?: number
+  pickup_option?: PickupOption
+}
+
 export interface PublicItemOwner {
   id: string
   name?: string | null
@@ -202,6 +222,10 @@ export interface CreateItemResponse {
   }
   qr_code?: string | null
   created_at?: string
+}
+
+export interface UpdateItemResponse extends CreateItemResponse {
+  updated_at?: string
 }
 
 export interface MyListedItem {

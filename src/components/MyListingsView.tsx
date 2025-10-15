@@ -6,19 +6,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ChatCircle, CheckCircle, Clock, Package, PencilSimpleLine, Plus, ShieldCheck, X } from '@phosphor-icons/react'
-import { Textarea } from '@/components/ui/textarea'
+import { ChatCircle, CheckCircle, Clock, MapPin, Package, PencilSimpleLine, Phone, Plus, QrCode, ShieldCheck } from '@phosphor-icons/react'
 import { useMessaging, useExchangeManager, useNotifications } from '@/hooks'
-import { listMyItems, listMyCollectedItems, createOrFindRoom, collectItem } from '@/lib/api'
+import { listMyItems, listMyCollectedItems, createOrFindRoom, collectItem, getItemById } from '@/lib/api'
 import { messageSocket } from '@/lib/messaging/socket'
 import ListingsSkeleton from '@/components/skeletons/ListingsSkeleton'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import type { ManagedListing } from '@/types/listings'
+import type { ListingEditDraft } from './ItemListingForm'
+import type { PublicItem } from '@/lib/api/types'
+import type { DropOffLocation } from './dropOffLocations'
 
 interface UserProfile {
   id: string
@@ -30,9 +28,9 @@ interface UserProfile {
 
 interface MyListingsViewProps {
   onAddNewItem?: () => void
-  defaultView?: 'table' | 'card'
   variant?: 'page' | 'dashboard'
   onOpenMessages?: (options?: { itemId?: string; chatId?: string; initialView?: 'chats' | 'requests' }) => void
+  onEditListing?: (draft: ListingEditDraft) => void
 }
 
 
@@ -56,33 +54,6 @@ const REQUEST_STATUS_BADGE: Record<ClaimRequest['status'], { label: string; vari
   completed: { label: 'Collected', variant: 'default' },
 }
 
-const CATEGORY_OPTIONS = [
-  'Electronics',
-  'Furniture',
-  'Clothing',
-  'Books',
-  'Kitchen Items',
-  'Sports Equipment',
-  'Home Decor',
-  'Other',
-]
-
-const ACTION_OPTIONS: Array<{ value: ManagedListing['actionType']; label: string }> = [
-  { value: 'exchange', label: 'Exchange' },
-  { value: 'donate', label: 'Donate' },
-  { value: 'recycle', label: 'Recycle' },
-]
-
-type EditableListingFields = {
-  title: string
-  description?: string
-  category: string
-  actionType: ManagedListing['actionType']
-  fulfillmentMethod?: ManagedListing['fulfillmentMethod']
-  location?: string
-  dropOffLocation?: ManagedListing['dropOffLocation']
-}
-
 const formatDate = (value: string) => {
   const date = new Date(value)
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -103,9 +74,9 @@ const formatRelativeTime = (value: string) => {
 
 export function MyListingsView({
   onAddNewItem,
-  defaultView = 'table',
   variant = 'page',
   onOpenMessages,
+  onEditListing,
 }: MyListingsViewProps) {
   const [currentUser, setCurrentUser] = useKV<UserProfile | null>('current-user', null)
   const [listings, setListings] = useKV<ManagedListing[]>('user-listings', [])
@@ -114,17 +85,14 @@ export function MyListingsView({
   const {
     getRequestsForItem,
     confirmClaimRequest,
-    completeClaimRequest,
-    pendingRequestCountByItem,
   } = useExchangeManager()
   const { addNotification } = useNotifications()
-  const initialView = variant === 'dashboard' ? 'card' : defaultView
-  const [viewMode, setViewMode] = useState<'table' | 'card'>(initialView)
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
-  const [editForm, setEditForm] = useState<EditableListingFields | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
+  const [selectedItemDetails, setSelectedItemDetails] = useState<PublicItem | null>(null)
+  const [detailsLoading, setDetailsLoading] = useState(false)
+  const [detailsError, setDetailsError] = useState<string | null>(null)
 
   const sortedListings = useMemo(() => {
     // Show all items for donors and collectors; order by newest first
@@ -137,22 +105,33 @@ export function MyListingsView({
   const listingRequests = useMemo(() => (selectedListing ? getRequestsForItem(selectedListing.id) : []), [selectedListing, getRequestsForItem])
 
   useEffect(() => {
-    if (selectedListing) {
-      setEditForm({
-        title: selectedListing.title,
-        description: selectedListing.description ?? '',
-        category: selectedListing.category,
-        actionType: selectedListing.actionType,
-        fulfillmentMethod: selectedListing.fulfillmentMethod,
-        location: selectedListing.location ?? '',
-        dropOffLocation: selectedListing.dropOffLocation,
-      })
-      setIsEditing(false)
-    } else {
-      setEditForm(null)
-      setIsEditing(false)
+    if (!showDetailModal || !selectedListingId) {
+      return
     }
-  }, [selectedListing])
+
+    let cancelled = false
+    setDetailsLoading(true)
+    setDetailsError(null)
+
+    getItemById(selectedListingId)
+      .then(res => {
+        if (cancelled) return
+        const item = res?.data ?? null
+        setSelectedItemDetails(item)
+      })
+      .catch((error: any) => {
+        if (cancelled) return
+        setSelectedItemDetails(null)
+        setDetailsError(typeof error?.message === 'string' ? error.message : 'Unable to load item details')
+      })
+      .finally(() => {
+        if (!cancelled) setDetailsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [showDetailModal, selectedListingId])
 
   const openMessages = (options?: { itemId?: string; chatId?: string; initialView?: 'chats' | 'requests' }) => {
     if (onOpenMessages) {
@@ -160,120 +139,6 @@ export function MyListingsView({
     } else {
       toast.info('Open the message center from the header to continue your conversation.')
     }
-  }
-
-  const handleEditFieldChange = (field: keyof EditableListingFields, value: unknown) => {
-    setEditForm(prev => {
-      if (!prev) return prev
-      const next: EditableListingFields = { ...prev }
-
-      if (field === 'title' || field === 'description' || field === 'category' || field === 'location') {
-        next[field] = typeof value === 'string' ? value : ''
-      }
-
-      if (field === 'actionType') {
-        const actionValue = value as ManagedListing['actionType']
-        next.actionType = actionValue
-        if (actionValue === 'donate') {
-          next.fulfillmentMethod = 'dropoff'
-        } else if (next.fulfillmentMethod === 'dropoff') {
-          next.fulfillmentMethod = 'pickup'
-          next.dropOffLocation = undefined
-        }
-      }
-
-      if (field === 'fulfillmentMethod') {
-        const method = value as ManagedListing['fulfillmentMethod'] | undefined
-        next.fulfillmentMethod = method
-        if (method !== 'dropoff') {
-          next.dropOffLocation = undefined
-        }
-      }
-
-      return next
-    })
-  }
-
-  const handleDropOffFieldChange = (field: 'name' | 'postcode' | 'address', value: string) => {
-    setEditForm(prev => {
-      if (!prev) return prev
-      const currentLocation = prev.dropOffLocation ?? { name: '', postcode: '', address: '' }
-      return {
-        ...prev,
-        dropOffLocation: {
-          ...currentLocation,
-          [field]: value,
-        },
-      }
-    })
-  }
-
-  const handleCancelEdit = () => {
-    if (!selectedListing) {
-      setEditForm(null)
-      setIsEditing(false)
-      return
-    }
-
-    setEditForm({
-      title: selectedListing.title,
-      description: selectedListing.description ?? '',
-      category: selectedListing.category,
-      actionType: selectedListing.actionType,
-      fulfillmentMethod: selectedListing.fulfillmentMethod,
-      location: selectedListing.location ?? '',
-      dropOffLocation: selectedListing.dropOffLocation,
-    })
-    setIsEditing(false)
-  }
-
-  const handleSaveEdit = () => {
-    if (!selectedListing || !editForm) return
-
-    const trimmedTitle = editForm.title.trim()
-    if (!trimmedTitle) {
-      toast.error('Add a title before saving changes')
-      return
-    }
-
-    if (!editForm.category) {
-      toast.error('Select a category before saving changes')
-      return
-    }
-
-    const finalFulfillment = editForm.fulfillmentMethod ?? selectedListing.fulfillmentMethod
-    const trimmedDescription = (editForm.description ?? '').trim()
-    const trimmedLocation = (editForm.location ?? '').trim()
-    const updatedListing: Partial<ManagedListing> = {
-      title: trimmedTitle,
-      description: trimmedDescription,
-      category: editForm.category,
-      actionType: editForm.actionType,
-      fulfillmentMethod: finalFulfillment,
-    }
-
-    if (finalFulfillment === 'dropoff') {
-      updatedListing.location = undefined
-      updatedListing.dropOffLocation = editForm.dropOffLocation ?? selectedListing.dropOffLocation
-    } else {
-      updatedListing.location = trimmedLocation
-      updatedListing.dropOffLocation = undefined
-    }
-
-    setListings(prev => prev.map(item => (
-      item.id === selectedListing.id
-        ? { ...item, ...updatedListing }
-        : item
-    )))
-
-    setGlobalListings(prev => prev.map(item => (
-      item.id === selectedListing.id
-        ? { ...item, ...updatedListing }
-        : item
-    )))
-
-    toast.success('Listing updated successfully')
-    setIsEditing(false)
   }
 
   const isCollector = currentUser?.userType === 'collector'
@@ -319,8 +184,103 @@ export function MyListingsView({
 
   const handleOpenListingDetails = (listingId: string) => {
     setSelectedListingId(listingId)
+    setSelectedItemDetails(null)
+    setDetailsError(null)
     setShowDetailModal(true)
   }
+
+  const mapConditionForDraft = (value?: string): ListingEditDraft['condition'] => {
+    const normal = String(value || '').toLowerCase()
+    if (normal === 'excellent' || normal === 'like_new' || normal === 'new') return 'excellent'
+    if (normal === 'good') return 'good'
+    if (normal === 'poor') return 'poor'
+    return 'fair'
+  }
+
+  const deriveDropOffLocation = (item: ManagedListing, detail: PublicItem | null): DropOffLocation | null => {
+    if (item.fulfillmentMethod !== 'dropoff') return null
+
+    const existing = item.dropOffLocation as any
+    if (existing && typeof existing === 'object' && 'coordinates' in existing) {
+      return existing as DropOffLocation
+    }
+
+    const latitude = typeof detail?.location?.latitude === 'number' ? detail.location.latitude : 51.5072
+    const longitude = typeof detail?.location?.longitude === 'number' ? detail.location.longitude : -0.1276
+
+    return {
+      id: `${item.id}-dropoff`,
+      name: existing?.name || detail?.location?.address_line || 'Partner shop',
+      address: existing?.address || detail?.location?.address_line || '',
+      postcode: existing?.postcode || detail?.location?.postcode || '',
+      distance: existing?.distance || '—',
+      openHours: existing?.openHours || 'Hours shared after confirmation',
+      phone: existing?.phone || 'Contact provided after booking',
+      acceptedItems: Array.isArray(existing?.acceptedItems) ? existing.acceptedItems : [],
+      specialServices: Array.isArray(existing?.specialServices) ? existing.specialServices : [],
+      coordinates: { lat: latitude, lng: longitude },
+    }
+  }
+
+  const handleEditInForm = () => {
+    if (!selectedListing || !selectedListingId || !onEditListing) {
+      toast.error('Select a listing to edit')
+      return
+    }
+    if (detailsLoading) {
+      toast.info('Loading item details…')
+      return
+    }
+    const detail = selectedItemDetails
+    if (!detail) {
+      toast.error('Unable to load item details for editing')
+      return
+    }
+
+    const actionType = (detail.pickup_option || selectedListing.actionType) as ListingEditDraft['actionType']
+    const fulfillmentMethod: ManagedListing['fulfillmentMethod'] = actionType === 'donate' ? 'dropoff' : 'pickup'
+    const photosFromDetail = Array.isArray(detail.images) ? detail.images.map(img => img?.url).filter(Boolean) : []
+    const dropOffLocation = deriveDropOffLocation(selectedListing, detail)
+
+    const draft: ListingEditDraft = {
+      itemId: selectedListingId,
+      title: detail.title || selectedListing.title,
+      description: detail.description || selectedListing.description || '',
+      category: detail.category || selectedListing.category,
+      condition: mapConditionForDraft(detail.condition || selectedListing.condition),
+      actionType,
+      fulfillmentMethod,
+      photos: photosFromDetail.length > 0 ? photosFromDetail : selectedListing.photos ?? [],
+      location: fulfillmentMethod === 'pickup'
+        ? (detail.location?.address_line || selectedListing.location || '')
+        : undefined,
+      dropOffLocation,
+      handoverNotes: selectedListing.handoverNotes,
+      preferPartnerSupport: selectedListing.preferPartnerSupport,
+      postcode: detail.location?.postcode,
+    }
+
+    onEditListing(draft)
+    setShowDetailModal(false)
+    setSelectedListingId(null)
+    setSelectedItemDetails(null)
+  }
+
+  const detailItem = selectedItemDetails
+  const dropOffLocationDetail = useMemo(() => (
+    selectedListing ? deriveDropOffLocation(selectedListing, detailItem) : null
+  ), [selectedListing, detailItem])
+  const qrImageUrl = detailItem?.qr_code ?? null
+  const galleryImages = detailItem
+    ? detailItem.images?.map((img) => img?.url).filter(Boolean) ?? []
+    : selectedListing?.photos ?? []
+  const detailDescription = detailItem?.description?.trim() || selectedListing?.description?.trim() || 'No description added yet. Share a few highlights to attract collectors.'
+  const handoffDisplay = selectedListing?.fulfillmentMethod === 'dropoff'
+    ? (selectedListing.dropOffLocation
+        ? `${selectedListing.dropOffLocation.name}${selectedListing.dropOffLocation.postcode ? ` — ${selectedListing.dropOffLocation.postcode}` : ''}`
+        : detailItem?.location?.address_line || 'Partner location shared after confirmation')
+    : (selectedListing?.location || detailItem?.location?.address_line || 'Pickup location to be confirmed in chat')
+  const isDonation = selectedListing?.actionType === 'donate'
 
   const handleOpenConversation = async (request: ClaimRequest) => {
     let room: any = null
@@ -518,106 +478,24 @@ export function MyListingsView({
   )
 
   const TableView = (
-    <>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Item</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Listed</TableHead>
-            <TableHead>Reward</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sortedListings.map(listing => {
-            const status = statusCopy[listing.status]
-            const chat = getChatForItem(listing.id)
-            const reward = listing.rewardPoints ?? listing.valuation?.rewardPoints
-            const requests = getRequestsForItem(listing.id)
-            const approvedRequest = requests.find(r => r.status === 'approved')
-            const collectorsBadgeText = listing.status === 'collected'
-              ? 'Collected'
-              : approvedRequest
-                ? 'Collector approved'
-                : (requests.length > 0
-                    ? `${requests.length} collector${requests.length === 1 ? '' : 's'}`
-                    : 'Waiting for collectors')
-            const collectorsBadgeVariant: any = listing.status === 'collected' ? 'default' : (approvedRequest ? 'secondary' : 'outline')
-            return (
-              <TableRow key={listing.id}>
-                <TableCell>
-                  <div className="space-y-1">
-                    <p className="font-medium">{listing.title}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{listing.category}</p>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="space-y-1">
-                    <Badge variant={status.tone === 'default' ? 'default' : status.tone} className="capitalize">
-                      {status.label}
-                    </Badge>
-                    {listing.aiClassification && (
-                      <p className="text-[11px] text-muted-foreground">
-                        {CLASSIFICATION_TEXT[listing.aiClassification.recommendedAction]} ({listing.aiClassification.confidence} confidence)
-                      </p>
-                    )}
-                    {listing.moderation?.status === 'flagged' && (
-                      <p className="text-[11px] text-destructive">{listing.moderation.message}</p>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="capitalize">{listing.actionType}</TableCell>
-                <TableCell>
-                  <span className="flex items-center gap-1 text-sm">
-                    <Clock size={12} />
-                    {formatDate(listing.createdAt)}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  {typeof reward === 'number' ? (
-                    <span className="text-sm font-medium text-primary">+{reward} pts</span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">Pending</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right space-x-2">
-                  {chat ? (
-                    <Button variant="outline" size="sm" onClick={() => openMessages({ chatId: chat.id })}>
-                      <ChatCircle size={14} className="mr-2" />
-                      Open chat
-                    </Button>
-                  ) : (
-                    <Badge variant={collectorsBadgeVariant} className="text-xs">{collectorsBadgeText}</Badge>
-                  )}
-                  {listing.status === 'claimed' && (
-                    <Button size="sm" onClick={() => handleMarkCollected(listing.id)}>
-                      <CheckCircle size={14} className="mr-2" />
-                      Mark collected
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-        <TableCaption>
-          Approval completes the hand-off. You can continue chatting for coordination.
-        </TableCaption>
-      </Table>
-    </>
-  )
-
-  const CardView = (
-    <div className="grid gap-4 md:grid-cols-2">
+  <Table>
+    <TableHeader>
+      <TableRow>
+        <TableHead>Item</TableHead>
+        <TableHead>Status</TableHead>
+        <TableHead>Type</TableHead>
+        <TableHead>Listed</TableHead>
+        <TableHead>Reward</TableHead>
+        <TableHead className="text-right">Actions</TableHead>
+      </TableRow>
+    </TableHeader>
+    <TableBody>
       {sortedListings.map(listing => {
         const status = statusCopy[listing.status]
         const chat = getChatForItem(listing.id)
         const reward = listing.rewardPoints ?? listing.valuation?.rewardPoints
         const requests = getRequestsForItem(listing.id)
         const approvedRequest = requests.find(r => r.status === 'approved')
-        const pendingRequestsCount = pendingRequestCountByItem[listing.id] ?? 0
         const collectorsBadgeText = listing.status === 'collected'
           ? 'Collected'
           : approvedRequest
@@ -625,154 +503,114 @@ export function MyListingsView({
             : (requests.length > 0
                 ? `${requests.length} collector${requests.length === 1 ? '' : 's'}`
                 : 'Waiting for collectors')
-        const collectorsBadgeVariant: any = listing.status === 'collected' ? 'default' : (approvedRequest ? 'secondary' : 'outline')
+        const collectorsBadgeVariant: any = listing.status === 'collected'
+          ? 'default'
+          : (approvedRequest ? 'secondary' : 'outline')
         return (
-          <Card key={listing.id} className="border-dashed">
-            <CardHeader className="space-y-1">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="text-base">{listing.title}</CardTitle>
-                  <CardDescription className="capitalize">{listing.category} â¢ {listing.actionType}</CardDescription>
-                </div>
+          <TableRow
+            key={listing.id}
+            className="cursor-pointer transition-colors hover:bg-muted/40"
+            onClick={() => handleOpenListingDetails(listing.id)}
+          >
+            <TableCell>
+              <div className="space-y-1">
+                <p className="font-medium">{listing.title}</p>
+                <p className="text-xs text-muted-foreground capitalize">{listing.category}</p>
+              </div>
+            </TableCell>
+            <TableCell>
+              <div className="space-y-1">
                 <Badge variant={status.tone === 'default' ? 'default' : status.tone} className="capitalize">
                   {status.label}
                 </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="flex items-center gap-1"><Clock size={12} /> Listed {formatDate(listing.createdAt)}</span>
-                {listing.fulfillmentMethod && (
-                  <span className="capitalize">{listing.fulfillmentMethod} ready</span>
+                {listing.aiClassification && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {CLASSIFICATION_TEXT[listing.aiClassification.recommendedAction]} ({listing.aiClassification.confidence} confidence)
+                  </p>
+                )}
+                {listing.moderation?.status === 'flagged' && (
+                  <p className="text-[11px] text-destructive">{listing.moderation.message}</p>
                 )}
               </div>
-              {(listing.aiClassification || listing.moderation) && (
-                <div className="space-y-2 text-xs">
-                  {listing.aiClassification && (
-                    <div className="rounded-md border border-primary/20 bg-primary/5 p-3 space-y-1">
-                      <p className="font-semibold text-primary">{CLASSIFICATION_TEXT[listing.aiClassification.recommendedAction]}</p>
-                      <p className="text-muted-foreground">{listing.aiClassification.reasoning}</p>
-                    </div>
-                  )}
-                  {listing.moderation && (
-                    <div
-                      className={
-                        listing.moderation.status === 'flagged'
-                          ? 'rounded-md border p-3 space-y-1 border-destructive/40 bg-destructive/10 text-destructive'
-                          : 'rounded-md border p-3 space-y-1 border-secondary/40 bg-secondary/10'
-                      }
-                    >
-                      <p className="font-semibold">
-                        {listing.moderation.status === 'flagged' ? 'Flagged for review' : 'Image check passed'}
-                      </p>
-                      <p className="text-muted-foreground">{listing.moderation.message}</p>
-                      {listing.moderation.labels.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {chat ? (
-                  <Button variant="outline" size="sm" onClick={() => openMessages({ chatId: chat.id })}>
-                    <ChatCircle size={14} className="mr-2" />
-                    Continue chat
-                  </Button>
-                ) : (
-                  <Badge variant={collectorsBadgeVariant}>{collectorsBadgeText}</Badge>
-                )}
-                {listing.status === 'claimed' && (
-                  <Button size="sm" onClick={() => handleMarkCollected(listing.id)}>
-                    <CheckCircle size={14} className="mr-2" />
-                    Mark collected
-                  </Button>
-                )}
-              </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+            </TableCell>
+            <TableCell className="capitalize">{listing.actionType}</TableCell>
+            <TableCell>
+              <span className="flex items-center gap-1 text-sm">
+                <Clock size={12} />
+                {formatDate(listing.createdAt)}
+              </span>
+            </TableCell>
+            <TableCell>
+              {typeof reward === 'number' ? (
+                <span className="text-sm font-medium text-primary">+{reward} pts</span>
+              ) : (
+                <span className="text-xs text-muted-foreground">Pending</span>
               )}
-              <div className="rounded-md bg-muted/60 p-3 text-xs text-muted-foreground space-y-1">
-                <p>Reward on completion:{' '} 
-                  {typeof reward === 'number' ? <span className="font-medium text-primary">+{reward} pts</span> : 'Pending'}
-                </p>
-                {listing.valuation?.estimatedValue && (
-                  <p>Estimated value: £{listing.valuation.estimatedValue.toFixed(2)}</p>
-                )}
-                <p>You confirm the collector before sharing hand-off details.</p>
-                <div className="flex items-center justify-between text-xs">
-                  {requests.length > 0 ? (
-                    <span className="text-muted-foreground">
-                      {pendingRequestsCount > 0
-                        ? `${pendingRequestsCount} pending request${pendingRequestsCount === 1 ? '' : 's'}`
-                        : 'All requests managed'}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">No collector requests yet</span>
-                  )}
-                  <Button variant="ghost" size="sm" onClick={() => handleOpenListingDetails(listing.id)}>Details</Button>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {chat ? (
-                  <Button variant="outline" size="sm" onClick={() => openMessages({ chatId: chat.id })}>
-                    <ChatCircle size={14} className="mr-2" />
-                    Continue chat
-                  </Button>
-                ) : (
-                  <Badge variant={collectorsBadgeVariant}>{collectorsBadgeText}</Badge>
-                )}
-                {listing.status === 'claimed' && (
-                  <Button size="sm" onClick={() => handleMarkCollected(listing.id)}>
-                    <CheckCircle size={14} className="mr-2" />
-                    Mark collected
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+            </TableCell>
+            <TableCell className="text-right space-x-2">
+              {chat ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    openMessages({ chatId: chat.id })
+                  }}
+                >
+                  <ChatCircle size={14} className="mr-2" />
+                  Open chat
+                </Button>
+              ) : (
+                <Badge variant={collectorsBadgeVariant} className="text-xs">{collectorsBadgeText}</Badge>
+              )}
+              {listing.status === 'claimed' && (
+                <Button
+                  size="sm"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleMarkCollected(listing.id)
+                  }}
+                >
+                  <CheckCircle size={14} className="mr-2" />
+                  Mark collected
+                </Button>
+              )}
+            </TableCell>
+          </TableRow>
         )
       })}
-    </div>
-  )
+    </TableBody>
+    <TableCaption>
+      Approval completes the hand-off. Tap a row to review full listing details.
+    </TableCaption>
+  </Table>
+)
 
-  const layoutToggle = (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as typeof viewMode)} className="sm:w-auto">
-        <TabsList>
-          <TabsTrigger value="table">Table</TabsTrigger>
-          <TabsTrigger value="card">Card</TabsTrigger>
-        </TabsList>
-      </Tabs>
-      {onAddNewItem && (
-        <Button onClick={onAddNewItem}>
-          <Plus size={16} className="mr-2" />
-          {addNewItemLabel}
-        </Button>
-      )}
-    </div>
-  )
+const content = loading
+  ? <ListingsSkeleton rows={3} />
+  : (sortedListings.length === 0
+    ? EmptyState
+    : TableView)
 
-  const content = loading
-    ? <ListingsSkeleton rows={3} />
-    : (sortedListings.length === 0
-      ? EmptyState
-      : viewMode === 'table'
-        ? TableView
-        : CardView)
-
-  if (variant === 'dashboard') {
-    return (
-      <div className="space-y-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <p className="font-medium">Switch layouts</p>
-            <p className="text-sm text-muted-foreground">
-              Quickly glance at status cards or review structured details in the table view.
-            </p>
-          </div>
-          {layoutToggle}
+if (variant === 'dashboard') {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <p className="font-medium">Your listed items</p>
+          <p className="text-sm text-muted-foreground">Select a listing to view full details.</p>
         </div>
-        {content}
+        {onAddNewItem && (
+          <Button onClick={onAddNewItem}>
+            <Plus size={16} className="mr-2" />
+            {addNewItemLabel}
+          </Button>
+        )}
       </div>
-    )
-  }
+      {content}
+    </div>
+  )
+}
 
   return (
     <>
@@ -785,7 +623,12 @@ export function MyListingsView({
             </CardTitle>
             <CardDescription>{description}</CardDescription>
           </div>
-          {layoutToggle}
+          {onAddNewItem && (
+            <Button onClick={onAddNewItem}>
+              <Plus size={16} className="mr-2" />
+              {addNewItemLabel}
+            </Button>
+          )}
         </CardHeader>
         <CardContent>{content}</CardContent>
       </Card>
@@ -796,183 +639,43 @@ export function MyListingsView({
           setShowDetailModal(open)
           if (!open) {
             setSelectedListingId(null)
+            setSelectedItemDetails(null)
+            setDetailsError(null)
           }
         }}
       >
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="w-full max-w-6xl lg:max-w-7xl">
           <DialogHeader>
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
                 <DialogTitle>{selectedListing?.title ?? 'Listing details'}</DialogTitle>
-                <DialogDescription>Manage collector requests, update listing details, and mark this listing once collected.</DialogDescription>
+                <DialogDescription>Review the full listing, manage collector requests, and keep track of hand-offs.</DialogDescription>
               </div>
-              {selectedListing && (
+              {selectedListing && onEditListing && (
                 <Button
-                  variant={isEditing ? 'ghost' : 'outline'}
+                  variant="outline"
                   size="sm"
-                  onClick={() => {
-                    if (isEditing) {
-                      handleCancelEdit()
-                    } else {
-                      setIsEditing(true)
-                    }
-                  }}
+                  onClick={handleEditInForm}
+                  disabled={detailsLoading || !selectedItemDetails}
                   className="flex items-center gap-2"
                 >
-                  {isEditing ? (
-                    <>
-                      <X size={14} />
-                      Cancel edit
-                    </>
-                  ) : (
-                    <>
-                      <PencilSimpleLine size={14} />
-                      Edit listing
-                    </>
-                  )}
+                  <PencilSimpleLine size={14} />
+                  Edit in listing form
                 </Button>
               )}
             </div>
           </DialogHeader>
 
           {selectedListing ? (
-            <div className="space-y-4">
-              {isEditing && editForm && (
-                <div className="space-y-4 rounded-lg border border-dashed border-primary/40 bg-muted/30 p-4">
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-primary">Edit listing</p>
-                    <p className="text-sm text-muted-foreground">Adjust the summary details collectors see. Changes apply instantly once saved.</p>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-title">Title</Label>
-                      <Input
-                        id="edit-title"
-                        value={editForm.title}
-                        onChange={(event) => handleEditFieldChange('title', event.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-category">Category</Label>
-                      <Select
-                        value={editForm.category}
-                        onValueChange={(value) => handleEditFieldChange('category', value)}
-                      >
-                        <SelectTrigger id="edit-category">
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CATEGORY_OPTIONS.map(category => (
-                            <SelectItem key={category} value={category}>
-                              {category}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-description">Description</Label>
-                    <Textarea
-                      id="edit-description"
-                      value={editForm.description ?? ''}
-                      onChange={(event) => handleEditFieldChange('description', event.target.value)}
-                      rows={3}
-                    />
-                    <p className="text-xs text-muted-foreground">Keep it friendly and clear—highlight any changes since first listing.</p>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Action type</Label>
-                      <Select
-                        value={editForm.actionType}
-                        onValueChange={(value) => handleEditFieldChange('actionType', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ACTION_OPTIONS.map(option => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Hand-off method</Label>
-                      <Select
-                        value={(editForm.fulfillmentMethod ?? selectedListing.fulfillmentMethod ?? (editForm.actionType === 'donate' ? 'dropoff' : 'pickup')) ?? 'pickup'}
-                        onValueChange={(value) => handleEditFieldChange('fulfillmentMethod', value)}
-                        disabled={editForm.actionType === 'donate'}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pickup">Pickup</SelectItem>
-                          <SelectItem value="dropoff">Partner shop drop-off</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {editForm.actionType === 'donate' && (
-                        <p className="text-xs text-muted-foreground">Donations route through partner shops for verified hand-off.</p>
-                      )}
-                    </div>
-                  </div>
-                  {(editForm.fulfillmentMethod ?? selectedListing.fulfillmentMethod) === 'pickup' && (
-                    <div className="space-y-2">
-                      <Label htmlFor="edit-location">Pickup area</Label>
-                      <Input
-                        id="edit-location"
-                        placeholder="e.g., Camden, London NW1"
-                        value={editForm.location ?? ''}
-                        onChange={(event) => handleEditFieldChange('location', event.target.value)}
-                      />
-                      <p className="text-xs text-muted-foreground">Share only broad area information. Exact addresses are exchanged privately.</p>
-                    </div>
-                  )}
-                  {(editForm.fulfillmentMethod ?? selectedListing.fulfillmentMethod) === 'dropoff' && (
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="edit-partner-name">Partner shop name</Label>
-                        <Input
-                          id="edit-partner-name"
-                          value={editForm.dropOffLocation?.name ?? ''}
-                          onChange={(event) => handleDropOffFieldChange('name', event.target.value)}
-                          placeholder="TruCycle Partner Shop"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="edit-partner-postcode">Postcode</Label>
-                        <Input
-                          id="edit-partner-postcode"
-                          value={editForm.dropOffLocation?.postcode ?? ''}
-                          onChange={(event) => handleDropOffFieldChange('postcode', event.target.value)}
-                          placeholder="NW1 8AH"
-                        />
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="edit-partner-address">Partner shop address</Label>
-                        <Textarea
-                          id="edit-partner-address"
-                          value={editForm.dropOffLocation?.address ?? ''}
-                          onChange={(event) => handleDropOffFieldChange('address', event.target.value)}
-                          rows={2}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-end gap-2">
-                    <Button variant="ghost" onClick={handleCancelEdit}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handleSaveEdit}>
-                      Save changes
-                    </Button>
-                  </div>
-                </div>
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+              <div className="space-y-4">
+              {detailsLoading && (
+                <p className="text-sm text-muted-foreground">Loading latest item details…</p>
               )}
+              {detailsError && (
+                <p className="text-sm text-destructive">{detailsError}</p>
+              )}
+
               <div className="grid gap-3 md:grid-cols-2 text-sm">
                 <div className="rounded-md border p-3 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase">Status</p>
@@ -1002,71 +705,65 @@ export function MyListingsView({
                     </Badge>
                   )}
                 </div>
-                <p className="text-muted-foreground">
-                  {selectedListing.description?.trim() || 'No description added yet. Share a few highlights to attract collectors.'}
-                </p>
+                <p className="text-muted-foreground">{detailDescription}</p>
                 <div className="grid gap-2 md:grid-cols-2">
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground uppercase">Category</p>
-                    <p className="capitalize">{selectedListing.category}</p>
+                    <p className="capitalize">{detailItem?.category || selectedListing.category}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground uppercase">Hand-off location</p>
-                    {selectedListing.fulfillmentMethod === 'dropoff' && selectedListing.dropOffLocation ? (
-                      <p>{selectedListing.dropOffLocation.name}{selectedListing.dropOffLocation.postcode ? `, ${selectedListing.dropOffLocation.postcode}` : ''}</p>
-                    ) : (
-                      <p>{selectedListing.location || 'Pickup location to be confirmed in chat'}</p>
-                    )}
+                    <p>{handoffDisplay}</p>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-sm font-semibold mb-2">Collector requests</h3>
-                {listingRequests.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No collectors have requested this item yet.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {listingRequests.map((request) => {
-                      const requestBadge = REQUEST_STATUS_BADGE[request.status]
-                      const requestChat = getChatForItem(request.itemId)
-                      return (
-                        <div key={request.id} className="rounded-lg border p-3 space-y-3">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="font-medium">{request.collectorName}</p>
-                              <p className="text-xs text-muted-foreground">Requested {formatRelativeTime(request.createdAt)}</p>
-                            </div>
-                            <Badge variant={requestBadge.variant} className="capitalize">{requestBadge.label}</Badge>
-                          </div>
-                          {request.note && (
-                            <p className="text-xs text-muted-foreground">{request.note}</p>
-                          )}
-                          <div className="flex flex-wrap gap-2">
-                            {request.status === 'pending' && (
-                              <Button size="sm" onClick={() => handleApproveRequest(request)}>
-                                Approve
-                              </Button>
-                            )}
-                            {request.status === 'approved' && (
-                              <Button size="sm" variant="outline" onClick={() => handleMarkCollected(request.itemId)}>
-                                Mark collected
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => (requestChat ? openMessages?.({ chatId: requestChat.id }) : handleOpenConversation(request))}
-                            >
-                              Open Conversation
-                            </Button>
-                          </div>
-                        </div>
-                      )
-                    })}
+              {galleryImages.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">Photos</h3>
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                    {galleryImages.map((photo, index) => (
+                      <img
+                        key={`${photo}-${index}`}
+                        src={photo}
+                        alt={`${selectedListing.title} photo ${index + 1}`}
+                        className="h-32 w-full rounded-md object-cover"
+                      />
+                    ))}
                   </div>
-                )}
+                </div>
+              )}
+
+              {isDonation && (
+                <CollectorRequestsSection
+                  requests={listingRequests}
+                  getChatForItem={getChatForItem}
+                  onApprove={handleApproveRequest}
+                  onMarkCollected={handleMarkCollected}
+                  onOpenConversation={handleOpenConversation}
+                  openMessages={openMessages}
+                />
+              )}
               </div>
+              <aside className="space-y-4">
+                {isDonation && selectedListing.fulfillmentMethod === 'dropoff' ? (
+                  <DropOffQrPanel
+                    listing={selectedListing}
+                    dropOffLocation={dropOffLocationDetail}
+                    qrImageUrl={qrImageUrl}
+                    isLoading={detailsLoading}
+                  />
+                ) : (
+                  <CollectorRequestsPanel
+                    requests={listingRequests}
+                    getChatForItem={getChatForItem}
+                    onApprove={handleApproveRequest}
+                    onMarkCollected={handleMarkCollected}
+                    onOpenConversation={handleOpenConversation}
+                    openMessages={openMessages}
+                  />
+                )}
+              </aside>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">Select a listing to see details.</p>
@@ -1077,7 +774,195 @@ export function MyListingsView({
   )
 }
 
+interface DropOffQrPanelProps {
+  listing: ManagedListing
+  dropOffLocation: DropOffLocation | null
+  qrImageUrl: string | null
+  isLoading: boolean
+}
 
+function DropOffQrPanel({ listing, dropOffLocation, qrImageUrl, isLoading }: DropOffQrPanelProps) {
+  const actionCopy = listing.actionType === 'exchange'
+    ? 'exchange hand-off'
+    : listing.actionType === 'recycle'
+      ? 'recycling drop-off'
+      : 'donation drop-off'
 
+  const isDonation = listing.actionType === 'donate'
+  const heading = isDonation ? 'Drop-off QR' : 'Collector requests'
+  return (
+    <div className="space-y-4 rounded-lg border bg-background p-4 shadow-sm">
+      <div className="space-y-1">
+        <h3 className="flex items-center gap-2 text-sm font-semibold">
+          <QrCode size={18} />
+          {heading}
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          {isDonation ? (
+            <>Present this code at the partner shop to record your {actionCopy}.</>
+          ) : (
+            'Share this code with the collector to complete the request.'
+          )}
+        </p>
+      </div>
 
+      <div className="flex justify-center">
+        {qrImageUrl ? (
+          <div className="rounded-lg border bg-white p-3 shadow-sm">
+            <img
+              src={qrImageUrl}
+              alt={`${heading} for ${listing.title}`}
+              className="h-48 w-48 object-contain"
+            />
+          </div>
+        ) : (
+          <div className="flex h-48 w-full max-w-[15rem] items-center justify-center rounded-lg border border-dashed bg-muted/40 p-4 text-center text-xs text-muted-foreground">
+            {isLoading ? 'Loading QR code…' : 'QR code becomes available once the listing is confirmed.'}
+          </div>
+        )}
+      </div>
 
+      <div className="space-y-3 text-sm">
+        <div>
+          <p className="text-xs text-muted-foreground uppercase">Drop-off location</p>
+          {dropOffLocation ? (
+            <div className="mt-2 space-y-2">
+              <div className="flex items-start gap-2">
+                <MapPin size={16} className="mt-1 text-muted-foreground" />
+                <div className="space-y-1">
+                  <p className="font-medium leading-tight">{dropOffLocation.name}</p>
+                  {dropOffLocation.address && (
+                    <p className="text-sm leading-snug text-muted-foreground">{dropOffLocation.address}</p>
+                  )}
+                  {dropOffLocation.postcode && (
+                    <p className="text-sm leading-snug text-muted-foreground">{dropOffLocation.postcode}</p>
+                  )}
+                  {dropOffLocation.distance && (
+                    <p className="text-xs leading-snug text-muted-foreground">About {dropOffLocation.distance} away</p>
+                  )}
+                </div>
+              </div>
+              {(dropOffLocation.openHours || dropOffLocation.phone) && (
+                <div className="space-y-2 rounded-md bg-muted/30 p-3 text-xs text-muted-foreground">
+                  {dropOffLocation.openHours && (
+                    <div className="flex items-center gap-2">
+                      <Clock size={14} />
+                      <span>{dropOffLocation.openHours}</span>
+                    </div>
+                  )}
+                  {dropOffLocation.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone size={14} />
+                      <span>{dropOffLocation.phone}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Partner location details will appear once a drop-off slot is confirmed.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface CollectorRequestsSharedProps {
+  requests: ClaimRequest[]
+  getChatForItem: (itemId: string) => ({ id: string } | null | undefined)
+  onApprove: (request: ClaimRequest) => void | Promise<void>
+  onMarkCollected: (itemId: string) => void | Promise<void>
+  onOpenConversation: (request: ClaimRequest) => void | Promise<void>
+  openMessages?: (options?: { chatId?: string }) => void
+}
+
+function CollectorRequestsSection(props: CollectorRequestsSharedProps) {
+  const { requests } = props
+  return (
+    <div>
+      <h3 className="text-sm font-semibold mb-2">Collector requests</h3>
+      {requests.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No collectors have requested this item yet.</p>
+      ) : (
+        <CollectorRequestsList {...props} />
+      )}
+    </div>
+  )
+}
+
+function CollectorRequestsPanel(props: CollectorRequestsSharedProps) {
+  const { requests } = props
+  return (
+    <div className="space-y-4 rounded-lg border bg-background p-4 shadow-sm">
+      <div className="space-y-1">
+        <h3 className="flex items-center gap-2 text-sm font-semibold">
+          <ChatCircle size={18} />
+          Collector requests
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Review collector interest and continue conversations to arrange the hand-off.
+        </p>
+      </div>
+
+      {requests.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No collectors have requested this item yet.</p>
+      ) : (
+        <CollectorRequestsList {...props} />
+      )}
+    </div>
+  )
+}
+
+function CollectorRequestsList({
+  requests,
+  getChatForItem,
+  onApprove,
+  onMarkCollected,
+  onOpenConversation,
+  openMessages,
+}: CollectorRequestsSharedProps) {
+  return (
+    <div className="space-y-3">
+      {requests.map((request) => {
+        const requestBadge = REQUEST_STATUS_BADGE[request.status]
+        const requestChat = getChatForItem(request.itemId)
+        return (
+          <div key={request.id} className="rounded-lg border p-3 space-y-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-medium">{request.collectorName}</p>
+                <p className="text-xs text-muted-foreground">Requested {formatRelativeTime(request.createdAt)}</p>
+              </div>
+              <Badge variant={requestBadge.variant} className="capitalize">{requestBadge.label}</Badge>
+            </div>
+            {request.note && (
+              <p className="text-xs text-muted-foreground">{request.note}</p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {request.status === 'pending' && (
+                <Button size="sm" onClick={() => onApprove(request)}>
+                  Approve
+                </Button>
+              )}
+              {request.status === 'approved' && (
+                <Button size="sm" variant="outline" onClick={() => onMarkCollected(request.itemId)}>
+                  Mark collected
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => (requestChat ? openMessages?.({ chatId: requestChat.id }) : onOpenConversation(request))}
+              >
+                Open Conversation
+              </Button>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
