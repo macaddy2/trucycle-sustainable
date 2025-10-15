@@ -168,7 +168,7 @@ export function PartnerApp({ route, onNavigate }: PartnerAppProps) {
         {content}
       </main>
 
-      <PartnerScanModal open={scanOpen} onOpenChange={setScanOpen} />
+      <PartnerScanModal open={scanOpen} onOpenChange={setScanOpen} shops={shops} />
     </div>
   )
 }

@@ -1,21 +1,38 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
-import { QrCode, CheckCircle, Clock, UserCircle, ArrowClockwise, Camera } from '@phosphor-icons/react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  QrCode,
+  CheckCircle,
+  Clock,
+  UserCircle,
+  ArrowClockwise,
+  Camera,
+  SpinnerGap,
+  ShieldCheck,
+} from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
-import { getItemById, qrClaimOut, qrDropoffIn, qrViewItem } from '@/lib/api'
+import { getItemById, qrClaimOut, qrDropoffIn, qrViewItem, type ShopDto } from '@/lib/api'
 import jsQR from 'jsqr'
 
 interface PartnerScanModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  shops: ShopDto[]
 }
 
 type ScanMode = 'dropoff' | 'pickup'
@@ -25,8 +42,10 @@ interface ScanRecord {
   mode: ScanMode
   reference: string
   notes?: string
-  staff?: string
   scannedAt: string
+  shopId?: string
+  shopName?: string | null
+  result?: string
 }
 
 function generateId() {
@@ -36,26 +55,54 @@ function generateId() {
   return `scan-${Date.now()}-${Math.round(Math.random() * 1e6)}`
 }
 
-export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) {
+function formatStatusLabel(status?: string | null) {
+  if (!status) return 'unknown'
+  return status.replace(/_/g, ' ')
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return '—'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return '—'
+  return parsed.toLocaleString()
+}
+
+const UUID_RE = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/
+
+export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModalProps) {
   const [mode, setMode] = useState<ScanMode>('dropoff')
   const [input, setInput] = useState('')
   const [notes, setNotes] = useState('')
-  const [staff, setStaff] = useState('')
   const [history, setHistory] = useKV<ScanRecord[]>('partner-scan-history', [])
+  const [selectedShopId, setSelectedShopId] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [isFetchingItem, setIsFetchingItem] = useState(false)
 
   // Camera scanning state
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([])
   const [selectedCameraId, setSelectedCameraId] = useState<string | undefined>(undefined)
-  const [stream, setStream] = useState<MediaStream | null>(null)
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const lastDetectedRef = useRef<string | null>(null)
+  const detailsRef = useRef<HTMLDivElement | null>(null)
 
   // Selected item state
   const [itemId, setItemId] = useState<string | null>(null)
   const [itemView, setItemView] = useState<any | null>(null)
   const [itemDetails, setItemDetails] = useState<any | null>(null)
+
+  const shopsById = useMemo(() => {
+    return shops.reduce<Record<string, ShopDto>>((acc, shop) => {
+      acc[shop.id] = shop
+      return acc
+    }, {})
+  }, [shops])
+
+  const hasShops = shops.length > 0
+  const selectedShop = selectedShopId ? shopsById[selectedShopId] : undefined
 
   const summary = useMemo(() => {
     const total = history.length
@@ -64,18 +111,72 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
     return { total, dropoffs, pickups }
   }, [history])
 
-  const UUID_RE = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/
+  useEffect(() => {
+    if (!hasShops) {
+      setSelectedShopId(null)
+      return
+    }
+    setSelectedShopId(prev => {
+      if (prev && shopsById[prev]) return prev
+      return shops[0]?.id ?? null
+    })
+  }, [hasShops, shops, shopsById])
 
-  const extractItemId = (payload: string): string | null => {
+  useEffect(() => {
+    setInput('')
+    setNotes('')
+    setItemId(null)
+    setItemView(null)
+    setItemDetails(null)
+    setIsFetchingItem(false)
+    lastDetectedRef.current = null
+  }, [mode])
+
+  useEffect(() => {
+    if (!input) {
+      lastDetectedRef.current = null
+    }
+  }, [input])
+
+  useEffect(() => {
+    if (!open) {
+      lastDetectedRef.current = null
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!itemId) return
+    const node = detailsRef.current
+    if (!node) return
+    const frame = requestAnimationFrame(() => {
+      node.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [itemId])
+
+  const dropoffAllowed = itemDetails?.status === 'pending_dropoff'
+  const pickupStatus = itemDetails?.status ?? itemView?.status
+  const pickupOption = itemDetails?.pickup_option ?? itemView?.pickup_option
+  const pickupAllowed = pickupStatus === 'active' && pickupOption === 'donate'
+  const confirmDisabled =
+    isProcessing ||
+    !hasShops ||
+    !selectedShopId ||
+    !itemId ||
+    (mode === 'dropoff' ? !dropoffAllowed : !pickupAllowed)
+
+  const extractItemId = useCallback((payload: string): string | null => {
     const match = payload.match(UUID_RE)
     if (match) return match[0]
     // Accept raw payloads like "QR:ITEM:<id>" as a fallback
     const parts = payload.split(':')
     const maybeId = parts[parts.length - 1]
     return UUID_RE.test(maybeId) ? maybeId : null
-  }
+  }, [])
 
   const fetchItem = useCallback(async (id: string) => {
+    setIsFetchingItem(true)
+    setItemId(id)
     let viewData: any = null
     let itemData: any = null
     try {
@@ -95,7 +196,7 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
     }
     setItemView(viewData)
     setItemDetails(itemData)
-    setItemId(id)
+    setIsFetchingItem(false)
   }, [])
 
   // Auto-search when input is long enough (>= UUID length)
@@ -108,14 +209,16 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
         fetchItem(id)
       }
     }
-  }, [input, fetchItem])
+  }, [input, itemId, extractItemId, fetchItem])
 
   // Camera and scanning setup on open
   useEffect(() => {
     if (!open) return
     let cancelled = false
+
     async function init() {
       try {
+        setScanError(null)
         if (!navigator.mediaDevices?.enumerateDevices || !navigator.mediaDevices?.getUserMedia) {
           setScanError('Camera not supported in this browser')
           return
@@ -123,14 +226,28 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
         const devices = await navigator.mediaDevices.enumerateDevices()
         const vids = devices.filter(d => d.kind === 'videoinput')
         setCameras(vids)
-        const preferred = selectedCameraId || vids[0]?.deviceId
-        if (preferred) {
-          const s = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: preferred } } })
-          if (cancelled) return
-          setStream(s)
-          if (videoRef.current) {
-            videoRef.current.srcObject = s
-            await videoRef.current.play().catch(() => {})
+        if (!vids.length) {
+          setScanError('No cameras detected')
+          return
+        }
+        const preferred =
+          (selectedCameraId && vids.some(device => device.deviceId === selectedCameraId)
+            ? selectedCameraId
+            : vids[0]?.deviceId) || undefined
+        const constraints = preferred ? { video: { deviceId: { exact: preferred } } } : { video: true }
+        const newStream = await navigator.mediaDevices.getUserMedia(constraints)
+        if (cancelled) {
+          newStream.getTracks().forEach(track => track.stop())
+          return
+        }
+        streamRef.current?.getTracks().forEach(track => track.stop())
+        streamRef.current = newStream
+        if (videoRef.current) {
+          videoRef.current.srcObject = newStream
+          try {
+            await videoRef.current.play()
+          } catch (err) {
+            console.warn('Camera playback failed to auto-start', err)
           }
         }
       } catch (err: any) {
@@ -138,13 +255,16 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
         setScanError(err?.message || 'Unable to access camera')
       }
     }
+
     init()
+
     return () => {
       cancelled = true
-      if (stream) {
-        stream.getTracks().forEach(t => t.stop())
+      streamRef.current?.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+      if (videoRef.current) {
+        videoRef.current.srcObject = null
       }
-      setStream(null)
       setScanning(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -157,60 +277,96 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
   // QR detection: BarcodeDetector with jsQR fallback
   useEffect(() => {
     if (!open) return
-    let running = true
-    const tryScan = async () => {
-      if (!running || !videoRef.current) return
-      const video = videoRef.current
-      // Prefer native BarcodeDetector
-      const Detector = (window as any).BarcodeDetector
-      if (Detector) {
-        try {
-          const detector = new Detector({ formats: ['qr_code'] })
-          setScanning(true)
-          const codes = await detector.detect(video as any)
-          if (codes && codes.length > 0) {
-            const value = codes[0]?.rawValue
-            if (value && value !== input) setInput(String(value))
-          }
-        } catch {
-          // fall through to jsQR
-        }
-      }
-      // jsQR fallback
-      try {
-        const vw = video.videoWidth
-        const vh = video.videoHeight
-        if (vw && vh) {
-          const canvas = canvasRef.current || document.createElement('canvas')
-          canvasRef.current = canvas
-          canvas.width = vw
-          canvas.height = vh
-          const ctx = canvas.getContext('2d')
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, vw, vh)
-            const imageData = ctx.getImageData(0, 0, vw, vh)
-            const result = jsQR(
-              imageData.data as unknown as Uint8ClampedArray,
-              vw,
-              vh,
-              { inversionAttempts: 'attemptBoth' }
-            )
-            const value = result?.data
-            if (value && value !== input) setInput(value)
-          }
-        }
-      } catch {
-        // ignore
-      }
-      if (running) setTimeout(tryScan, 350)
+    let cancelled = false
+    let rafId: number | null = null
+    const Detector = (window as any).BarcodeDetector
+      ? new (window as any).BarcodeDetector({ formats: ['qr_code'] })
+      : null
+    const canvas = canvasRef.current || document.createElement('canvas')
+    if (!canvasRef.current) {
+      canvasRef.current = canvas
     }
-    setScanning(true)
-    tryScan()
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+
+    const scheduleNext = () => {
+      if (cancelled) return
+      rafId = requestAnimationFrame(scanFrame)
+    }
+
+    const scanFrame = () => {
+      if (cancelled) return
+      const video = videoRef.current
+      if (!video) {
+        scheduleNext()
+        return
+      }
+
+      if (video.readyState < HTMLMediaElement.HAVE_ENOUGH_DATA) {
+        scheduleNext()
+        return
+      }
+
+      setScanning(true)
+
+      const processFrame = async () => {
+        let detected: string | null = null
+
+        if (Detector) {
+          try {
+            const codes = await Detector.detect(video as any)
+            if (codes && codes.length > 0) {
+              detected = codes[0]?.rawValue ?? null
+            }
+          } catch (err) {
+            console.warn('BarcodeDetector scan failed, falling back to jsQR', err)
+          }
+        }
+
+        if (!detected && ctx) {
+          try {
+            const vw = video.videoWidth
+            const vh = video.videoHeight
+            if (vw && vh) {
+              if (canvas.width !== vw) canvas.width = vw
+              if (canvas.height !== vh) canvas.height = vh
+              ctx.drawImage(video, 0, 0, vw, vh)
+              const imageData = ctx.getImageData(0, 0, vw, vh)
+              const result = jsQR(imageData.data as Uint8ClampedArray, vw, vh, {
+                inversionAttempts: 'attemptBoth',
+              })
+              detected = result?.data ?? null
+            }
+          } catch (err) {
+            console.error('jsQR scan failed', err)
+          }
+        }
+
+        if (detected) {
+          const normalized = String(detected).trim()
+          if (normalized && normalized !== lastDetectedRef.current) {
+            lastDetectedRef.current = normalized
+            setInput(normalized)
+          }
+        }
+
+        scheduleNext()
+      }
+
+      processFrame().catch(() => {
+        scheduleNext()
+      })
+    }
+
+    scheduleNext()
+
     return () => {
-      running = false
+      cancelled = true
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId)
+      }
       setScanning(false)
     }
-  }, [open, input])
+  }, [open])
 
   const handleConfirm = async () => {
     const val = input.trim()
@@ -219,28 +375,71 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
       toast.error('Scan or enter a valid QR/item id')
       return
     }
+    if (!selectedShopId) {
+      toast.error('Select a partner shop before confirming the scan')
+      return
+    }
+    if (mode === 'dropoff' && !dropoffAllowed) {
+      toast.error('Item must be pending drop-off before it can be accepted')
+      return
+    }
+    if (mode === 'pickup' && !pickupAllowed) {
+      toast.error("Only active donation items can be released for pickup")
+      return
+    }
+    const trimmedNotes = notes.trim()
+    const shopName = selectedShop?.name ?? null
+    setIsProcessing(true)
     try {
       if (mode === 'dropoff') {
-        const res = await qrDropoffIn(id, { notes: notes.trim() || undefined })
-        toast.success(res?.data?.scan_result ? `Drop-off ${res.data.scan_result}` : 'Drop-off recorded')
+        const res = await qrDropoffIn(id, {
+          shop_id: selectedShopId,
+          action: 'accept',
+          ...(trimmedNotes ? { reason: trimmedNotes } : {}),
+        })
+        toast.success(res?.data?.scan_result ? `Drop-off ${res.data.scan_result}` : 'Drop-off recorded', {
+          description: shopName ? `Logged at ${shopName}` : undefined,
+        })
+        await fetchItem(id)
+        const record: ScanRecord = {
+          id: generateId(),
+          mode,
+          reference: id,
+          notes: trimmedNotes || undefined,
+          scannedAt: new Date().toISOString(),
+          shopId: selectedShopId,
+          shopName,
+          result: res?.data?.scan_result ?? 'accepted',
+        }
+        setHistory(prev => [record, ...prev].slice(0, 25))
       } else {
-        const res = await qrClaimOut(id, { notes: notes.trim() || undefined })
-        toast.success(res?.data?.scan_result ? `Pickup ${res.data.scan_result}` : 'Pickup confirmed')
+        const pickupMessage = 'Pickup confirmed by partner'
+        const res = await qrClaimOut(id, {
+          shop_id: selectedShopId,
+          notes: pickupMessage,
+        })
+        toast.success(res?.data?.scan_result ? `Pickup ${res.data.scan_result}` : 'Pickup confirmed', {
+          description: shopName ? `Logged at ${shopName}` : undefined,
+        })
+        await fetchItem(id)
+        const record: ScanRecord = {
+          id: generateId(),
+          mode,
+          reference: id,
+          notes: pickupMessage,
+          scannedAt: new Date().toISOString(),
+          shopId: selectedShopId,
+          shopName,
+          result: res?.data?.scan_result ?? 'confirmed',
+        }
+        setHistory(prev => [record, ...prev].slice(0, 25))
       }
-      // add a minimal local record
-      const record: ScanRecord = {
-        id: generateId(),
-        mode,
-        reference: id,
-        notes: notes.trim() || undefined,
-        staff: staff.trim() || undefined,
-        scannedAt: new Date().toISOString(),
-      }
-      setHistory(prev => [record, ...prev].slice(0, 25))
       setNotes('')
     } catch (err: any) {
       console.error('Confirm failed', err)
       toast.error(err?.message || 'Failed to register scan')
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -249,8 +448,34 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
     setItemView(null)
     setItemDetails(null)
     setInput('')
+    setNotes('')
+    lastDetectedRef.current = null
     toast.info('Cleared selected item')
   }
+
+  const shopSelector = (
+    <div className="space-y-2">
+      <label className="text-sm font-medium text-foreground" htmlFor="scan-shop">
+        Shop
+      </label>
+      <Select value={selectedShopId ?? undefined} onValueChange={value => setSelectedShopId(value)}>
+        <SelectTrigger id="scan-shop" disabled={!hasShops} className="w-full">
+          <SelectValue placeholder={hasShops ? 'Select partner shop' : 'Add a partner shop to begin'} />
+        </SelectTrigger>
+        <SelectContent>
+          {shops.map(shop => (
+            <SelectItem key={shop.id} value={shop.id}>
+              {shop.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-[11px] text-muted-foreground">
+        Scans are recorded against the selected shop.{selectedShop?.address_line ? ` ${selectedShop.address_line}` : ''}
+        {selectedShop?.postcode ? `, ${selectedShop.postcode}` : ''}
+      </p>
+    </div>
+  )
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -260,16 +485,24 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
             <QrCode size={24} className="text-primary" />
             Scan drop-offs & pickups
           </DialogTitle>
+          <DialogDescription>
+            Use the camera or manual entry to verify items before recording a drop-off acceptance or pickup
+            confirmation.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-6 lg:grid-cols-[1.3fr,1fr]">
           <div className="space-y-5">
             {/* Camera scanner */}
             <div className="rounded-2xl border border-border bg-muted/30 p-3">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Camera size={18} className="text-primary" />
                   <span className="text-sm font-medium">Camera scanner</span>
+                  <Badge variant={scanning ? 'secondary' : 'outline'} className="flex items-center gap-1 text-[10px]">
+                    {scanning ? <SpinnerGap size={12} className="animate-spin" /> : null}
+                    {scanning ? 'Scanning…' : 'Idle'}
+                  </Badge>
                 </div>
                 <div>
                   {cameras.length > 0 ? (
@@ -295,6 +528,14 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
                 )}
               </div>
             </div>
+            <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-4">
+              {shopSelector}
+              {!hasShops && (
+                <p className="mt-2 text-xs text-destructive">
+                  Register a shop in the partner console to enable QR confirmations.
+                </p>
+              )}
+            </div>
             <Tabs value={mode} onValueChange={value => setMode(value as ScanMode)}>
               <TabsList className="grid grid-cols-2">
                 <TabsTrigger value="dropoff">Drop-off</TabsTrigger>
@@ -305,27 +546,41 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
                   <label className="text-sm font-medium text-foreground" htmlFor="dropoff-scan">
                     QR payload or manual code
                   </label>
-                    <Input
-                      id="dropoff-scan"
-                      value={input}
-                      onChange={event => setInput(event.target.value)}
-                      placeholder='Paste QR payload or item id'
-                    />
+                  <Input
+                    id="dropoff-scan"
+                    value={input}
+                    onChange={event => setInput(event.target.value)}
+                    placeholder="Paste QR payload or item id"
+                  />
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground" htmlFor="scan-notes">
-                      Shop notes (optional)
-                    </label>
                     <Textarea
-                      id="scan-notes"
+                      id="dropoff-notes"
                       value={notes}
                       onChange={event => setNotes(event.target.value)}
-                      placeholder="Condition, packaging, or special observations"
+                      aria-label="Drop-off notes"
                       rows={3}
                     />
                   </div>
-                  {/* Staff on duty - temporarily commented out */}
+                </div>
+                <div className="rounded-lg border border-dashed border-border bg-background/60 p-3 text-xs">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <CheckCircle size={16} />
+                    Drop-off requirement
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    Confirm drop-off is enabled only when the item is marked as pending drop-off.
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Current status:</span>
+                    <Badge variant={dropoffAllowed ? 'secondary' : 'outline'} className="capitalize">
+                      {formatStatusLabel(itemDetails?.status)}
+                    </Badge>
+                    {!dropoffAllowed && (
+                      <span className="text-[11px] text-destructive">Awaiting donor arrival</span>
+                    )}
+                  </div>
                 </div>
               </TabsContent>
               <TabsContent value="pickup" className="mt-4 space-y-4">
@@ -333,35 +588,46 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
                   <label className="text-sm font-medium text-foreground" htmlFor="pickup-scan">
                     QR payload or manual code
                   </label>
-                    <Input
-                      id="pickup-scan"
-                      value={input}
-                      onChange={event => setInput(event.target.value)}
-                      placeholder='Paste QR payload or item id'
-                    />
+                  <Input
+                    id="pickup-scan"
+                    value={input}
+                    onChange={event => setInput(event.target.value)}
+                    placeholder="Paste QR payload or item id"
+                  />
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground" htmlFor="pickup-notes">
-                      Release notes (optional)
-                    </label>
-                    <Textarea
-                      id="pickup-notes"
-                      value={notes}
-                      onChange={event => setNotes(event.target.value)}
-                      placeholder="Collector verified ID, packaging, etc."
-                      rows={3}
-                    />
+                <div className="rounded-lg border border-dashed border-border bg-background/60 p-3 text-xs">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <ShieldCheck size={16} />
+                    Pickup requirement
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    Items must be active donation listings before they can be released to collectors.
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Badge variant={pickupAllowed ? 'secondary' : 'outline'} className="capitalize">
+                      {formatStatusLabel(pickupStatus)}
+                    </Badge>
+                    {pickupOption && (
+                      <Badge variant="outline" className="capitalize">
+                        {pickupOption}
+                      </Badge>
+                    )}
+                    {!pickupAllowed && (
+                      <span className="text-[11px] text-destructive">Activate item to hand it over</span>
+                    )}
                   </div>
-                  {/* Staff on duty - temporarily commented out */}
                 </div>
               </TabsContent>
             </Tabs>
 
             <div className="flex flex-wrap items-center gap-3">
-              <Button onClick={handleConfirm}>
-                <CheckCircle size={18} className="mr-2" />
-                Confirm {mode === 'dropoff' ? 'drop-off' : 'pickup'}
+              <Button onClick={handleConfirm} disabled={confirmDisabled} aria-busy={isProcessing}>
+                {isProcessing ? (
+                  <SpinnerGap size={18} className="mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle size={18} className="mr-2" />
+                )}
+                {isProcessing ? 'Processing…' : `Confirm ${mode === 'dropoff' ? 'drop-off' : 'pickup'}`}
               </Button>
               <Button variant="outline" onClick={handleClearHistory}>
                 <ArrowClockwise size={18} className="mr-2" />
@@ -375,27 +641,110 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
               <h3 className="text-sm font-semibold text-muted-foreground">Item details</h3>
               {itemId && <Badge variant="outline" title="Item id" className="font-mono">{itemId.slice(0, 8)}…</Badge>}
             </div>
-            {!itemId ? (
-              <div className="flex h-64 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
-                <Clock size={20} />
-                <p>Scan a QR or paste an item id.</p>
+            {summary.total > 0 && (
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                <Badge variant="outline">Total scans {summary.total}</Badge>
+                <Badge variant="outline">Drop-offs {summary.dropoffs}</Badge>
+                <Badge variant="outline">Pickups {summary.pickups}</Badge>
               </div>
-            ) : (
-              <ScrollArea className="h-64">
-                <div className="space-y-3">
-                  {itemDetails && (
-                    <div className="rounded-xl bg-background p-3">
-                      <p className="text-sm font-semibold">{itemDetails.title ?? 'Item'}</p>
-                      <div className="mt-1 text-xs text-muted-foreground flex flex-wrap gap-2">
-                        {itemDetails.pickup_option && <Badge variant="outline" className="capitalize">{itemDetails.pickup_option}</Badge>}
-                        {itemDetails.status && <Badge variant="outline">{itemDetails.status}</Badge>}
+            )}
+            <div ref={detailsRef}>
+              {!itemId ? (
+                <div className="flex h-64 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+                  <Clock size={20} />
+                  <p>Scan a QR or paste an item id.</p>
+                </div>
+              ) : (
+                <ScrollArea className="h-80">
+                  <div className="space-y-4">
+                    {isFetchingItem ? (
+                      <div className="space-y-3">
+                        <Skeleton className="h-5 w-3/4" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-20 w-full" />
+                      </div>
+                    ) : itemDetails ? (
+                    <>
+                      <div className="space-y-3 rounded-xl bg-background p-3">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{itemDetails.title ?? 'Item'}</p>
+                          <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                            {itemDetails.description?.trim() || 'No description provided.'}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          {itemDetails.pickup_option && (
+                            <Badge variant="outline" className="capitalize">
+                              {itemDetails.pickup_option}
+                            </Badge>
+                          )}
+                          {itemDetails.status && (
+                            <Badge variant="secondary" className="capitalize">
+                              {formatStatusLabel(itemDetails.status)}
+                            </Badge>
+                          )}
+                          {itemDetails.condition && (
+                            <Badge variant="outline" className="capitalize">
+                              {itemDetails.condition.replace(/_/g, ' ')} condition
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-2">
+                          <div>
+                            <p className="font-medium text-foreground">Category</p>
+                            <p className="capitalize">{itemDetails.category ?? '—'}</p>
+                          </div>
+                          <div>
+                            <p className="font-medium text-foreground">Created</p>
+                            <p>{formatDateTime(itemDetails.created_at)}</p>
+                          </div>
+                          {typeof itemDetails.estimated_co2_saved_kg === 'number' && (
+                            <div>
+                              <p className="font-medium text-foreground">Estimated CO₂ saved</p>
+                              <p>{itemDetails.estimated_co2_saved_kg.toFixed(1)} kg</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       {itemDetails.owner && (
-                        <div className="mt-3 flex items-center gap-2 text-sm">
-                          <UserCircle size={18} className="text-muted-foreground" />
-                          <span>{itemDetails.owner?.name ?? 'User'}</span>
+                        <div className="space-y-3 rounded-xl border border-border/60 bg-background p-3">
+                          <div className="flex items-center gap-2">
+                            <UserCircle size={20} className="text-muted-foreground" />
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">{itemDetails.owner?.name ?? 'Neighbour'}</p>
+                              {itemDetails.owner?.id && (
+                                <p className="text-[11px] font-mono text-muted-foreground">#{itemDetails.owner.id.slice(0, 8)}…</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                            <Badge
+                              variant={itemDetails.owner?.verification?.email_verified ? 'secondary' : 'outline'}
+                            >
+                              Email {itemDetails.owner?.verification?.email_verified ? 'verified' : 'pending'}
+                            </Badge>
+                            <Badge
+                              variant={itemDetails.owner?.verification?.identity_verified ? 'secondary' : 'outline'}
+                            >
+                              ID {itemDetails.owner?.verification?.identity_verified ? 'verified' : 'pending'}
+                            </Badge>
+                            <Badge
+                              variant={itemDetails.owner?.verification?.address_verified ? 'secondary' : 'outline'}
+                            >
+                              Address {itemDetails.owner?.verification?.address_verified ? 'verified' : 'pending'}
+                            </Badge>
+                            {typeof itemDetails.owner?.rating === 'number' && (
+                              <Badge variant="outline">
+                                Rating {itemDetails.owner.rating.toFixed(1)} ({itemDetails.owner.reviews_count ?? 0})
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       )}
+                    </>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-border p-3 text-xs text-muted-foreground">
+                      Scan an item to load its details.
                     </div>
                   )}
                   {itemView && itemView.scan_events && (
@@ -412,8 +761,9 @@ export function PartnerScanModal({ open, onOpenChange }: PartnerScanModalProps) 
                     </div>
                   )}
                 </div>
-              </ScrollArea>
-            )}
+                </ScrollArea>
+              )}
+            </div>
           </div>
         </div>
       </DialogContent>

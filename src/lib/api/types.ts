@@ -379,15 +379,14 @@ export interface QrScanAck {
 }
 
 export interface DropoffScanDto {
-  // Minimal payload for backend acceptance
-  notes?: string
-  shopId?: string
+  shop_id: string
+  action: 'accept' | 'reject'
+  reason?: string
 }
 
 export interface ShopScanDto {
-  // Minimal payload for backend acceptance
+  shop_id: string
   notes?: string
-  shopId?: string
 }
 
 export interface DropoffInResult {
