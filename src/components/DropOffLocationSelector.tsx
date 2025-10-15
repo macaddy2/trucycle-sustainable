@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -7,7 +7,9 @@ import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { MapPin, Clock, Phone, NavigationArrow, Storefront, XCircle } from '@phosphor-icons/react'
-import { DROP_OFF_LOCATIONS, type DropOffLocation } from './dropOffLocations'
+import type { DropOffLocation } from './dropOffLocations'
+import { useKV } from '@/hooks/useKV'
+import { shopsNearby, type NearbyShop } from '@/lib/api'
 
 interface DropOffLocationSelectorProps {
   selectedLocation: DropOffLocation | null
@@ -33,7 +35,83 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
     return null
   }
 
-  const [activeLocationId, setActiveLocationId] = useState<string>(selectedLocation?.id ?? DROP_OFF_LOCATIONS[0].id)
+  // Helpers mirroring DropOffMap behaviour, with "same Block" when distanceMeters = 0
+  const formatDistance = (distanceMeters?: number | null): string => {
+    if (typeof distanceMeters !== 'number' || !Number.isFinite(distanceMeters) || distanceMeters < 0) {
+      return 'Distance unavailable'
+    }
+    if (distanceMeters === 0) return 'same Block'
+    if (distanceMeters >= 1000) {
+      const km = distanceMeters / 1000
+      return `${km >= 10 ? km.toFixed(0) : km.toFixed(1)} km`
+    }
+    return `${Math.round(distanceMeters)} m`
+  }
+
+  const formatOpeningHours = (opening?: NearbyShop['opening_hours'] | null): string => {
+    if (!opening) return 'Hours not available'
+    const { days, open_time, close_time } = opening
+    const joinedDays = Array.isArray(days) && days.length > 0 ? days.join(', ') : 'Daily'
+    if (!open_time && !close_time) return joinedDays
+    if (open_time && close_time) return `${joinedDays} ${open_time} - ${close_time}`
+    if (open_time) return `${joinedDays} from ${open_time}`
+    if (close_time) return `${joinedDays} until ${close_time}`
+    return joinedDays
+  }
+
+  const shopToLocation = (shop: NearbyShop, index: number): DropOffLocation => {
+    const coordinates =
+      typeof shop.latitude === 'number' && Number.isFinite(shop.latitude) &&
+      typeof shop.longitude === 'number' && Number.isFinite(shop.longitude)
+        ? { lat: shop.latitude, lng: shop.longitude }
+        : { lat: 51.541 + (index % 3) * 0.01, lng: -0.142 + Math.floor(index / 3) * 0.01 }
+
+    const acceptedItems = Array.isArray(shop.acceptable_categories) && shop.acceptable_categories.length > 0
+      ? shop.acceptable_categories
+      : ['General donations']
+
+    return {
+      id: shop.id || `shop-${index}`,
+      name: shop.name || 'TruCycle Partner Shop',
+      address: shop.address_line || 'Address available upon confirmation',
+      postcode: shop.postcode || '—',
+      distance: formatDistance(shop.distanceMeters),
+      openHours: formatOpeningHours(shop.opening_hours),
+      phone: shop.phone_number || 'Contact provided after booking',
+      acceptedItems,
+      specialServices: shop.active === false ? [] : ['Verified partner'],
+      coordinates,
+    }
+  }
+
+  const [remoteLocations, setRemoteLocations] = useState<DropOffLocation[]>([])
+  const [user] = useKV<{ postcode?: string } | null>('current-user', null)
+  const [activeLocationId, setActiveLocationId] = useState<string | null>(selectedLocation?.id ?? null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const postcode = user?.postcode?.trim()
+        const res = await shopsNearby(postcode ? { postcode } : { postcode: 'SW1A 1AA' })
+        const data = Array.isArray((res as any)?.data)
+          ? ((res as any).data as NearbyShop[])
+          : Array.isArray(res)
+            ? (res as NearbyShop[])
+            : (((res as any)?.data ?? []) as NearbyShop[])
+        if (cancelled) return
+        const mapped = data.map((s, i) => shopToLocation(s, i))
+        setRemoteLocations(mapped)
+        if (!selectedLocation && mapped.length > 0 && !activeLocationId) {
+          setActiveLocationId(mapped[0].id)
+        }
+      } catch {
+        setRemoteLocations([])
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [user?.postcode])
 
   useEffect(() => {
     if (selectedLocation) {
@@ -41,11 +119,16 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
     }
   }, [selectedLocation])
 
-  const activeLocation = DROP_OFF_LOCATIONS.find(location => location.id === activeLocationId) ?? DROP_OFF_LOCATIONS[0]
+  const activeLocation = useMemo(() => {
+    if (activeLocationId) {
+      return remoteLocations.find(l => l.id === activeLocationId) ?? remoteLocations[0]
+    }
+    return remoteLocations[0]
+  }, [activeLocationId, remoteLocations])
 
   return (
     <div className="fixed inset-0 z-[70] flex items-start justify-center bg-background/80 backdrop-blur-sm p-4 md:p-10 overflow-y-auto">
-      <Card className="w-full max-w-5xl shadow-2xl border-primary/30">
+      <Card className="w-full max-w-6xl shadow-2xl border-primary/30">
         <CardHeader className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div>
             <CardTitle className="text-h2 flex items-center space-x-2">
@@ -53,9 +136,6 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
               <span>Select a drop-off partner</span>
             </CardTitle>
             <CardDescription className="mt-2 space-y-1">
-              <span className="block text-xs font-semibold uppercase tracking-wide text-primary">
-                Choose a drop-off partner
-              </span>
               <span>
                 Explore trusted TruCycle partners with real-time availability, amenities, and travel-friendly insights.
               </span>
@@ -66,16 +146,13 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
           </Button>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-[1.6fr,1fr]">
-            <div className="space-y-4">
+          <div className="grid gap-6 md:grid-cols-8">
+            <div className="space-y-4 md:col-span-5">
               <div className="overflow-hidden rounded-2xl border border-primary/30 bg-background shadow-sm">
                 <div className="flex flex-col gap-2 border-b border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-primary/90">
                       Choose a partner on the map
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Tap a pin to preview details, then confirm the location for your QR code hand-off.
                     </p>
                   </div>
                   <Badge variant="secondary" className="w-max">
@@ -84,19 +161,19 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
                 </div>
 
                 <MapContainer
-                  center={[activeLocation.coordinates.lat, activeLocation.coordinates.lng]}
+                  center={[activeLocation?.coordinates.lat ?? 51.5416, activeLocation?.coordinates.lng ?? -0.143]}
                   zoom={15}
                   minZoom={2}
                   maxZoom={19}
                   scrollWheelZoom={true}
                   zoomControl={true}
-                  className="h-[320px] w-full"
+                  className="h-[360px] w-full"
                 >
                   <TileLayer
                     attribution="&copy; OpenStreetMap contributors"
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  {DROP_OFF_LOCATIONS.map(location => {
+                  {remoteLocations.map(location => {
                     const isSelected = selectedLocation?.id === location.id
 
                     return (
@@ -111,7 +188,9 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
                       />
                     )
                   })}
-                  <RecenterMap center={[activeLocation.coordinates.lat, activeLocation.coordinates.lng]} />
+                  {activeLocation && (
+                    <RecenterMap center={[activeLocation.coordinates.lat, activeLocation.coordinates.lng]} />
+                  )}
                 </MapContainer>
 
                 {activeLocation && (
@@ -139,9 +218,9 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
               </div>
             </div>
 
-            <ScrollArea className="h-[420px] rounded-2xl border border-border/80 bg-background">
+            <ScrollArea className="h-[420px] rounded-2xl border border-border/80 bg-background md:col-span-3">
               <div className="divide-y">
-                {DROP_OFF_LOCATIONS.map(location => (
+                {remoteLocations.map(location => (
                   <div
                     key={location.id}
                     className={`p-5 transition hover:bg-muted/60 ${

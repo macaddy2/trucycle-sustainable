@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { listActiveRooms } from '@/lib/api'
 import { messageSocket } from '@/lib/messaging/socket'
@@ -7,6 +7,7 @@ import { messageSocket } from '@/lib/messaging/socket'
 // Stores a map of userId -> online boolean in KV so any component can read it.
 export function usePresence(currentUserId?: string | null) {
   const [presence, setPresence] = useKV<Record<string, boolean>>('presence-map', {})
+  const primeRef = useRef<string | null>(null)
 
   // Subscribe to presence updates over the socket
   useEffect(() => {
@@ -34,8 +35,11 @@ export function usePresence(currentUserId?: string | null) {
       setPresence({})
       return
     }
+    // Avoid re-priming repeatedly for the same user id
+    const didPrimeForUser = (primeRef.current === currentUserId)
     let cancelled = false
     ;(async () => {
+      if (didPrimeForUser) return
       try {
         const res = await listActiveRooms()
         const rooms = Array.isArray(res?.data) ? res.data : []
@@ -46,7 +50,10 @@ export function usePresence(currentUserId?: string | null) {
             next[p.id] = Boolean(p.online)
           })
         })
-        if (!cancelled) setPresence(prev => ({ ...prev, ...next }))
+        if (!cancelled) {
+          setPresence(prev => ({ ...prev, ...next }))
+          primeRef.current = currentUserId
+        }
       } catch {
         // ignore
       }
@@ -58,4 +65,3 @@ export function usePresence(currentUserId?: string | null) {
 
   return { presence, isOnline }
 }
-

@@ -382,3 +382,18 @@ export interface ClaimOutResult {
   completed_at?: string
   scan_events?: Array<{ scan_type?: string; shop_id?: string | null; scanned_at?: string }>
 }
+
+// Impact metrics
+export interface ImpactMonthlyGoal {
+  target_kg: number
+  achieved_kg: number
+  remaining_kg: number
+  progress_percent: number
+}
+
+export interface ImpactMetrics {
+  total_co2_saved_kg: number
+  items_exchanged: number
+  items_donated: number
+  monthly_goal: ImpactMonthlyGoal
+}

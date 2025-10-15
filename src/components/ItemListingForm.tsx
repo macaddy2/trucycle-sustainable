@@ -1282,9 +1282,6 @@ export function ItemListingForm({
                 <h3 className="font-medium text-lg">Review your listing details</h3>
                 {valuationSummary && (
                   <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="font-semibold text-primary">
-                      Est. value £{valuationSummary.estimatedValue.toFixed(2)}
-                    </span>
                     <Badge variant="secondary">Reward +{valuationSummary.rewardPoints} pts</Badge>
                     {estimatedCarbonImpact !== null && (
                       <Badge variant="outline" className="capitalize">-{estimatedCarbonImpact}kg CO2</Badge>

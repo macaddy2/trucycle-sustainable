@@ -3,6 +3,8 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Leaf, Trophy, Recycle, ArrowsClockwise, TrendUp } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
+import { getMyImpactMetrics } from '@/lib/api'
+import { useEffect } from 'react'
 
 interface CarbonData {
   totalCO2Saved: number
@@ -15,7 +17,7 @@ interface CarbonData {
 }
 
 export function CarbonTracker() {
-  const [carbonData] = useKV<CarbonData>('carbon-data', {
+  const [carbonData, setCarbonData] = useKV<CarbonData>('carbon-data', {
     totalCO2Saved: 0,
     itemsExchanged: 0,
     itemsDonated: 0,
@@ -24,6 +26,36 @@ export function CarbonTracker() {
     badges: [],
     weeklyData: []
   })
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadImpact() {
+      try {
+        const res = await getMyImpactMetrics()
+        if (cancelled) return
+        const data = (res as any)?.data
+        if (data && typeof data === 'object') {
+          const total = typeof data.total_co2_saved_kg === 'number' ? data.total_co2_saved_kg : 0
+          const exchanged = typeof data.items_exchanged === 'number' ? data.items_exchanged : 0
+          const donated = typeof data.items_donated === 'number' ? data.items_donated : 0
+          const target = typeof data?.monthly_goal?.target_kg === 'number' ? data.monthly_goal.target_kg : 50
+          const achieved = typeof data?.monthly_goal?.achieved_kg === 'number' ? data.monthly_goal.achieved_kg : 0
+          setCarbonData(prev => ({
+            ...prev,
+            totalCO2Saved: total,
+            itemsExchanged: exchanged,
+            itemsDonated: donated,
+            monthlyGoal: target,
+            currentMonthSavings: achieved,
+          }))
+        }
+      } catch {
+        // Silently ignore errors (e.g., unauthenticated); keep defaults
+      }
+    }
+    loadImpact()
+    return () => { cancelled = true }
+  }, [setCarbonData])
 
   const progressPercentage = Math.min((carbonData?.currentMonthSavings || 0) / (carbonData?.monthlyGoal || 1) * 100, 100)
 

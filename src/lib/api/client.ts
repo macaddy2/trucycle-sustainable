@@ -42,6 +42,7 @@ import type {
   ClaimOutResult,
   DropoffScanDto,
   ShopScanDto,
+  ImpactMetrics,
 } from './types'
 
 export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '') || ''
@@ -403,4 +404,9 @@ export async function qrClaimOut(itemId: string, dto?: ShopScanDto) {
     auth: true,
     body: dto ?? {},
   })
+}
+
+// IMPACT ENDPOINTS
+export async function getMyImpactMetrics() {
+  return request<ApiEnvelope<ImpactMetrics>>('/items/me/impact', { auth: true })
 }
