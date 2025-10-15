@@ -21,7 +21,6 @@ import {
   Bell,
   Package,
   Storefront,
-  ChatCircle,
   House
 } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
@@ -185,9 +184,6 @@ function App() {
       { value: 'listings', label: isCollector ? 'My Collected Items' : 'My Listed Items', Icon: Package, show: true },
       { value: 'dropoff', label: 'Partner Shops', Icon: Storefront, show: !isCollector },
       { value: 'impact', label: 'Impact', Icon: Leaf, show: true },
-      // Expose Messages as a tab so it’s directly reachable
-      { value: 'messages', label: 'Messages', Icon: ChatCircle, show: Boolean(user) },
-      
     ].filter((tab) => tab.show)
   }, [user])
 

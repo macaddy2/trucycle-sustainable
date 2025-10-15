@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import { messageSocket } from '@/lib/messaging/socket'
 import { createOrFindRoom, listRoomMessages, listActiveRooms, sendGeneralMessage } from '@/lib/api'
-import type { DMMessageView } from '@/lib/api/types'
+import type { DMMessageView, DMRoom } from '@/lib/api/types'
 
 interface UserProfile {
   id: string
@@ -267,11 +267,16 @@ export function useMessaging() {
     return chats.find(chat => chat.itemId === itemId)
   }
 
-  const refreshActiveRooms = async () => {
+  const refreshActiveRooms = useCallback(async () => {
     if (!currentUser) return
     try {
       const res = await listActiveRooms()
-      const rooms = Array.isArray(res?.data) ? res.data : []
+      const payload = res?.data as unknown
+      const rooms: DMRoom[] = Array.isArray(payload)
+        ? (payload as DMRoom[])
+        : Array.isArray((payload as { rooms?: DMRoom[] | undefined })?.rooms)
+          ? ((payload as { rooms?: DMRoom[] }).rooms ?? [])
+          : []
       setChats(prev => {
         // Map each backend room to a lightweight Chat
         const mapped: Chat[] = rooms.map((r) => {
@@ -316,14 +321,31 @@ export function useMessaging() {
         const existingByRoom = new Map(prev.filter(c => c.remoteRoomId).map(c => [c.remoteRoomId!, c]))
         const merged = mapped.map(m => {
           const ex = existingByRoom.get(m.remoteRoomId!)
-          return ex ? { ...ex, lastMessage: m.lastMessage, updatedAt: m.updatedAt } : m
+          if (!ex) return m
+          return {
+            ...ex,
+            ...m,
+            // Preserve any richer metadata we might already have on the chat record
+            itemTitle: ex.itemTitle || m.itemTitle,
+            itemImage: ex.itemImage ?? m.itemImage,
+            donorAvatar: ex.donorAvatar ?? m.donorAvatar,
+            collectorAvatar: ex.collectorAvatar ?? m.collectorAvatar,
+            status: ex.status,
+            unreadCount: typeof ex.unreadCount === 'number' ? ex.unreadCount : m.unreadCount,
+          }
         })
-        return merged
+        const sortedMerged = [...merged].sort((a, b) => {
+          const aTime = a.updatedAt instanceof Date ? a.updatedAt.getTime() : new Date(a.updatedAt).getTime()
+          const bTime = b.updatedAt instanceof Date ? b.updatedAt.getTime() : new Date(b.updatedAt).getTime()
+          return bTime - aTime
+        })
+        const offlineChats = prev.filter(c => !c.remoteRoomId)
+        return [...sortedMerged, ...offlineChats]
       })
     } catch {
       // ignore; UI can remain empty
     }
-  }
+  }, [currentUser, setChats])
 
   return {
     chats,
