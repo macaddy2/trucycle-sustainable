@@ -746,503 +746,563 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     if (loadingChats || (selectedChatId && loadingThread)) {
       return <MessageCenterSkeleton />
     }
+
     return (
-    <>
-              <div className={`flex flex-col min-h-0 ${isPage ? 'h-[min(100svh,720px)]' : 'h-full'}`}>
-                <div className="flex items-center justify-between border-b border-border p-4">
+      <>
+        <div className={`flex flex-col min-h-0 ${isPage ? 'h-[min(100svh,720px)]' : 'h-full'}`}>
+          <div className="flex items-center justify-between border-b border-border p-4">
+            <div>
+              <h2 className="text-h3 font-medium">Messages</h2>
+              <p className="text-small text-muted-foreground">
+                {normalizedChats.length} active conversation{normalizedChats.length === 1 ? '' : 's'}
+              </p>
+            </div>
+            {/* Requests tab removed: requests are managed in My Listings */}
+          </div>
+
+          {false ? (
+            <div className="flex flex-1 min-h-0">
+              {groupedRequests.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground space-y-4">
+                  <Package size={48} className="mx-auto text-muted-foreground" />
                   <div>
-                    <h2 className="text-h3 font-medium">Messages</h2>
-                    <p className="text-small text-muted-foreground">
-                      {normalizedChats.length} active conversation{normalizedChats.length === 1 ? '' : 's'}
+                    <p className="font-medium">No claim requests yet</p>
+                    <p className="text-sm">
+                      Collectors can request your listings directly from the marketplace.
                     </p>
                   </div>
-                  {/* Requests tab removed: requests are managed in My Listings */}
                 </div>
-      
-                {false ? (
-                  <div className="flex flex-1 min-h-0">
-                    {groupedRequests.length === 0 ? (
-                      <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground space-y-4">
-                        <Package size={48} className="mx-auto text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">No claim requests yet</p>
-                          <p className="text-sm">
-                            Collectors can request your listings directly from the marketplace.
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="w-1/3 border-r border-border flex flex-col min-h-0">
-                          <ScrollArea className="flex-1 min-h-0">
-                            <div className="p-3 space-y-2">
-                              {groupedRequests.map(group => {
-                                const pending = group.requests.filter(request => request.status === 'pending').length
-                                const approved = group.requests.filter(request => request.status === 'approved').length
-                                const collected = group.requests.some(request => request.status === 'completed')
-                                return (
-                                  <Card
-                                    key={group.itemId}
-                                    className={`cursor-pointer transition-colors ${selectedRequestItem === group.itemId ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
-                                    onClick={() => setSelectedRequestItem(group.itemId)}
-                                  >
-                                    <CardContent className="p-3 space-y-2">
-                                      <p className="font-medium text-sm line-clamp-2">{group.itemTitle}</p>
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <Badge variant="outline">{group.requests.length} interested</Badge>
-                                        {pending > 0 && (
-                                          <Badge variant="destructive">{pending} pending</Badge>
-                                        )}
-                                        {approved > 0 && (
-                                          <Badge variant="secondary">{approved} confirmed</Badge>
-                                        )}
-                                        {collected && (
-                                          <Badge variant="secondary" className="bg-green-600 text-white">Collected</Badge>
-                                        )}
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                )
-                              })}
-                            </div>
-                          </ScrollArea>
-                        </div>
-      
-                        <div className="flex-1 flex flex-col min-h-0">
-                          {selectedRequestGroup ? (
-                            <ScrollArea className="flex-1 min-h-0">
-                              <div className="p-4 space-y-4">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <h3 className="text-h3">{selectedRequestGroup.itemTitle}</h3>
-                                    <p className="text-sm text-muted-foreground">
-                                      Select a collector to confirm the exchange.
-                                    </p>
-                                  </div>
-                                  <Badge variant="outline">Reward balance: {rewardBalance} GreenPoints</Badge>
+              ) : (
+                <>
+                  <div className="w-1/3 border-r border-border flex flex-col min-h-0">
+                    <ScrollArea className="flex-1 min-h-0">
+                      <div className="p-3 space-y-2">
+                        {groupedRequests.map(group => {
+                          const pending = group.requests.filter(request => request.status === 'pending').length
+                          const approved = group.requests.filter(request => request.status === 'approved').length
+                          const collected = group.requests.some(request => request.status === 'completed')
+                          return (
+                            <Card
+                              key={group.itemId}
+                              className={`cursor-pointer transition-colors ${selectedRequestItem === group.itemId ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
+                              onClick={() => setSelectedRequestItem(group.itemId)}
+                            >
+                              <CardContent className="p-3 space-y-2">
+                                <p className="font-medium text-sm line-clamp-2">{group.itemTitle}</p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge variant="outline">{group.requests.length} interested</Badge>
+                                  {pending > 0 && (
+                                    <Badge variant="destructive">{pending} pending</Badge>
+                                  )}
+                                  {approved > 0 && (
+                                    <Badge variant="secondary">{approved} confirmed</Badge>
+                                  )}
+                                  {collected && (
+                                    <Badge variant="secondary" className="bg-green-600 text-white">Collected</Badge>
+                                  )}
                                 </div>
-      
-                                {selectedRequestGroup.requests.map(request => {
-                                  const requestChat = normalizedChats.find(chat => chat.linkedRequestId === request.id)
-                                  return (
-                                    <Card key={request.id} className="border-border/60">
-                                      <CardContent className="p-4 space-y-4">
-                                        <div className="flex items-center justify-between">
-                                          <div className="flex items-center gap-3">
-                                            <Avatar className="h-10 w-10">
-                                              {request.collectorAvatar ? (
-                                                <AvatarImage src={request.collectorAvatar} alt={request.collectorName} />
-                                              ) : (
-                                                <AvatarFallback>{(request.collectorName || '?')[0]}</AvatarFallback>
-                                              )}
-                                            </Avatar>
-                                            <div>
-                                              <p className="font-medium">{request.collectorName}</p>
-                                              <p className="text-xs text-muted-foreground">
-                                                Requested {formatRelativeTime(request.createdAt)}
-                                              </p>
-                                            </div>
-                                          </div>
-                                          <Badge className={requestStatusStyles[request.status]}>
-                                            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                                          </Badge>
-                                        </div>
-      
-                                        <div className="flex flex-wrap gap-2 justify-between text-xs text-muted-foreground">
-                                          <span>Donor: {request.donorName}</span>
-                                          <span>Collector ID: {request.collectorId.slice(-6)}</span>
-                                        </div>
-      
-                                        <div className="flex flex-wrap gap-2">
-                                          {request.status === 'pending' && (
-                                            <Button size="sm" onClick={() => handleApproveRequest(request)}>
-                                              Confirm exchange
-                                            </Button>
-                                          )}
-                                          {request.status === 'approved' && requestChat && (
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={() => handleOpenChatForRequest(request)}
-                                            >
-                                              Open chat
-                                            </Button>
-                                          )}
-                                          {request.status === 'approved' && !requestChat && (
-                                            <Button size="sm" variant="outline" disabled>
-                                              Chat pending activation
-                                            </Button>
-                                          )}
-                                          {request.status === 'completed' && (
-                                            <Badge variant="outline" className="bg-green-100 text-green-700">
-                                              Reward issued
-                                            </Badge>
-                                          )}
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  )
-                                })}
-                              </div>
-                            </ScrollArea>
-                          ) : (
-                            <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                              Select an item to view interested collectors
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
+                              </CardContent>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    </ScrollArea>
                   </div>
-                ) : (
-                  <div className="flex flex-1 min-h-0">
-                    <div className={`${isPage && isMobile ? (selectedChatId ? 'hidden' : 'w-full') : 'w-1/3'} ${isPage && isMobile ? '' : 'border-r border-border'} flex flex-col min-h-0`}>
+
+                  <div className="flex-1 flex flex-col min-h-0">
+                    {selectedRequestGroup ? (
                       <ScrollArea className="flex-1 min-h-0">
-                        {normalizedChats.length === 0 ? (
-                          <div className="p-6 text-center text-sm text-muted-foreground space-y-2">
-                            <Package size={36} className="mx-auto text-muted-foreground" />
-                            <p>No conversations yet</p>
-                            <p>Start by requesting or listing an item.</p>
+                        <div className="p-4 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-h3">{selectedRequestGroup.itemTitle}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                Select a collector to confirm the exchange.
+                              </p>
+                            </div>
+                            <Badge variant="outline">Reward balance: {rewardBalance} GreenPoints</Badge>
                           </div>
-                        ) : (
-                          <div className="space-y-1 p-2">
-                            {normalizedChats.map(chat => (
-                              <Card
-                                key={chat.id}
-                                className={`cursor-pointer transition-colors ${selectedChatId === chat.id ? 'bg-muted border-primary' : 'hover:bg-muted/50'}`}
-                                onClick={() => { setSelectedChatId(chat.id); if (isPage) { pushMessagesPath(chat.remoteRoomId || chat.id) } }}
-                              >
-                                <CardContent className="p-3">
-                                  <div className="flex items-start space-x-3">
-                                    <Avatar className="w-10 h-10">
-                                      <AvatarImage src={currentUser.id === chat.donorId ? chat.collectorAvatar : chat.donorAvatar} />
-                                      <AvatarFallback>
-                                        {((currentUser.id === chat.donorId ? chat.collectorName : chat.donorName) || '?')[0]}
-                                      </AvatarFallback>
-                                    </Avatar>
-      
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          {(() => {
-                                            const otherId = currentUser.id === chat.donorId ? chat.collectorId : chat.donorId
-                                            const online = typeof chat.otherOnline === 'boolean' ? chat.otherOnline : isOnline(otherId)
-                                            return <span className={`${online ? 'bg-green-500' : 'bg-slate-300'} inline-block w-2 h-2 rounded-full`}></span>
-                                          })()}
-                                          <p className="text-small font-medium truncate">
-                                            {currentUser.id === chat.donorId ? chat.collectorName : chat.donorName}
-                                          </p>
-                                        </div>
-                                        {chat.unreadCount > 0 && (
-                                          <Badge variant="destructive" className="text-xs">
-                                            {chat.unreadCount}
-                                          </Badge>
+
+                          {selectedRequestGroup.requests.map(request => {
+                            const requestChat = normalizedChats.find(chat => chat.linkedRequestId === request.id)
+                            return (
+                              <Card key={request.id} className="border-border/60">
+                                <CardContent className="p-4 space-y-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <Avatar className="h-10 w-10">
+                                        {request.collectorAvatar ? (
+                                          <AvatarImage src={request.collectorAvatar} alt={request.collectorName} />
+                                        ) : (
+                                          <AvatarFallback>{(request.collectorName || '?')[0]}</AvatarFallback>
                                         )}
-                                      </div>
-                                      <p className="text-xs text-muted-foreground truncate">
-                                        {chat.itemTitle}
-                                      </p>
-                                      {chat.lastMessage && (
-                                        <p className="text-xs text-muted-foreground truncate mt-1">
-                                          {chat.lastMessage.content}
+                                      </Avatar>
+                                      <div>
+                                        <p className="font-medium">{request.collectorName}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Requested {formatRelativeTime(request.createdAt)}
                                         </p>
-                                      )}
-                                      <p className="text-xs text-muted-foreground mt-1">
-                                        {chat.lastMessage
-                                          ? formatRelativeTime(chat.lastMessage.timestamp)
-                                          : formatRelativeTime(chat.createdAt)}
-                                      </p>
+                                      </div>
                                     </div>
+                                    <Badge className={requestStatusStyles[request.status]}>
+                                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                                    </Badge>
+                                  </div>
+
+                                  <div className="flex flex-wrap gap-2 justify-between text-xs text-muted-foreground">
+                                    <span>Donor: {request.donorName}</span>
+                                    <span>Collector ID: {request.collectorId.slice(-6)}</span>
+                                  </div>
+
+                                  <div className="flex flex-wrap gap-2">
+                                    {request.status === 'pending' && (
+                                      <Button size="sm" onClick={() => handleApproveRequest(request)}>
+                                        Confirm exchange
+                                      </Button>
+                                    )}
+                                    {request.status === 'approved' && requestChat && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleOpenChatForRequest(request)}
+                                      >
+                                        Open chat
+                                      </Button>
+                                    )}
+                                    {request.status === 'approved' && !requestChat && (
+                                      <Button size="sm" variant="outline" disabled>
+                                        Chat pending activation
+                                      </Button>
+                                    )}
+                                    {request.status === 'completed' && (
+                                      <Badge variant="outline" className="bg-green-100 text-green-700">
+                                        Reward issued
+                                      </Badge>
+                                    )}
                                   </div>
                                 </CardContent>
                               </Card>
-                            ))}
-                          </div>
-                        )}
+                            )
+                          })}
+                        </div>
                       </ScrollArea>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                        Select an item to view interested collectors
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-1 min-h-0">
+              <div
+                className={`${
+                  isPage && isMobile ? (selectedChatId ? 'hidden' : 'w-full') : 'w-1/3'
+                } ${isPage && isMobile ? '' : 'border-r border-border'} flex flex-col min-h-0`}
+              >
+                <ScrollArea className="flex-1 min-h-0">
+                  {normalizedChats.length === 0 ? (
+                    <div className="p-6 text-center text-sm text-muted-foreground space-y-2">
+                      <Package size={36} className="mx-auto text-muted-foreground" />
+                      <p>No conversations yet</p>
+                      <p>Start by requesting or listing an item.</p>
                     </div>
-      
-                    <div className={`${isPage && isMobile ? (selectedChatId ? 'flex w-full' : 'hidden') : 'flex-1 flex'} flex-col min-h-0`}>
-                      {selectedChat ? (
-                        <>
-                          <div className="p-4 border-b border-border flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              {isPage && isMobile && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  aria-label="Back to chats"
-                                  onClick={() => { setSelectedChatId(null); if (isPage) pushMessagesPath(undefined) }}
-                                >
-                                  <ArrowLeft size={18} />
-                                </Button>
-                              )}
-                              <Avatar>
-                                <AvatarImage src={currentUser.id === selectedChat.donorId ? selectedChat.collectorAvatar : selectedChat.donorAvatar} />
+                  ) : (
+                    <div className="space-y-1 p-2">
+                      {normalizedChats.map(chat => (
+                        <Card
+                          key={chat.id}
+                          className={`cursor-pointer transition-colors ${
+                            selectedChatId === chat.id ? 'bg-muted border-primary' : 'hover:bg-muted/50'
+                          }`}
+                          onClick={() => {
+                            setSelectedChatId(chat.id)
+                            if (isPage) {
+                              pushMessagesPath(chat.remoteRoomId || chat.id)
+                            }
+                          }}
+                        >
+                          <CardContent className="p-3">
+                            <div className="flex items-start space-x-3">
+                              <Avatar className="w-10 h-10">
+                                <AvatarImage src={currentUser.id === chat.donorId ? chat.collectorAvatar : chat.donorAvatar} />
                                 <AvatarFallback>
-                                  {((currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName) || '?')[0]}
+                                  {((currentUser.id === chat.donorId ? chat.collectorName : chat.donorName) || '?')[0]}
                                 </AvatarFallback>
                               </Avatar>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  {(() => {
-                                    const otherId = currentUser.id === selectedChat.donorId ? selectedChat.collectorId : selectedChat.donorId
-                                    const online = typeof selectedChat.otherOnline === 'boolean' ? selectedChat.otherOnline : isOnline(otherId)
-                                    return <span className={`${online ? 'bg-green-500' : 'bg-slate-300'} inline-block w-2 h-2 rounded-full`}></span>
-                                  })()}
-                                  <h3 className="font-medium">
-                                    {currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName}
-                                  </h3>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {(() => {
+                                      const otherId = currentUser.id === chat.donorId ? chat.collectorId : chat.donorId
+                                      const online = typeof chat.otherOnline === 'boolean' ? chat.otherOnline : isOnline(otherId)
+                                      return (
+                                        <span className={`${online ? 'bg-green-500' : 'bg-slate-300'} inline-block w-2 h-2 rounded-full`}></span>
+                                      )
+                                    })()}
+                                    <p className="text-small font-medium truncate">
+                                      {currentUser.id === chat.donorId ? chat.collectorName : chat.donorName}
+                                    </p>
+                                  </div>
+                                  {chat.unreadCount > 0 && (
+                                    <Badge variant="destructive" className="text-xs">
+                                      {chat.unreadCount}
+                                    </Badge>
+                                  )}
                                 </div>
-                                <p className="text-small text-muted-foreground">
-                                  About: {selectedChat.itemTitle}
+                                <p className="text-xs text-muted-foreground truncate">{chat.itemTitle}</p>
+                                {chat.lastMessage && (
+                                  <p className="text-xs text-muted-foreground truncate mt-1">
+                                    {chat.lastMessage.content}
+                                  </p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {chat.lastMessage
+                                    ? formatRelativeTime(chat.lastMessage.timestamp)
+                                    : formatRelativeTime(chat.createdAt)}
                                 </p>
                               </div>
                             </div>
-                            <Badge variant={selectedChat.status === 'active' ? 'secondary' : 'outline'}>
-                              {selectedChat.status.replace('_', ' ')}
-                            </Badge>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+
+              <div
+                className={`${
+                  isPage && isMobile ? (selectedChatId ? 'flex w-full' : 'hidden') : 'flex-1 flex'
+                } flex-col min-h-0`}
+              >
+                {selectedChat ? (
+                  <>
+                    <div className="p-4 border-b border-border flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {isPage && isMobile && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Back to chats"
+                            onClick={() => {
+                              setSelectedChatId(null)
+                              if (isPage) pushMessagesPath(undefined)
+                            }}
+                          >
+                            <ArrowLeft size={18} />
+                          </Button>
+                        )}
+                        <Avatar>
+                          <AvatarImage src={
+                            currentUser.id === selectedChat.donorId
+                              ? selectedChat.collectorAvatar
+                              : selectedChat.donorAvatar
+                          } />
+                          <AvatarFallback>
+                            {((currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName) || '?')[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            {(() => {
+                              const otherId = currentUser.id === selectedChat.donorId ? selectedChat.collectorId : selectedChat.donorId
+                              const online =
+                                typeof selectedChat.otherOnline === 'boolean' ? selectedChat.otherOnline : isOnline(otherId)
+                              return (
+                                <span className={`${online ? 'bg-green-500' : 'bg-slate-300'} inline-block w-2 h-2 rounded-full`}></span>
+                              )
+                            })()}
+                            <h3 className="font-medium">
+                              {currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName}
+                            </h3>
                           </div>
-      
-                          <ScrollArea className="flex-1 min-h-0 p-4">
-                            <div ref={messagesContainerRef} className="space-y-4">
-                              {groupedMessages(currentMessages).map((block, idx) => {
-                                if (block.type === 'images') {
-                                  const align = block.senderId === currentUser.id ? 'justify-end' : 'justify-start'
-                                  return (
-                                    <div key={`imggrp_${idx}`} className={`flex ${align}`}>
-                                      <div className="max-w-[70%] rounded-lg p-2 bg-muted">
-                                        <div className="grid grid-cols-2 gap-2">
-                                          {block.images.map((url, i) => (
-                                            <img key={`${url}_${i}`} src={url} onClick={() => openImageViewer(block.images, i)} className="w-28 h-28 object-cover rounded cursor-pointer" />
-                                          ))}
-                                        </div>
-                                        {block.caption && (
-                                          <p className="text-xs mt-2 text-foreground whitespace-pre-line">{block.caption}</p>
-                                        )}
-                                        <div className="flex items-center justify-between mt-2 text-xs opacity-70">
-                                          <span>{block.senderName || 'User'}</span>
-                                          <span>{formatRelativeTime(block.timestamp)}</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )
-                                }
-                                const m = block.message
-                                return (
-                                  <div key={m.id} className={`flex ${m.senderId === currentUser.id ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[70%] rounded-lg p-3 ${m.senderId === currentUser.id ? 'bg-primary text-primary-foreground' : m.type === 'system' ? 'bg-muted text-muted-foreground' : 'bg-muted text-foreground'} ${m.type === 'system' ? 'mx-auto text-center' : ''}`}>
-                                      {m.type === 'location' && m.metadata?.location && (
-                                        <div className="flex items-center gap-2 mb-2">
-                                          <MapPin size={16} />
-                                          <span className="text-small">Location shared</span>
-                                        </div>
-                                      )}
-                                      <p className="text-small whitespace-pre-line">{m.content}</p>
-                                      <div className="flex items-center justify-between mt-2 text-xs opacity-70">
-                                        <span>{m.type !== 'system' ? m.senderName : 'System'}</span>
-                                        <span>{formatRelativeTime(m.timestamp)}</span>
-                                      </div>
-                                    </div>
+                          <p className="text-small text-muted-foreground">About: {selectedChat.itemTitle}</p>
+                        </div>
+                      </div>
+                      <Badge variant={selectedChat.status === 'active' ? 'secondary' : 'outline'}>
+                        {selectedChat.status.replace('_', ' ')}
+                      </Badge>
+                    </div>
+
+                    <ScrollArea className="flex-1 min-h-0 p-4">
+                      <div ref={messagesContainerRef} className="space-y-4">
+                        {groupedMessages(currentMessages).map((block, idx) => {
+                          if (block.type === 'images') {
+                            const align = block.senderId === currentUser.id ? 'justify-end' : 'justify-start'
+                            return (
+                              <div key={`imggrp_${idx}`} className={`flex ${align}`}>
+                                <div className="max-w-[70%] rounded-lg p-2 bg-muted">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {block.images.map((url, i) => (
+                                      <img
+                                        key={`${url}_${i}`}
+                                        src={url}
+                                        onClick={() => openImageViewer(block.images, i)}
+                                        className="w-28 h-28 object-cover rounded cursor-pointer"
+                                      />
+                                    ))}
                                   </div>
-                                )
-                              })}
-                              {pendingBlocks.map((p) => (
-                                p.type === 'images' ? (
-                                  <div key={p.id} className="flex justify-end opacity-60">
-                                    <div className="max-w-[70%] rounded-lg p-2 bg-muted">
-                                      <div className="grid grid-cols-2 gap-2">
-                                        {(p.images || []).map((url, i) => (
-                                          <img key={`${url}_${i}`} src={url} className="w-28 h-28 object-cover rounded" />
-                                        ))}
-                                      </div>
-                                      {p.content && (
-                                        <p className="text-xs mt-2 text-foreground whitespace-pre-line">{p.content}</p>
-                                      )}
-                                      <div className="flex items-center justify-between mt-2 text-xs opacity-70">
-                                        <span>{p.senderName}</span>
-                                        <span>Sending…</span>
-                                      </div>
-                                    </div>
+                                  {block.caption && (
+                                    <p className="text-xs mt-2 text-foreground whitespace-pre-line">{block.caption}</p>
+                                  )}
+                                  <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                                    <span>{block.senderName || 'User'}</span>
+                                    <span>{formatRelativeTime(block.timestamp)}</span>
                                   </div>
-                                ) : (
-                                  <div key={p.id} className="flex justify-end">
-                                    <div className="max-w-[70%] rounded-lg p-3 bg-primary text-primary-foreground opacity-60">
-                                      <p className="text-small whitespace-pre-line">{p.content}</p>
-                                      <div className="flex items-center justify-between mt-2 text-xs opacity-70">
-                                        <span>{p.senderName}</span>
-                                        <span>Sending…</span>
-                                      </div>
-                                    </div>
+                                </div>
+                              </div>
+                            )
+                          }
+                          const m = block.message
+                          return (
+                            <div
+                              key={m.id}
+                              className={`flex ${m.senderId === currentUser.id ? 'justify-end' : 'justify-start'}`}
+                            >
+                              <div
+                                className={`max-w-[70%] rounded-lg p-3 ${
+                                  m.senderId === currentUser.id
+                                    ? 'bg-primary text-primary-foreground'
+                                    : m.type === 'system'
+                                    ? 'bg-muted text-muted-foreground'
+                                    : 'bg-muted text-foreground'
+                                } ${m.type === 'system' ? 'mx-auto text-center' : ''}`}
+                              >
+                                {m.type === 'location' && m.metadata?.location && (
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <MapPin size={16} />
+                                    <span className="text-small">Location shared</span>
                                   </div>
-                                )
-                              ))}
-                              <div ref={messagesEndRef} />
+                                )}
+                                <p className="text-small whitespace-pre-line">{m.content}</p>
+                                <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                                  <span>{m.type !== 'system' ? m.senderName : 'System'}</span>
+                                  <span>{formatRelativeTime(m.timestamp)}</span>
+                                </div>
+                              </div>
                             </div>
-                          </ScrollArea>
-      
-                          {quickActions.length > 0 && (
-                            <div className="p-3 border-t border-border flex flex-wrap gap-2">
-                              {quickActions.map(action => (
-                                <Button
-                                  key={action.label}
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={action.action}
-                                  className="flex items-center space-x-1"
-                                >
-                                  <action.icon size={14} className={action.color} />
-                                  <span className="text-xs">{action.label}</span>
-                                </Button>
-                              ))}
-                            </div>
-                          )}
-      
-                          {messageTemplates.length > 0 && (
-                            <div className="px-4 py-2 border-t border-border bg-muted/40 flex flex-wrap gap-2">
-                              {messageTemplates.map(template => (
-                                <Button
-                                  key={template}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-left whitespace-normal"
-                                  onClick={() => setNewMessage(template)}
-                                >
-                                  {template}
-                                </Button>
-                              ))}
-                            </div>
-                          )}
-      
-                          <div className="p-4 border-t border-border">
-                            <div className="flex gap-2 items-center">
-                              <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*"
-                                multiple
-                                className="hidden"
-                                onChange={handleImageSelected}
-                              />
-                              <Button type="button" variant="outline" size="icon" onClick={handlePickImage} title="Attach image">
-                                <Paperclip size={16} />
-                              </Button>
-                              {attachments.length > 0 && (
-                                <div className="flex gap-2 overflow-x-auto py-1">
-                                  {attachments.map((a, i) => (
-                                    <div key={i} className="relative">
-                                      <img src={a.url} className="w-12 h-12 object-cover rounded" onClick={() => openImageViewer(attachments.map(x => x.url), i)} />
-                                      <button className="absolute -top-1 -right-1 bg-black/60 text-white rounded-full w-5 h-5 text-xs" onClick={() => removeAttachment(i)}>×</button>
-                                    </div>
+                          )
+                        })}
+                        {pendingBlocks.map(p => (
+                          p.type === 'images' ? (
+                            <div key={p.id} className="flex justify-end opacity-60">
+                              <div className="max-w-[70%] rounded-lg p-2 bg-muted">
+                                <div className="grid grid-cols-2 gap-2">
+                                  {(p.images || []).map((url, i) => (
+                                    <img key={`${url}_${i}`} src={url} className="w-28 h-28 object-cover rounded" />
                                   ))}
                                 </div>
-                              )}
-                              <Input
-                                placeholder="Type your message..."
-                                value={newMessage}
-                                onChange={(event) => setNewMessage(event.target.value)}
-                                onKeyDown={(event) => {
-                                  if (event.key === 'Enter' && !event.shiftKey) {
-                                    event.preventDefault()
-                                    handleSendMessage()
-                                  }
-                                }}
-                                className="flex-1"
-                              />
-                              <Button onClick={handleSendMessage} disabled={!newMessage.trim() && attachments.length === 0} size="icon" title="Send">
-                                <PaperPlaneTilt size={16} />
-                              </Button>
+                                {p.content && (
+                                  <p className="text-xs mt-2 text-foreground whitespace-pre-line">{p.content}</p>
+                                )}
+                                <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                                  <span>{p.senderName}</span>
+                                  <span>Sending…</span>
+                                </div>
+                              </div>
                             </div>
+                          ) : (
+                            <div key={p.id} className="flex justify-end">
+                              <div className="max-w-[70%] rounded-lg p-3 bg-primary text-primary-foreground opacity-60">
+                                <p className="text-small whitespace-pre-line">{p.content}</p>
+                                <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                                  <span>{p.senderName}</span>
+                                  <span>Sending…</span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        ))}
+                        <div ref={messagesEndRef} />
+                      </div>
+                    </ScrollArea>
+
+                    {quickActions.length > 0 && (
+                      <div className="p-3 border-t border-border flex flex-wrap gap-2">
+                        {quickActions.map(action => (
+                          <Button
+                            key={action.label}
+                            variant="outline"
+                            size="sm"
+                            onClick={action.action}
+                            className="flex items-center space-x-1"
+                          >
+                            <action.icon size={14} className={action.color} />
+                            <span className="text-xs">{action.label}</span>
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+
+                    {messageTemplates.length > 0 && (
+                      <div className="px-4 py-2 border-t border-border bg-muted/40 flex flex-wrap gap-2">
+                        {messageTemplates.map(template => (
+                          <Button
+                            key={template}
+                            variant="ghost"
+                            size="sm"
+                            className="text-left whitespace-normal"
+                            onClick={() => setNewMessage(template)}
+                          >
+                            {template}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="p-4 border-t border-border">
+                      <div className="flex gap-2 items-center">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={handleImageSelected}
+                        />
+                        <Button type="button" variant="outline" size="icon" onClick={handlePickImage} title="Attach image">
+                          <Paperclip size={16} />
+                        </Button>
+                        {attachments.length > 0 && (
+                          <div className="flex gap-2 overflow-x-auto py-1">
+                            {attachments.map((a, i) => (
+                              <div key={i} className="relative">
+                                <img
+                                  src={a.url}
+                                  className="w-12 h-12 object-cover rounded"
+                                  onClick={() => openImageViewer(attachments.map(x => x.url), i)}
+                                />
+                                <button
+                                  className="absolute -top-1 -right-1 bg-black/60 text-white rounded-full w-5 h-5 text-xs"
+                                  onClick={() => removeAttachment(i)}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
                           </div>
-                        </>
-                      ) : (
-                        <div className="flex-1 flex flex-col">
-                          {isPage && isMobile && (
-                            <div className="p-4 border-b border-border flex items-center">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label="Back to chats"
-                                onClick={() => { setSelectedChatId(null); if (isPage) pushMessagesPath(undefined) }}
-                              >
-                                <ArrowLeft size={18} />
-                              </Button>
-                              <span className="ml-2 text-sm text-muted-foreground">Chats</span>
-                            </div>
-                          )}
-                          <div className="flex-1 flex items-center justify-center">
-                            <div className="text-center space-y-2 text-muted-foreground">
-                              <Package size={48} className="mx-auto text-muted-foreground" />
-                              <p className="font-medium text-foreground">{chatId ? 'Loading conversation…' : 'Select a conversation'}</p>
-                              {!chatId && (
-                                <p className="text-sm">Choose a chat from the {isPage && isMobile ? 'list' : 'sidebar'} to start messaging</p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                        )}
+                        <Input
+                          placeholder="Type your message..."
+                          value={newMessage}
+                          onChange={event => setNewMessage(event.target.value)}
+                          onKeyDown={event => {
+                            if (event.key === 'Enter' && !event.shiftKey) {
+                              event.preventDefault()
+                              handleSendMessage()
+                            }
+                          }}
+                          className="flex-1"
+                        />
+                        <Button
+                          onClick={handleSendMessage}
+                          disabled={!newMessage.trim() && attachments.length === 0}
+                          size="icon"
+                          title="Send"
+                        >
+                          <PaperPlaneTilt size={16} />
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex flex-col">
+                    {isPage && isMobile && (
+                      <div className="p-4 border-b border-border flex items-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Back to chats"
+                          onClick={() => {
+                            setSelectedChatId(null)
+                            if (isPage) pushMessagesPath(undefined)
+                          }}
+                        >
+                          <ArrowLeft size={18} />
+                        </Button>
+                        <span className="ml-2 text-sm text-muted-foreground">Chats</span>
+                      </div>
+                    )}
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center space-y-2 text-muted-foreground">
+                        <Package size={48} className="mx-auto text-muted-foreground" />
+                        <p className="font-medium text-foreground">{chatId ? 'Loading conversation…' : 'Select a conversation'}</p>
+                        {!chatId && (
+                          <p className="text-sm">
+                            Choose a chat from the {isPage && isMobile ? 'list' : 'sidebar'} to start messaging
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
-      
-              {selectedDropOffLocation && selectedChat && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                  <div className="bg-background p-6 rounded-lg max-w-md w-full mx-4 space-y-4">
-                    <div>
-                      <h3 className="text-h3 mb-2">Generate QR Code</h3>
-                      <p className="text-muted-foreground text-sm">
-                        Choose your role for this transaction to generate the right QR code.
-                      </p>
-                    </div>
-      
-                    {currentUser.id === selectedChat.donorId && (
-                      <QRCodeGenerator
-                        itemId={selectedChat.itemId}
-                        itemTitle={selectedChat.itemTitle}
-                        category={listingForChat?.category ?? 'general'}
-                        condition={listingForChat?.condition ?? 'good'}
-                        actionType={listingForChat?.actionType ?? 'donate'}
-                        co2Impact={listingForChat?.co2Impact ?? 25}
-                        description={listingForChat?.description}
-                        primaryImageUrl={listingForChat?.photos?.[0]}
-                        dropOffLocation={generatorDropOffLocation}
-                        type="donor"
-                        onGenerated={handleQRCodeGenerated}
-                      />
-                    )}
+            </div>
+          )}
+        </div>
 
-                    {currentUser.id === selectedChat.collectorId && (
-                      <QRCodeGenerator
-                        itemId={selectedChat.itemId}
-                        itemTitle={selectedChat.itemTitle}
-                        category={listingForChat?.category ?? 'general'}
-                        condition={listingForChat?.condition ?? 'good'}
-                        actionType={listingForChat?.actionType ?? 'donate'}
-                        co2Impact={listingForChat?.co2Impact ?? 25}
-                        description={listingForChat?.description}
-                        primaryImageUrl={listingForChat?.photos?.[0]}
-                        dropOffLocation={generatorDropOffLocation}
-                        type="collector"
-                        onGenerated={handleQRCodeGenerated}
-                      />
-                    )}
-      
-                    <Button variant="outline" onClick={() => setSelectedDropOffLocation('')} className="w-full">
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              )}
-      
-              {showQRCode && (
-                <QRCodeDisplay
-                  qrData={showQRCode}
-                  onClose={() => setShowQRCode(null)}
+        {selectedDropOffLocation && selectedChat && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-background p-6 rounded-lg max-w-md w-full mx-4 space-y-4">
+              <div>
+                <h3 className="text-h3 mb-2">Generate QR Code</h3>
+                <p className="text-muted-foreground text-sm">
+                  Choose your role for this transaction to generate the right QR code.
+                </p>
+              </div>
+
+              {currentUser.id === selectedChat.donorId && (
+                <QRCodeGenerator
+                  itemId={selectedChat.itemId}
+                  itemTitle={selectedChat.itemTitle}
+                  category={listingForChat?.category ?? 'general'}
+                  condition={listingForChat?.condition ?? 'good'}
+                  actionType={listingForChat?.actionType ?? 'donate'}
+                  co2Impact={listingForChat?.co2Impact ?? 25}
+                  description={listingForChat?.description}
+                  primaryImageUrl={listingForChat?.photos?.[0]}
+                  dropOffLocation={generatorDropOffLocation}
+                  type="donor"
+                  onGenerated={handleQRCodeGenerated}
                 />
               )}
-    </>
-  )
+
+              {currentUser.id === selectedChat.collectorId && (
+                <QRCodeGenerator
+                  itemId={selectedChat.itemId}
+                  itemTitle={selectedChat.itemTitle}
+                  category={listingForChat?.category ?? 'general'}
+                  condition={listingForChat?.condition ?? 'good'}
+                  actionType={listingForChat?.actionType ?? 'donate'}
+                  co2Impact={listingForChat?.co2Impact ?? 25}
+                  description={listingForChat?.description}
+                  primaryImageUrl={listingForChat?.photos?.[0]}
+                  dropOffLocation={generatorDropOffLocation}
+                  type="collector"
+                  onGenerated={handleQRCodeGenerated}
+                />
+              )}
+
+              <Button variant="outline" onClick={() => setSelectedDropOffLocation('')} className="w-full">
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {showQRCode && (
+          <QRCodeDisplay
+            qrData={showQRCode}
+            onClose={() => setShowQRCode(null)}
+          />
+        )}
+      </>
+    )
+  }
 
   if (isPage) {
     return (
@@ -1268,124 +1328,161 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
           <div className="relative max-w-3xl w-full px-4">
             <img src={imageViewer.urls[imageViewer.index]} className="max-h-[80vh] w-full object-contain rounded" />
             <div className="absolute top-2 right-2">
-              <Button size="sm" variant="secondary" onClick={closeImageViewer}>Close</Button>
+              <Button size="sm" variant="secondary" onClick={closeImageViewer}>
+                Close
+              </Button>
             </div>
           </div>
         </div>
       )}
 
       {showLocationSheet && (
-          <div className="fixed inset-0 z-50">
-            <div className="absolute inset-0 bg-black/40" onClick={() => setShowLocationSheet(false)} />
-            <div className="absolute inset-x-0 bottom-0 bg-background border-t border-border rounded-t-2xl p-4 shadow-lg max-h-[80vh] overflow-auto">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-medium">Share location</h4>
-                <Button variant="ghost" size="sm" onClick={() => setShowLocationSheet(false)}>Close</Button>
-              </div>
-              <div className="space-y-3">
-                <div className="text-sm text-muted-foreground">Pick a place using OpenStreetMap</div>
-                <Button variant="outline" onClick={() => setInlineLocationPickerOpen(true)}>Open map selector</Button>
-                {locationValue.lat && locationValue.lng && (
-                  <div className="rounded-md border p-3 text-sm">
-                    <div className="font-medium">{locationValue.label || 'Selected location'}</div>
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <Button
-                    className="flex-1"
-                    onClick={() => {
-                      if (!selectedChat || !locationValue.lat || !locationValue.lng) return
-                      dispatchMessage(selectedChat.id, locationValue.label || 'Shared location', 'location', {
-                        location: { lat: locationValue.lat, lng: locationValue.lng, address: locationValue.label || 'Selected location' }
-                      })
-                      toast.success('Location shared')
-                      setShowLocationSheet(false)
-                    }}
-                    disabled={!locationValue.lat || !locationValue.lng}
-                  >
-                    Share
-                  </Button>
-                  <Button variant="outline" className="flex-1" onClick={() => setShowLocationSheet(false)}>Cancel</Button>
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowLocationSheet(false)} />
+          <div className="absolute inset-x-0 bottom-0 bg-background border-t border-border rounded-t-2xl p-4 shadow-lg max-h-[80vh] overflow-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium">Share location</h4>
+              <Button variant="ghost" size="sm" onClick={() => setShowLocationSheet(false)}>
+                Close
+              </Button>
+            </div>
+            <div className="space-y-3">
+              <div className="text-sm text-muted-foreground">Pick a place using OpenStreetMap</div>
+              <Button variant="outline" onClick={() => setInlineLocationPickerOpen(true)}>
+                Open map selector
+              </Button>
+              {locationValue.lat && locationValue.lng && (
+                <div className="rounded-md border p-3 text-sm">
+                  <div className="font-medium">{locationValue.label || 'Selected location'}</div>
                 </div>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    if (!selectedChat || !locationValue.lat || !locationValue.lng) return
+                    dispatchMessage(selectedChat.id, locationValue.label || 'Shared location', 'location', {
+                      location: {
+                        lat: locationValue.lat,
+                        lng: locationValue.lng,
+                        address: locationValue.label || 'Selected location'
+                      }
+                    })
+                    toast.success('Location shared')
+                    setShowLocationSheet(false)
+                  }}
+                  disabled={!locationValue.lat || !locationValue.lng}
+                >
+                  Share
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={() => setShowLocationSheet(false)}>
+                  Cancel
+                </Button>
               </div>
             </div>
-            <LocationSelector
-              open={inlineLocationPickerOpen}
-              onOpenChange={setInlineLocationPickerOpen}
-              initialValue={locationValue}
-              onApply={(val) => setLocationValue(val)}
-            />
           </div>
-        )}
+          <LocationSelector
+            open={inlineLocationPickerOpen}
+            onOpenChange={setInlineLocationPickerOpen}
+            initialValue={locationValue}
+            onApply={val => setLocationValue(val)}
+          />
+        </div>
+      )}
 
       {showScheduleSheet && (
-          <div className="fixed inset-0 z-50">
-            <div className="absolute inset-0 bg-black/40" onClick={() => setShowScheduleSheet(false)} />
-            <div className="absolute inset-x-0 bottom-0 bg-background border-t border-border rounded-t-2xl p-4 shadow-lg max-h-[80vh] overflow-auto">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-medium">Schedule pickup</h4>
-                <Button variant="ghost" size="sm" onClick={() => setShowScheduleSheet(false)}>Close</Button>
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowScheduleSheet(false)} />
+          <div className="absolute inset-x-0 bottom-0 bg-background border-t border-border rounded-t-2xl p-4 shadow-lg max-h-[80vh] overflow-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium">Schedule pickup</h4>
+              <Button variant="ghost" size="sm" onClick={() => setShowScheduleSheet(false)}>
+                Close
+              </Button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-muted-foreground">Pickup time</label>
+                <Input type="datetime-local" value={scheduleDateTime} onChange={e => setScheduleDateTime(e.target.value)} />
               </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs text-muted-foreground">Pickup time</label>
-                  <Input type="datetime-local" value={scheduleDateTime} onChange={(e) => setScheduleDateTime(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <div className="text-xs text-muted-foreground">Location</div>
-                  {scheduleLocation?.label ? (
-                    <div className="rounded-md border p-3 text-sm">
-                      <div className="font-medium">{scheduleLocation.label}</div>
-                      {typeof scheduleLocation.lat === 'number' && typeof scheduleLocation.lng === 'number' && null}
+              <div className="space-y-2">
+                <div className="text-xs text-muted-foreground">Location</div>
+                {scheduleLocation?.label ? (
+                  <div className="rounded-md border p-3 text-sm">
+                    <div className="font-medium">{scheduleLocation.label}</div>
+                    {typeof scheduleLocation.lat === 'number' && typeof scheduleLocation.lng === 'number' && null}
                   </div>
                 ) : (
-                    <div className="text-sm text-muted-foreground">No location chosen</div>
-                  )}
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setInlineLocationPickerOpen(true)}>Choose on map</Button>
-                    <Button
-                      onClick={() => {
-                        if (!navigator.geolocation) return
-                        navigator.geolocation.getCurrentPosition((pos) => {
-                          setScheduleLocation({ lat: Number(pos.coords.latitude.toFixed(7)), lng: Number(pos.coords.longitude.toFixed(7)), label: 'Current location' })
-                          toast.success('Using current location')
-                        })
-                      }}
-                    >
-                      Use my location
-                    </Button>
-                  </div>
-                </div>
+                  <div className="text-sm text-muted-foreground">No location chosen</div>
+                )}
                 <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setInlineLocationPickerOpen(true)}>
+                    Choose on map
+                  </Button>
                   <Button
-                    className="flex-1"
-                    disabled={!scheduleDateTime || !scheduleLocation}
                     onClick={() => {
-                      if (!selectedChat) return
-                      const dt = new Date(scheduleDateTime)
-                      const when = isNaN(dt.getTime()) ? scheduleDateTime : dt.toLocaleString()
-                      const where = scheduleLocation?.label || 'Selected location'
-                      sendSystemMessage(selectedChat.id, `Pickup has been scheduled for ${when} at ${where}.`, 'pickup_scheduled')
-                      toast.success('Pickup details shared')
-                      setShowScheduleSheet(false)
+                      if (!navigator.geolocation) return
+                      navigator.geolocation.getCurrentPosition(pos => {
+                        setScheduleLocation({
+                          lat: Number(pos.coords.latitude.toFixed(7)),
+                          lng: Number(pos.coords.longitude.toFixed(7)),
+                          label: 'Current location'
+                        })
+                        toast.success('Using current location')
+                      })
                     }}
                   >
-                    Share schedule
+                    Use my location
                   </Button>
-                  <Button variant="outline" className="flex-1" onClick={() => setShowScheduleSheet(false)}>Cancel</Button>
                 </div>
               </div>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  disabled={!scheduleDateTime || !scheduleLocation}
+                  onClick={() => {
+                    if (!selectedChat) return
+                    const dt = new Date(scheduleDateTime)
+                    const when = isNaN(dt.getTime()) ? scheduleDateTime : dt.toLocaleString()
+                    const where = scheduleLocation?.label || 'Selected location'
+                    sendSystemMessage(
+                      selectedChat.id,
+                      `Pickup has been scheduled for ${when} at ${where}.`,
+                      'pickup_scheduled'
+                    )
+                    toast.success('Pickup details shared')
+                    setShowScheduleSheet(false)
+                  }}
+                >
+                  Share schedule
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={() => setShowScheduleSheet(false)}>
+                  Cancel
+                </Button>
+              </div>
             </div>
-            <LocationSelector
-              open={inlineLocationPickerOpen}
-              onOpenChange={(open) => {
-                setInlineLocationPickerOpen(open)
-              }}
-              initialValue={{ lat: scheduleLocation?.lat, lng: scheduleLocation?.lng, label: scheduleLocation?.label, radiusKm: 5 }}
-              onApply={(val: any) => setScheduleLocation({ lat: typeof val.lat === 'number' ? Number(val.lat.toFixed(7)) : val.lat, lng: typeof val.lng === 'number' ? Number(val.lng.toFixed(7)) : val.lng, label: val.label })}
-            />
           </div>
-        )}
+          <LocationSelector
+            open={inlineLocationPickerOpen}
+            onOpenChange={open => {
+              setInlineLocationPickerOpen(open)
+            }}
+            initialValue={{
+              lat: scheduleLocation?.lat,
+              lng: scheduleLocation?.lng,
+              label: scheduleLocation?.label,
+              radiusKm: 5
+            }}
+            onApply={(val: any) =>
+              setScheduleLocation({
+                lat: typeof val.lat === 'number' ? Number(val.lat.toFixed(7)) : val.lat,
+                lng: typeof val.lng === 'number' ? Number(val.lng.toFixed(7)) : val.lng,
+                label: val.label
+              })
+            }
+          />
+        </div>
+      )}
     </>
-  )}
+  )
 }
