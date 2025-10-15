@@ -11,8 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { MapPin, Clock, Phone, NavigationArrow, Storefront, ArrowRight, WarningCircle } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { shopsNearby, type NearbyShop } from '@/lib/api'
-import { toast } from 'sonner'
-import { DROP_OFF_LOCATIONS, type DropOffLocation } from './dropOffLocations'
+import type { DropOffLocation } from './dropOffLocations'
 
 interface DropOffMapProps {
   onPlanDropOff?: (location: DropOffLocation) => void
@@ -108,7 +107,6 @@ function RecenterMap({ center }: { center: [number, number] }) {
   return null
 }
 
-  const [storedLocations] = useKV<DropOffLocation[]>('dropoff-locations', [])
   const [remoteLocations, setRemoteLocations] = useState<DropOffLocation[]>([])
   const [loadingNearby, setLoadingNearby] = useState(false)
   const [nearbyError, setNearbyError] = useState<string | null>(null)
@@ -132,9 +130,7 @@ function RecenterMap({ center }: { center: [number, number] }) {
         if (!cancelled) {
           const mapped = data.map((shop, index) => shopToLocation(shop, index))
           setRemoteLocations(mapped)
-          if (mapped.length === 0 && !postcode) {
-            toast.info('No live partner shops found near the default area. Showing sample locations instead.')
-          }
+          // If there are no live results, do not show local/sample shops.
         }
       } catch (error: any) {
         console.error('Failed to fetch nearby shops', error)
@@ -166,21 +162,8 @@ function RecenterMap({ center }: { center: [number, number] }) {
       merged.set(normalized.id, normalized)
     })
 
-    for (const location of storedLocations ?? []) {
-      merged.set(location.id, {
-        ...location,
-        coordinates: location.coordinates ?? defaultCoordinateFallback(merged.size),
-      })
-    }
-
-    for (const location of DROP_OFF_LOCATIONS) {
-      if (!merged.has(location.id)) {
-        merged.set(location.id, location)
-      }
-    }
-
     return Array.from(merged.values())
-  }, [remoteLocations, storedLocations])
+  }, [remoteLocations])
 
   const [activeLocationId, setActiveLocationId] = useState<string | null>(locations[0]?.id ?? null)
 
@@ -258,8 +241,8 @@ function RecenterMap({ center }: { center: [number, number] }) {
               </p>
             </div>
           ) : (
-            <div className="grid gap-6 lg:grid-cols-[1.6fr,1fr]">
-              <div className="space-y-4">
+            <div className="grid gap-6 md:grid-cols-8">
+              <div className="space-y-4 md:col-span-5">
                 <div className="overflow-hidden rounded-2xl border border-primary/30 bg-background shadow-sm">
                   <div className="flex flex-col gap-2 border-b border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -340,7 +323,7 @@ function RecenterMap({ center }: { center: [number, number] }) {
                 </div>
 
               </div>
-              <ScrollArea className="h-[420px] rounded-2xl border border-border/80 bg-background">
+              <ScrollArea className="h-[420px] rounded-2xl border border-border/80 bg-background md:col-span-3">
                 <div className="divide-y">
                   {locations.map(location => (
                     <div
@@ -360,7 +343,11 @@ function RecenterMap({ center }: { center: [number, number] }) {
                           </p>
                           <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                             <span>Postcode: {location.postcode}</span>
-                            <span>{location.distance}</span>
+                            {location.distance && location.distance !== 'Distance unavailable' ? (
+                              <span>{location.distance}</span>
+                            ) : (
+                              <span>Open: {location.openHours}</span>
+                            )}
                           </div>
                         </div>
                         <div className="flex flex-col gap-2 text-xs text-muted-foreground">
@@ -417,7 +404,7 @@ function RecenterMap({ center }: { center: [number, number] }) {
         </CardContent>
       </Card>
 
-      <Card className="border-accent/20 bg-accent/5">
+      {/* <Card className="border-accent/20 bg-accent/5">
         <CardHeader>
           <CardTitle className="text-h3">How the Partner Shop flow works</CardTitle>
           <CardDescription>
@@ -440,7 +427,7 @@ function RecenterMap({ center }: { center: [number, number] }) {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   )
 }
