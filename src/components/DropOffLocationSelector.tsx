@@ -26,6 +26,54 @@ const selectorMarkerIcon = L.icon({
   shadowAnchor: [12, 41],
 })
 
+const formatDistance = (distanceMeters?: number | null): string => {
+  if (typeof distanceMeters !== 'number' || !Number.isFinite(distanceMeters) || distanceMeters < 0) {
+    return 'Distance unavailable'
+  }
+  if (distanceMeters === 0) return 'same Block'
+  if (distanceMeters >= 1000) {
+    const km = distanceMeters / 1000
+    return `${km >= 10 ? km.toFixed(0) : km.toFixed(1)} km`
+  }
+  return `${Math.round(distanceMeters)} m`
+}
+
+const formatOpeningHours = (opening?: NearbyShop['opening_hours'] | null): string => {
+  if (!opening) return 'Hours not available'
+  const { days, open_time, close_time } = opening
+  const joinedDays = Array.isArray(days) && days.length > 0 ? days.join(', ') : 'Daily'
+  if (!open_time && !close_time) return joinedDays
+  if (open_time && close_time) return `${joinedDays} ${open_time} - ${close_time}`
+  if (open_time) return `${joinedDays} from ${open_time}`
+  if (close_time) return `${joinedDays} until ${close_time}`
+  return joinedDays
+}
+
+const shopToLocation = (shop: NearbyShop, index: number): DropOffLocation => {
+  const coordinates =
+    typeof shop.latitude === 'number' && Number.isFinite(shop.latitude) &&
+    typeof shop.longitude === 'number' && Number.isFinite(shop.longitude)
+      ? { lat: shop.latitude, lng: shop.longitude }
+      : { lat: 51.541 + (index % 3) * 0.01, lng: -0.142 + Math.floor(index / 3) * 0.01 }
+
+  const acceptedItems = Array.isArray(shop.acceptable_categories) && shop.acceptable_categories.length > 0
+    ? shop.acceptable_categories
+    : ['General donations']
+
+  return {
+    id: shop.id || `shop-${index}`,
+    name: shop.name || 'TruCycle Partner Shop',
+    address: shop.address_line || 'Address available upon confirmation',
+    postcode: shop.postcode || '—',
+    distance: formatDistance(shop.distanceMeters),
+    openHours: formatOpeningHours(shop.opening_hours),
+    phone: shop.phone_number || 'Contact provided after booking',
+    acceptedItems,
+    specialServices: shop.active === false ? [] : ['Verified partner'],
+    coordinates,
+  }
+}
+
 export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }: DropOffLocationSelectorProps) {
   const RecenterMap = ({ center }: { center: [number, number] }) => {
     const map = useMap()
@@ -33,55 +81,6 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
       map.setView(center)
     }, [center, map])
     return null
-  }
-
-  // Helpers mirroring DropOffMap behaviour, with "same Block" when distanceMeters = 0
-  const formatDistance = (distanceMeters?: number | null): string => {
-    if (typeof distanceMeters !== 'number' || !Number.isFinite(distanceMeters) || distanceMeters < 0) {
-      return 'Distance unavailable'
-    }
-    if (distanceMeters === 0) return 'same Block'
-    if (distanceMeters >= 1000) {
-      const km = distanceMeters / 1000
-      return `${km >= 10 ? km.toFixed(0) : km.toFixed(1)} km`
-    }
-    return `${Math.round(distanceMeters)} m`
-  }
-
-  const formatOpeningHours = (opening?: NearbyShop['opening_hours'] | null): string => {
-    if (!opening) return 'Hours not available'
-    const { days, open_time, close_time } = opening
-    const joinedDays = Array.isArray(days) && days.length > 0 ? days.join(', ') : 'Daily'
-    if (!open_time && !close_time) return joinedDays
-    if (open_time && close_time) return `${joinedDays} ${open_time} - ${close_time}`
-    if (open_time) return `${joinedDays} from ${open_time}`
-    if (close_time) return `${joinedDays} until ${close_time}`
-    return joinedDays
-  }
-
-  const shopToLocation = (shop: NearbyShop, index: number): DropOffLocation => {
-    const coordinates =
-      typeof shop.latitude === 'number' && Number.isFinite(shop.latitude) &&
-      typeof shop.longitude === 'number' && Number.isFinite(shop.longitude)
-        ? { lat: shop.latitude, lng: shop.longitude }
-        : { lat: 51.541 + (index % 3) * 0.01, lng: -0.142 + Math.floor(index / 3) * 0.01 }
-
-    const acceptedItems = Array.isArray(shop.acceptable_categories) && shop.acceptable_categories.length > 0
-      ? shop.acceptable_categories
-      : ['General donations']
-
-    return {
-      id: shop.id || `shop-${index}`,
-      name: shop.name || 'TruCycle Partner Shop',
-      address: shop.address_line || 'Address available upon confirmation',
-      postcode: shop.postcode || '—',
-      distance: formatDistance(shop.distanceMeters),
-      openHours: formatOpeningHours(shop.opening_hours),
-      phone: shop.phone_number || 'Contact provided after booking',
-      acceptedItems,
-      specialServices: shop.active === false ? [] : ['Verified partner'],
-      coordinates,
-    }
   }
 
   const [remoteLocations, setRemoteLocations] = useState<DropOffLocation[]>([])
@@ -111,7 +110,7 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
     }
     load()
     return () => { cancelled = true }
-  }, [user?.postcode])
+  }, [activeLocationId, selectedLocation, user?.postcode])
 
   useEffect(() => {
     if (selectedLocation) {

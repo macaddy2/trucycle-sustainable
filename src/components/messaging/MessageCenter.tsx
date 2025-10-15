@@ -6,7 +6,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   PaperPlaneTilt,
   CheckCircle,
@@ -140,7 +139,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const scrollViewportRef = useRef<HTMLElement | null>(null)
-  const [isAtBottom, setIsAtBottom] = useState(true)
   const wasAtBottomRef = useRef<boolean>(true)
   const ensuredChatIdsRef = useRef<Set<string>>(new Set())
   const loadedChatIdsRef = useRef<Set<string>>(new Set())
@@ -198,10 +196,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     return groupedRequests.find(group => group.itemId === selectedRequestItem) ?? null
   }, [groupedRequests, selectedRequestItem])
 
-  const pendingRequestsCount = useMemo(() => {
-    return donorRequests.filter(request => request.status === 'pending').length
-  }, [donorRequests])
-
   const linkedRequest = useMemo(() => {
     if (!selectedChat?.linkedRequestId) return null
     return getClaimRequestById(selectedChat.linkedRequestId)
@@ -226,19 +220,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     return undefined
   }, [listingForChat, selectedDropOffLocation])
 
-  const hasSharedLocation = useMemo(() => {
-    return currentMessages.some(message =>
-      message.type === 'location' || message.metadata?.systemAction === 'location_shared'
-    )
-  }, [currentMessages])
-
-  const hasScheduledExchange = useMemo(() => {
-    return currentMessages.some(message => {
-      const action = message.metadata?.systemAction
-      return action === 'pickup_scheduled' || action === 'dropoff_scheduled'
-    })
-  }, [currentMessages])
-
   const isNewChat = useMemo(() => currentMessages.every(m => m.type === 'system'), [currentMessages])
 
   const messageTemplates = useMemo(() => {
@@ -260,7 +241,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
       'I can collect tomorrow afternoon if that works for you.',
       'Could you please share the pickup address when convenient?'
     ]
-  }, [currentUser, selectedChat])
+  }, [currentUser, isNewChat, selectedChat])
 
   useEffect(() => {
     setActivePanel(initialView)
@@ -342,7 +323,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
         ensuredChatIdsRef.current.add(selectedChatId)
       }
     })()
-  }, [selectedChatId])
+  }, [ensureRemoteRoomForChat, selectedChatId])
 
   // Load initial history (run once per chat id)
   useEffect(() => {
@@ -357,7 +338,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
         setLoadingThread(false)
       }
     })()
-  }, [selectedChatId])
+  }, [loadHistoryForChat, selectedChatId])
 
   // Initial load of active rooms from server when MessageCenter mounts
   useEffect(() => {
@@ -415,7 +396,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
       const distanceFromBottom = target.scrollHeight - (target.scrollTop + target.clientHeight)
       const atBottom = distanceFromBottom <= threshold
       wasAtBottomRef.current = atBottom
-      setIsAtBottom(atBottom)
     }
 
     // Initialize once when chat changes
@@ -535,7 +515,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
         const senderId = m.senderId
         const senderName = m.senderName
         const ts0 = new Date(m.timestamp)
-        let caption: string | undefined = m.content || undefined
+        const caption: string | undefined = m.content || undefined
         let j = i + 1
         while (j < list.length) {
           const n = list[j]
@@ -698,16 +678,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     }
 
     return actions.filter(action => action.visible)
-  }, [
-    currentUser,
-    handleConfirmCollection,
-    hasScheduledExchange,
-    hasSharedLocation,
-    linkedRequest,
-    selectedChat,
-    sendSystemMessage,
-    shareLocation
-  ])
+  }, [currentUser, handleConfirmCollection, linkedRequest, selectedChat, shareLocation])
 
   if (!currentUser) {
     if (isPage) {

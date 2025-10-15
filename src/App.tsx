@@ -208,7 +208,7 @@ function App() {
         }
       }
     }
-  }, [navTabs, currentTab])
+  }, [navTabs, currentTab, tabToPath])
 
   useEffect(() => {
     const initial = pathToTab(window.location.pathname)
@@ -238,7 +238,7 @@ function App() {
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
-  }, [])
+  }, [currentTab, parseMessageChatIdFromPath, pathToTab, tabToPath])
 
   // Check for shop scanner mode in URL
   const handleOpenMessages = useCallback((options?: { itemId?: string; chatId?: string; initialView?: 'chats' | 'requests' }) => {
@@ -423,7 +423,7 @@ function App() {
       window.removeEventListener('exchange-claim-approved', handleClaimApproved as EventListener)
       window.removeEventListener('exchange-collection-confirmed', handleCollectionConfirmed as EventListener)
     }
-  }, [handleOpenMessages, user])
+  }, [handleOpenMessages, navigateToTab, user])
 
   const handleSignIn = () => {
     setAuthMode('signin')
@@ -573,7 +573,7 @@ function App() {
     }
 
     navigateToTab('list')
-  }, [navigateToTab, user, user?.userType])
+  }, [navigateToTab, user])
 
   // If in shop scanner mode, render only the scanner
   if (showShopScanner) {

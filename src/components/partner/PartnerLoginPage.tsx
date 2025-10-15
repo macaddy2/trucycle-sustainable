@@ -23,7 +23,6 @@ export function PartnerLoginPage({ onNavigate }: PartnerLoginPageProps) {
   const [, setPartner] = useKV<MinimalUser | null>('partner-user', null)
 
   // If user already has auth tokens (logged in as customer), show upgrade prompt instead of login
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     let mounted = true
     tokens.get()
@@ -48,7 +47,7 @@ export function PartnerLoginPage({ onNavigate }: PartnerLoginPageProps) {
           } else {
             setShouldShowUpgrade(true)
           }
-        } catch (err) {
+        } catch {
           // If auth/me fails, fall back to showing upgrade prompt
           setShouldShowUpgrade(true)
         } finally {

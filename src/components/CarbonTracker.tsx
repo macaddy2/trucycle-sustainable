@@ -1,6 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { Leaf, Trophy, Recycle, ArrowsClockwise, TrendUp } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { getMyImpactMetrics } from '@/lib/api'

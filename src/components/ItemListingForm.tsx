@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Plus, Camera, MapPin, Recycle, Heart, ArrowsClockwise, Truck, Storefront, X } from '@phosphor-icons/react'
+import { Plus, Camera, MapPin, Recycle, Heart, ArrowsClockwise, Storefront, X } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 // Removed demo local KV persistence
@@ -21,7 +21,7 @@ import type { ListingValuation, ManagedListing } from '@/types/listings'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { uploadImageToCloudinary } from '@/lib/cloudinary'
 import { createItem, updateItem } from '@/lib/api'
-import { LocationSelector, type LocationValue } from '@/components/LocationSelector'
+import { LocationSelector } from '@/components/LocationSelector'
 
 const CONDITIONS = [
   { value: 'excellent', label: 'Excellent', description: 'Like new, minimal wear' },
@@ -63,55 +63,12 @@ const DEFAULT_CONDITION_BY_INTENT: Record<'exchange' | 'donate' | 'recycle', (ty
   recycle: 'fair',
 }
 
-const FULFILLMENT_OPTIONS: Array<{
-  value: 'pickup' | 'dropoff'
-  title: string
-  description: string
-  icon: typeof Truck
-  accent: string
-}> = [
-  {
-    value: 'pickup',
-    title: 'Arrange a local pickup',
-    description: 'Coordinate a safe meeting point or doorstep collection directly with the collector.',
-    icon: Truck,
-    accent: 'from-slate-500/20 via-slate-500/10 to-transparent',
-  },
-  {
-    value: 'dropoff',
-    title: 'Drop-off at a partner shop',
-    description: 'Hand the item to a TruCycle partner hub so staff can verify the QR code and complete the exchange.',
-    icon: Storefront,
-    accent: 'from-primary/25 via-primary/15 to-transparent',
-  },
-]
-
 const CLASSIFICATION_LABELS: Record<'exchange' | 'donate' | 'recycle', string> = {
   exchange: 'Free exchange',
   donate: 'Community donation',
   recycle: 'Professional recycling',
 }
 
-const ACTION_TYPES = [
-  {
-    value: 'exchange',
-    icon: ArrowsClockwise,
-    label: 'Exchange',
-    description: 'Trade with other users'
-  },
-  {
-    value: 'donate',
-    icon: Heart,
-    label: 'Donate',
-    description: 'Give away for free'
-  },
-  {
-    value: 'recycle',
-    icon: Recycle,
-    label: 'Recycle',
-    description: 'Proper disposal/recycling'
-  }
-]
 const CATEGORY_BASE_VALUES: Record<string, number> = {
   Electronics: 240,
   Furniture: 180,
@@ -200,6 +157,23 @@ export type ListingCompletionDetails = {
   qrCode: QRCodeData
 }
 
+async function reverseGeocodePostcode(lat: number, lng: number): Promise<string | undefined> {
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/reverse')
+    url.searchParams.set('format', 'json')
+    url.searchParams.set('lat', lat.toFixed(7))
+    url.searchParams.set('lon', lng.toFixed(7))
+    url.searchParams.set('zoom', '18')
+    url.searchParams.set('addressdetails', '1')
+    const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } })
+    const data = await res.json()
+    const pc = data?.address?.postcode as string | undefined
+    return pc
+  } catch {
+    return undefined
+  }
+}
+
 export interface ListingEditDraft {
   itemId: string
   title: string
@@ -251,9 +225,6 @@ export function ItemListingForm({
     return 'exchange'
   }, [initialIntent])
   const [quickStartIntent, setQuickStartIntent] = useState<'exchange' | 'donate' | 'recycle'>(defaultQuickStartIntent)
-  const [quickStartFulfillment, setQuickStartFulfillment] = useState<'pickup' | 'dropoff'>(
-    defaultQuickStartIntent === 'donate' ? 'dropoff' : 'pickup'
-  )
   const [showQuickStart, setShowQuickStart] = useState(true)
   const [browseLocation] = useKV<{ lat?: number; lng?: number; label?: string; radiusKm?: number }>('browse.location', { radiusKm: 10 })
 
@@ -353,7 +324,6 @@ export function ItemListingForm({
     }
 
     setQuickStartIntent(actionType)
-    setQuickStartFulfillment(method)
     setShowQuickStart(false)
     setFormData({
       title: editingListing.title ?? '',
@@ -496,23 +466,6 @@ export function ItemListingForm({
     toast.success('Pickup area updated from your saved profile details')
   }, [defaultPickupAddress])
 
-  async function reverseGeocodePostcode(lat: number, lng: number): Promise<string | undefined> {
-    try {
-      const url = new URL('https://nominatim.openstreetmap.org/reverse')
-      url.searchParams.set('format', 'json')
-      url.searchParams.set('lat', lat.toFixed(7))
-      url.searchParams.set('lon', lng.toFixed(7))
-      url.searchParams.set('zoom', '18')
-      url.searchParams.set('addressdetails', '1')
-      const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } })
-      const data = await res.json()
-      const pc = data?.address?.postcode as string | undefined
-      return pc
-    } catch {
-      return undefined
-    }
-  }
-
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
@@ -546,27 +499,23 @@ export function ItemListingForm({
           : '',
       dropOffLocation: method === 'pickup' ? null : prev.dropOffLocation
     }))
-
-    setQuickStartFulfillment(method)
   }, [])
 
   // Prefill pickup address from Browse location, if present and using pickup flow
   useEffect(() => {
     if (effectiveFulfillmentMethod !== 'pickup') return
     if (!browseLocation?.lat || !browseLocation?.lng) return
-    // Only prefill if user hasn't set one
-    if (!pickupLocation) {
-      const label = browseLocation.label || ''
-      setPickupLocation({ lat: browseLocation.lat, lng: browseLocation.lng, label })
-      if (!formData.location && label) {
-        setFormData(prev => ({ ...prev, location: label }))
-      }
-      // Try to resolve postcode in background
-      reverseGeocodePostcode(browseLocation.lat, browseLocation.lng).then((pc) => {
-        setPickupLocation(prev => ({ ...(prev || {}), postcode: pc }))
-      })
+    if (pickupLocation) return
+
+    const label = browseLocation.label || ''
+    setPickupLocation({ lat: browseLocation.lat, lng: browseLocation.lng, label })
+    if (!formData.location && label) {
+      setFormData(prev => ({ ...prev, location: label }))
     }
-  }, [browseLocation?.lat, browseLocation?.lng, browseLocation?.label, effectiveFulfillmentMethod])
+    reverseGeocodePostcode(browseLocation.lat, browseLocation.lng).then((pc) => {
+      setPickupLocation(prev => ({ ...(prev || {}), postcode: pc }))
+    })
+  }, [browseLocation?.lat, browseLocation?.lng, browseLocation?.label, effectiveFulfillmentMethod, formData.location, pickupLocation])
 
   const handleQuickStartIntentSelect = useCallback((intent: 'exchange' | 'donate' | 'recycle') => {
     if (intent === 'recycle') {
@@ -586,17 +535,11 @@ export function ItemListingForm({
     }))
 
     const nextFulfillment: 'pickup' | 'dropoff' = intent === 'donate' ? 'dropoff' : 'pickup'
-    setQuickStartFulfillment(nextFulfillment)
     handleFulfillmentSelect(nextFulfillment)
     if (intent === 'donate') {
       setShowDropOffSelector(true)
     }
   }, [handleFulfillmentSelect, defaultPickupAddress])
-
-  const handleQuickStartFulfillmentSelect = useCallback((method: 'pickup' | 'dropoff') => {
-    setQuickStartFulfillment(method)
-    handleFulfillmentSelect(method)
-  }, [handleFulfillmentSelect])
 
   const scrollToDetailCard = useCallback(() => {
     document.getElementById('listing-form-steps')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -614,7 +557,6 @@ export function ItemListingForm({
 
     setQuickStartIntent(initialIntent)
     const defaultMethod: 'pickup' | 'dropoff' = initialIntent === 'donate' ? 'dropoff' : 'pickup'
-    setQuickStartFulfillment(defaultMethod)
     setCurrentStep(1)
     setFormData(prev => ({
       ...prev,
@@ -645,7 +587,6 @@ export function ItemListingForm({
       return
     }
 
-    setQuickStartFulfillment(prefillFulfillmentMethod)
     handleFulfillmentSelect(prefillFulfillmentMethod)
     onFulfillmentPrefillHandled?.()
   }, [prefillFulfillmentMethod, handleFulfillmentSelect, onFulfillmentPrefillHandled, editingListingId])
@@ -663,7 +604,6 @@ export function ItemListingForm({
       dropOffLocation: prefillDropOffLocation,
       location: prefillDropOffLocation.address
     }))
-    setQuickStartFulfillment('dropoff')
     setShowDropOffSelector(false)
     onDropOffPrefillHandled?.()
   }, [prefillDropOffLocation, onDropOffPrefillHandled, editingListingId])
@@ -721,8 +661,6 @@ export function ItemListingForm({
 
       const fulfillmentMethod: 'pickup' | 'dropoff' =
         formData.actionType === 'donate' ? 'dropoff' : 'pickup'
-      const listingStatus: CreatedListing['status'] =
-        fulfillmentMethod === 'dropoff' ? 'pending_dropoff' : 'active'
       let classification = classificationResult
       if (!classification) {
         classification = await classifyListing({
@@ -900,7 +838,6 @@ export function ItemListingForm({
         handoverNotes: '',
         preferPartnerSupport: quickStartIntent === 'donate'
       })
-      setQuickStartFulfillment(quickStartIntent === 'donate' ? 'dropoff' : 'pickup')
       setCurrentStep(1)
 
     } catch (error) {

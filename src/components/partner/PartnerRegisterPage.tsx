@@ -41,7 +41,6 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
 
   // Detect if the user is already authenticated (customer) to enable upgrade flow
   // We only need to know if an access token is present
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     let mounted = true
     tokens.get().then(t => {

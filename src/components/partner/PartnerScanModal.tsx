@@ -258,16 +258,17 @@ export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModal
 
     init()
 
+    const videoElement = videoRef.current
     return () => {
       cancelled = true
-      streamRef.current?.getTracks().forEach(track => track.stop())
+      const stream = streamRef.current
+      stream?.getTracks().forEach(track => track.stop())
       streamRef.current = null
-      if (videoRef.current) {
-        videoRef.current.srcObject = null
+      if (videoElement) {
+        videoElement.srcObject = null
       }
       setScanning(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, selectedCameraId])
 
   const switchCamera = async (deviceId: string) => {

@@ -1,6 +1,7 @@
 import { forwardRef } from 'react'
+import type { ComponentPropsWithoutRef } from 'react'
 
-export interface TruCycleGlyphProps extends React.SVGAttributes<SVGSVGElement> {}
+export type TruCycleGlyphProps = ComponentPropsWithoutRef<'svg'>
 
 export const TruCycleGlyph = forwardRef<SVGSVGElement, TruCycleGlyphProps>(function TruCycleGlyph(
   { className, ...props },

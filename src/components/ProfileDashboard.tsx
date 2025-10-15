@@ -45,6 +45,15 @@ type ListingStatus = ManagedListing['status']
 
 const VERIFICATION_KEYS: Array<keyof UserProfile['verificationLevel']> = ['email', 'phone', 'identity', 'address']
 
+const DEFAULT_VERIFICATION_LEVEL: UserProfile['verificationLevel'] = {
+  email: false,
+  phone: false,
+  identity: false,
+  address: false,
+  payment: false,
+  community: false,
+}
+
 export function ProfileDashboard({ onCreateListing: _onCreateListing, onOpenMessages: _onOpenMessages, initialActiveTab = 'overview' }: ProfileDashboardProps) {
   const [user, setUser] = useKV<UserProfile | null>('current-user', null)
   const [listings] = useKV<ManagedListing[]>('user-listings', [])
@@ -53,14 +62,6 @@ export function ProfileDashboard({ onCreateListing: _onCreateListing, onOpenMess
   const [showSettings, setShowSettings] = useState(false)
 
   // Ensure verification data is always defined and complete
-  const DEFAULT_VERIFICATION_LEVEL: UserProfile['verificationLevel'] = {
-    email: false,
-    phone: false,
-    identity: false,
-    address: false,
-    payment: false,
-    community: false,
-  }
   const normalizedVerification = useMemo<UserProfile['verificationLevel']>(
     () => ({
       ...DEFAULT_VERIFICATION_LEVEL,

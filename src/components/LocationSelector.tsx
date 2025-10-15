@@ -62,7 +62,7 @@ export function LocationSelector({ open, onOpenChange, initialValue, onApply }: 
     setRadiusKm(initialValue.radiusKm ?? 10)
     setQuery('')
     setResults([])
-  }, [open])
+  }, [open, initialValue.lat, initialValue.lng, initialValue.label, initialValue.radiusKm])
 
   const center = useMemo<[number, number]>(() => {
     if (typeof lat === 'number' && typeof lng === 'number') return [lat, lng]
@@ -130,7 +130,7 @@ export function LocationSelector({ open, onOpenChange, initialValue, onApply }: 
       clearTimeout(timeout)
       ctrl.abort()
     }
-  }, [query, open])
+  }, [query, open, results.length])
 
   const canApply = typeof lat === 'number' && typeof lng === 'number'
 

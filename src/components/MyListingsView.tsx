@@ -78,7 +78,7 @@ export function MyListingsView({
   onOpenMessages,
   onEditListing,
 }: MyListingsViewProps) {
-  const [currentUser, setCurrentUser] = useKV<UserProfile | null>('current-user', null)
+  const [currentUser] = useKV<UserProfile | null>('current-user', null)
   const [listings, setListings] = useKV<ManagedListing[]>('user-listings', [])
   const [, setGlobalListings] = useKV<ManagedListing[]>('global-listings', [])
   const { getChatForItem, updateChatStatus, createOrGetChat } = useMessaging()
