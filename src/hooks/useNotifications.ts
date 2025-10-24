@@ -64,19 +64,7 @@ export function useNotifications() {
     [notifications],
   )
 
-  useEffect(() => {
-    const handleDemoNotification = (event: Event) => {
-      const customEvent = event as CustomEvent<{ notification: NotificationInput }>
-      if (customEvent.detail?.notification) {
-        addNotification(customEvent.detail.notification)
-      }
-    }
-
-    window.addEventListener('add-demo-notification', handleDemoNotification)
-    return () => {
-      window.removeEventListener('add-demo-notification', handleDemoNotification)
-    }
-  }, [addNotification])
+  // Demo notifications disabled
 
   return {
     notifications,

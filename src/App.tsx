@@ -38,7 +38,7 @@ import {
 } from './components'
 import { ShopScannerOverview } from './components/ShopScannerOverview'
 import { TruCycleGlyph } from './components/icons/TruCycleGlyph'
-import { NotificationList, type Notification } from './components/NotificationList'
+import type { Notification } from './components/NotificationList'
 import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
@@ -469,43 +469,6 @@ function App() {
     const newUserType: 'donor' | 'collector' = user.userType === 'donor' ? 'collector' : 'donor'
     const updatedUser: UserProfile = { ...user, userType: newUserType }
     setUser(updatedUser)
-    
-    // Trigger demo notification for the switched profile
-    const demoNotification = {
-      id: `demo-${Date.now()}`,
-      userId: user.id,
-      type: newUserType === 'collector' ? 'item_match' : 'community_need',
-      title: newUserType === 'collector' 
-        ? 'New High-Value Items Available!' 
-        : 'Urgent Community Need Alert!',
-      message: newUserType === 'collector'
-        ? 'Several quality electronics and furniture items just became available in your area.'
-        : 'Local shelter urgently needs winter clothing and bedding for families.',
-      urgency: 'high',
-      createdAt: new Date().toISOString(),
-      read: false,
-      actionUrl: newUserType === 'collector' ? '/browse' : '/profile'
-    }
-    
-    // Dispatch custom event for demo notification
-    window.dispatchEvent(new CustomEvent('add-demo-notification', {
-      detail: { notification: demoNotification }
-    }))
-    
-    // Show immediate toast
-    toast(demoNotification.title, {
-      description: demoNotification.message,
-      action: {
-        label: newUserType === 'collector' ? 'View Items' : 'See Needs',
-        onClick: () => {
-          if (newUserType === 'collector') {
-            navigateToTab('browse')
-          } else {
-            navigateToTab('profile')
-          }
-        }
-      }
-    })
   }
 
 
@@ -627,34 +590,7 @@ function App() {
                 <div className="flex items-center space-x-2">
                   <MessageNotification onOpenMessages={handleOpenMessages} />
 
-                  <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="relative"
-                        title={totalUnreadNotifications > 0 ? `${totalUnreadNotifications} new notification${totalUnreadNotifications === 1 ? '' : 's'}` : 'Notifications'}
-                      >
-                        <Bell size={16} />
-                        {totalUnreadNotifications > 0 && (
-                          <Badge
-                            variant="destructive"
-                            className="absolute -top-2 -right-2 text-xs w-5 h-5 p-0 flex items-center justify-center"
-                          >
-                            {totalUnreadNotifications > 99 ? '99+' : totalUnreadNotifications}
-                          </Badge>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[360px] p-0" align="end">
-                      <NotificationList
-                        notifications={trayNotifications.map(({ notification }) => notification)}
-                        onMarkAsRead={handleNotificationMarkAsRead}
-                        onMarkAllAsRead={hasUnreadNotifications ? handleNotificationsMarkAll : undefined}
-                        onDeleteNotification={handleNotificationDelete}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  {/* Notifications disabled until backend ready */}
 
                   <Button
                     variant="outline"
@@ -688,6 +624,15 @@ function App() {
                         <DropdownMenuItem onSelect={() => navigateToTab('listings')}>
                           My Listings
                         </DropdownMenuItem>
+                        {user?.partnerAccess ? (
+                          <DropdownMenuItem onSelect={() => { window.location.href = `${baseNormalized}/partner/shops` }}>
+                            Go to My Shops
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onSelect={() => { window.location.href = `${baseNormalized}/partner/register` }}>
+                            Become a Partner
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onSelect={handleToggleUserType}>
                           {user?.userType === 'donor' ? 'Switch to Collector' : 'Switch to Donor'}
@@ -725,34 +670,7 @@ function App() {
                 <div className="flex items-center space-x-1">
                   <MessageNotification onOpenMessages={handleOpenMessages} />
 
-                  <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="relative"
-                        title={totalUnreadNotifications > 0 ? `${totalUnreadNotifications} new notification${totalUnreadNotifications === 1 ? '' : 's'}` : 'Notifications'}
-                      >
-                        <Bell size={16} />
-                        {totalUnreadNotifications > 0 && (
-                          <Badge
-                            variant="destructive"
-                            className="absolute -top-1.5 -right-1.5 text-[10px] w-4.5 h-4.5 p-0 flex items-center justify-center"
-                          >
-                            {totalUnreadNotifications > 99 ? '99+' : totalUnreadNotifications}
-                          </Badge>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[320px] p-0" align="end">
-                      <NotificationList
-                        notifications={trayNotifications.map(({ notification }) => notification)}
-                        onMarkAsRead={handleNotificationMarkAsRead}
-                        onMarkAllAsRead={hasUnreadNotifications ? handleNotificationsMarkAll : undefined}
-                        onDeleteNotification={handleNotificationDelete}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  {/* Notifications disabled until backend ready */}
 
                   <Button
                     variant="outline"
@@ -785,6 +703,15 @@ function App() {
                       <DropdownMenuItem onSelect={() => navigateToTab('listings')}>
                         My Listings
                       </DropdownMenuItem>
+                      {user?.partnerAccess ? (
+                        <DropdownMenuItem onSelect={() => { window.location.href = `${baseNormalized}/partner/shops` }}>
+                          Go to My Shops
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem onSelect={() => { window.location.href = `${baseNormalized}/partner/register` }}>
+                          Become a Partner
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onSelect={handleToggleUserType}>
                         {user?.userType === 'donor' ? 'Switch to Collector' : 'Switch to Donor'}

@@ -142,6 +142,9 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
     return UK_POSTCODE_REGEX.test(normalizePostcode(formState.postcode)) ? '' : 'Enter a valid UK postcode'
   }, [formState.postcode])
 
+  const kmToMi = (km: number) => km * 0.621371
+  const miToKm = (mi: number) => mi / 0.621371
+
   const handleSave = async () => {
     if (!user) {
       toast.error('Sign in to update your settings')
@@ -237,9 +240,8 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
         ) : (
           <div className="space-y-6">
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
-              <TabsList className="grid grid-cols-3">
+              <TabsList className="grid grid-cols-2">
                 <TabsTrigger value="account">Account</TabsTrigger>
-                <TabsTrigger value="notifications">Notifications</TabsTrigger>
                 <TabsTrigger value="partner">Partner tools</TabsTrigger>
               </TabsList>
 
@@ -277,76 +279,24 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
                     {postcodeError && <p className="text-xs text-destructive">{postcodeError}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="settings-distance">Preferred search radius (km)</Label>
+                    <Label htmlFor="settings-distance">Preferred search radius (mi)</Label>
                     <Input
                       id="settings-distance"
                       type="number"
                       min={1}
-                      max={50}
-                      value={formState.maxDistance}
-                      onChange={(event) =>
-                        setFormState((prev) => ({ ...prev, maxDistance: Number(event.target.value) || prev.maxDistance }))
-                      }
+                      max={31}
+                      value={Number.isFinite(formState.maxDistance) ? Math.round(kmToMi(formState.maxDistance)) : 0}
+                      onChange={(event) => {
+                        const miles = Number(event.target.value)
+                        if (!Number.isFinite(miles)) return
+                        const km = miToKm(miles)
+                        setFormState((prev) => ({ ...prev, maxDistance: km }))
+                      }}
                     />
                     <p className="text-xs text-muted-foreground">
-                      We use this radius to highlight nearby matches and partner hubs.
+                      Stored in km internally for search; displayed here in miles.
                     </p>
                   </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="notifications" className="space-y-4 pt-4">
-                <div className="space-y-3">
-                  {[{
-                    key: 'newMatches' as const,
-                    label: 'New matches',
-                    description: 'Get notified when a listing or need matches your interests.',
-                  }, {
-                    key: 'messages' as const,
-                    label: 'Messages',
-                    description: 'Receive alerts for new messages and collection updates.',
-                  }, {
-                    key: 'recommendations' as const,
-                    label: 'Recommendations',
-                    description: 'See personalised suggestions to keep items in use.',
-                  }, {
-                    key: 'communityNeeds' as const,
-                    label: 'Community needs',
-                    description: 'Hear about urgent requests from local organisations.',
-                  }].map((option) => (
-                    <div key={option.key} className="flex items-start justify-between gap-4 rounded-lg border border-border p-4">
-                      <div>
-                        <p className="font-medium">{option.label}</p>
-                        <p className="text-sm text-muted-foreground">{option.description}</p>
-                      </div>
-                      <Switch
-                        checked={formState.notifications[option.key]}
-                        onCheckedChange={(checked) =>
-                          setFormState((prev) => ({
-                            ...prev,
-                            notifications: { ...prev.notifications, [option.key]: Boolean(checked) },
-                          }))
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between rounded-lg border border-border p-4">
-                  <div>
-                    <p className="font-medium">Smart alerts</p>
-                    <p className="text-sm text-muted-foreground">
-                      Allow TruCycle to prioritise the most relevant updates and pause the rest when you&apos;re busy.
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formState.autoNotifications}
-                    onCheckedChange={(checked) =>
-                      setFormState((prev) => ({ ...prev, autoNotifications: Boolean(checked) }))
-                    }
-                  />
                 </div>
               </TabsContent>
 

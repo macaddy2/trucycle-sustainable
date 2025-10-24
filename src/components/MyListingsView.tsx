@@ -347,6 +347,8 @@ export function MyListingsView({
               co2Impact: typeof it.estimated_co2_saved_kg === 'number' ? it.estimated_co2_saved_kg : undefined,
               aiClassification: undefined,
               moderation: undefined,
+              // For collectors, store donor name for table display
+              userName: it.owner?.name || undefined,
             }
           })
           if (!cancelled) setListings(mapped)
@@ -496,13 +498,15 @@ export function MyListingsView({
         const reward = listing.rewardPoints ?? listing.valuation?.rewardPoints
         const requests = getRequestsForItem(listing.id)
         const approvedRequest = requests.find(r => r.status === 'approved')
-        const collectorsBadgeText = listing.status === 'collected'
-          ? 'Collected'
-          : approvedRequest
-            ? 'Collector approved'
-            : (requests.length > 0
-                ? `${requests.length} collector${requests.length === 1 ? '' : 's'}`
-                : 'Waiting for collectors')
+        const collectorsBadgeText = isCollector
+          ? (listing.userName ? `Donor: ${listing.userName}` : 'Donor')
+          : (listing.status === 'collected'
+              ? 'Collected'
+              : approvedRequest
+                ? 'Collector approved'
+                : (requests.length > 0
+                    ? `${requests.length} collector${requests.length === 1 ? '' : 's'}`
+                    : 'Waiting for collectors'))
         const collectorsBadgeVariant: any = listing.status === 'collected'
           ? 'default'
           : (approvedRequest ? 'secondary' : 'outline')
@@ -746,14 +750,13 @@ if (variant === 'dashboard') {
               )}
               </div>
               <aside className="space-y-4">
-                {isDonation && selectedListing.fulfillmentMethod === 'dropoff' ? (
-                  <DropOffQrPanel
-                    listing={selectedListing}
-                    dropOffLocation={dropOffLocationDetail}
-                    qrImageUrl={qrImageUrl}
-                    isLoading={detailsLoading}
-                  />
-                ) : (
+                <DropOffQrPanel
+                  listing={selectedListing}
+                  dropOffLocation={dropOffLocationDetail}
+                  qrImageUrl={qrImageUrl}
+                  isLoading={detailsLoading}
+                />
+                {!isCollector && (
                   <CollectorRequestsPanel
                     requests={listingRequests}
                     getChatForItem={getChatForItem}
@@ -789,7 +792,7 @@ function DropOffQrPanel({ listing, dropOffLocation, qrImageUrl, isLoading }: Dro
       : 'donation drop-off'
 
   const isDonation = listing.actionType === 'donate'
-  const heading = isDonation ? 'Drop-off QR' : 'Collector requests'
+  const heading = 'QR Code'
   return (
     <div className="space-y-4 rounded-lg border bg-background p-4 shadow-sm">
       <div className="space-y-1">
@@ -798,11 +801,9 @@ function DropOffQrPanel({ listing, dropOffLocation, qrImageUrl, isLoading }: Dro
           {heading}
         </h3>
         <p className="text-xs text-muted-foreground">
-          {isDonation ? (
-            <>Present this code at the partner shop to record your {actionCopy}.</>
-          ) : (
-            'Share this code with the collector to complete the request.'
-          )}
+          {isDonation
+            ? <>Present this code at the partner shop to record your {actionCopy}.</>
+            : 'Share this code with the collector to complete the request.'}
         </p>
       </div>
 

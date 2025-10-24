@@ -49,6 +49,9 @@ export function LocationSelector({ open, onOpenChange, initialValue, onApply }: 
   const [lng, setLng] = useState<number | undefined>(initialValue.lng)
   const [label, setLabel] = useState<string>(initialValue.label || '')
   const [radiusKm, setRadiusKm] = useState<number>(initialValue.radiusKm ?? 10)
+  const kmToMi = (km: number) => km * 0.621371
+  const miToKm = (mi: number) => mi / 0.621371
+  const radiusMi = useMemo(() => Number((kmToMi(radiusKm)).toFixed(1)), [radiusKm])
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [results, setResults] = useState<Array<{ display_name: string; lat: string; lon: string }>>([])
@@ -232,22 +235,25 @@ export function LocationSelector({ open, onOpenChange, initialValue, onApply }: 
 
             <div>
               <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Radius</div>
-                <Badge variant="secondary">{radiusKm} km</Badge>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Radius (mi)</div>
+                <Badge variant="secondary">{radiusMi} mi</Badge>
               </div>
               <div className="mt-3 px-1">
                 <Slider
                   min={1}
-                  max={100}
-                  defaultValue={[radiusKm]}
-                  value={[radiusKm]}
-                  onValueChange={(vals) => setRadiusKm(vals[0] ?? 10)}
+                  max={62}
+                  defaultValue={[radiusMi]}
+                  value={[radiusMi]}
+                  onValueChange={(vals) => {
+                    const mi = vals[0] ?? 10
+                    setRadiusKm(Number(miToKm(mi).toFixed(2)))
+                  }}
                 />
                 <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
                   <span>1</span>
-                  <span>25</span>
-                  <span>50</span>
-                  <span>100</span>
+                  <span>15</span>
+                  <span>31</span>
+                  <span>62</span>
                 </div>
               </div>
             </div>

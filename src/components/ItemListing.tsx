@@ -158,7 +158,10 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
       community: false,
     }
     const photos = Array.isArray(it?.images) ? it.images.map((img: any) => img?.url).filter(Boolean) : []
-    const distance = typeof it?.distance_km === 'number' ? `${it.distance_km.toFixed(1)} km` : ''
+    // Display distance in miles (backend supplies km)
+    const distance = typeof it?.distance_km === 'number'
+      ? `${(it.distance_km * 0.621371).toFixed(1)} mi`
+      : ''
     const actionType = (it?.pickup_option || 'donate') as ListingItem['actionType']
     return {
       id: String(it?.id || crypto.randomUUID()),
@@ -368,7 +371,11 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                       {locationFilter?.label || (locationFilter?.lat && locationFilter?.lng ? 'Custom location' : 'Anywhere')}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
-                      Radius: {Math.max(1, Number(locationFilter?.radiusKm) || 10)} km
+                      {(() => {
+                        const km = Math.max(1, Number(locationFilter?.radiusKm) || 10)
+                        const mi = Math.round(km * 0.621371)
+                        return `Radius: ${mi} mi`
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -621,10 +628,12 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
+                    {false && (
                     <div>
                       <h4 className="font-medium mb-2">Description</h4>
                       <p className="text-muted-foreground">{activeItem.description}</p>
                     </div>
+                    )}
 
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between"><span>Category</span><span>{activeItem.category}</span></div>

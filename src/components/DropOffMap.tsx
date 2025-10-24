@@ -27,13 +27,8 @@ function formatDistance(distanceMeters?: number | null): string {
   if (typeof distanceMeters !== 'number' || !Number.isFinite(distanceMeters) || distanceMeters <= 0) {
     return 'Distance unavailable'
   }
-
-  if (distanceMeters >= 1000) {
-    const km = distanceMeters / 1000
-    return `${km >= 10 ? km.toFixed(0) : km.toFixed(1)} km`
-  }
-
-  return `${Math.round(distanceMeters)} m`
+  const miles = distanceMeters / 1609.344
+  return `${miles >= 10 ? miles.toFixed(0) : miles.toFixed(1)} mi`
 }
 
 function formatOpeningHours(opening?: NearbyShop['opening_hours'] | null): string {

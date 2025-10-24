@@ -28,7 +28,8 @@ export function useRecommendationNotifications(user: UserProfile | null) {
   const [lastCheckTime, setLastCheckTime] = useKV<string | null>('last-notification-check', null)
 
   const checkForNewRecommendations = useCallback(async () => {
-    if (!user || !user.onboardingCompleted) return
+    // Demo recommendation notifications disabled for now
+    return
 
     try {
       const now = new Date().toISOString()
@@ -83,7 +84,8 @@ export function useRecommendationNotifications(user: UserProfile | null) {
 
   // Check for recommendations every 10 minutes when user is active
   useEffect(() => {
-    if (!user || !user.onboardingCompleted) return
+    // Demo recommendation notifications disabled; do not schedule or listen for events
+    return
 
     // Initial check
     void checkForNewRecommendations()
@@ -117,7 +119,8 @@ export function useRecommendationNotifications(user: UserProfile | null) {
 
   // Function to trigger urgent notifications manually
   const triggerUrgentNotifications = async () => {
-    if (!user || !user.onboardingCompleted) return
+    // Demo urgent notifications disabled
+    return
 
     try {
       const now = new Date().toISOString()
