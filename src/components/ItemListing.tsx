@@ -55,6 +55,11 @@ export interface ListingItem {
   ownerAvatar?: string
   ownerRating?: number
   ownerVerificationLevel?: VerificationLevel
+  claim?: {
+    status: 'approved' | 'pending_approval' | string
+    requestedAt?: string
+    claimedAt?: string | null
+  } | null
 }
 
 const conditionBadgeClass = {
@@ -88,6 +93,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
   
   const [items, setItems] = useState<ListingItem[]>([])
   const [activeItem, setActiveItem] = useState<ListingItem | null>(null)
+  const [submittingRequests, setSubmittingRequests] = useState<Set<string>>(new Set())
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [selectedCondition, setSelectedCondition] = useState('All')
   const [selectedType, setSelectedType] = useState<'All' | ListingItem['actionType']>('All')
@@ -166,6 +172,18 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
       ? `${(it.distance_km * 0.621371).toFixed(1)} mi`
       : ''
     const actionType = (it?.pickup_option || 'donate') as ListingItem['actionType']
+    // Map server claim field if present
+    const claimRaw = it?.claim
+    const claim = claimRaw
+      ? {
+          status: String(claimRaw.status || ''),
+          requestedAt: claimRaw.requested_at ? String(claimRaw.requested_at) : undefined,
+          claimedAt: claimRaw.claimed_at === null
+            ? null
+            : (typeof claimRaw.claimed_at === 'string' ? String(claimRaw.claimed_at) : undefined),
+        }
+      : null
+
     return {
       id: String(it?.id || crypto.randomUUID()),
       title: String(it?.title || 'Untitled'),
@@ -184,6 +202,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
       ownerAvatar: owner?.profile_image || undefined,
       ownerRating: typeof owner?.rating === 'number' ? owner.rating : undefined,
       ownerVerificationLevel,
+      claim,
     }
   }
 
@@ -218,7 +237,24 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
 
   const activeItemPendingCount = activeItem ? pendingRequestCountByItem[activeItem.id] ?? 0 : 0
   const activeItemIsOwner = activeItem ? currentUser?.id === activeItem.ownerId : false
-  const activeItemRequestLabel = activeItem?.actionType === 'recycle' ? 'Arrange recycling' : 'Request a Claim'
+  const hasRequestedActive = useMemo(() => {
+    if (!activeItem) return false
+    const requests = getRequestsForItem(activeItem.id)
+    return requests.some((r) => r.collectorId === currentUser?.id && r.status === 'pending')
+  }, [activeItem, currentUser?.id, getRequestsForItem])
+  const formatClaimStatus = (s?: string) => {
+    const v = String(s || '').toLowerCase()
+    if (v === 'pending_approval') return 'Pending approval'
+    if (v === 'approved') return 'Approved'
+    return v ? (v.charAt(0).toUpperCase() + v.slice(1)) : 'Requested'
+  }
+  const activeItemRequestLabel = activeItem?.actionType === 'recycle'
+    ? 'Arrange recycling'
+    : (activeItem?.claim
+        ? formatClaimStatus(activeItem.claim.status)
+        : ((hasRequestedActive || (activeItem ? submittingRequests.has(activeItem.id) : false))
+            ? 'Request sent to Donor'
+            : 'Request a Claim'))
   const activeItemOwnerLabel = activeItem?.actionType === 'donate' ? 'Pickup Shop' : 'Item owner'
 
   const formatTimeAgo = (createdAt: string) => {
@@ -252,6 +288,9 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
       return
     }
 
+    // Optimistically disable the button
+    setSubmittingRequests((prev) => new Set(prev).add(item.id))
+
     const request = await submitClaimRequest({
       itemId: item.id,
       itemTitle: item.title,
@@ -265,6 +304,13 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
 
     if (request) {
       setActiveItem(null)
+    } else {
+      // Re-enable if failed
+      setSubmittingRequests((prev) => {
+        const next = new Set(prev)
+        next.delete(item.id)
+        return next
+      })
     }
   }
 
@@ -483,7 +529,14 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
             const itemRequests = getRequestsForItem(item.id)
             const pendingRequests = pendingRequestCountByItem[item.id] ?? 0
             const isOwner = currentUser?.id === item.ownerId
-            const requestButtonLabel = item.actionType === 'recycle' ? 'Arrange recycling' : 'Request a Claim'
+            const hasRequested = itemRequests.some((r) => r.collectorId === currentUser?.id && r.status === 'pending')
+            const isSubmitting = submittingRequests.has(item.id)
+            const hasServerClaim = Boolean(item.claim)
+            const requestButtonLabel = item.actionType === 'recycle'
+              ? 'Arrange recycling'
+              : (hasServerClaim
+                  ? formatClaimStatus(item.claim?.status)
+                  : ((hasRequested || isSubmitting) ? 'Request sent to Donor' : 'Request a Claim'))
 
             return (
               <Card
@@ -596,7 +649,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                       View details
                     </Button>
                     {!isOwner && !collectionStatus?.collected && (
-                      <Button className="flex-1" onClick={() => handleRequestClaim(item)}>
+                      <Button className="flex-1" disabled={hasServerClaim || hasRequested || isSubmitting} onClick={() => handleRequestClaim(item)}>
                         {requestButtonLabel}
                       </Button>
                     )}
@@ -731,6 +784,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                     ) : (
                       <Button
                         className="w-full"
+                        disabled={Boolean(activeItem?.claim) || hasRequestedActive || submittingRequests.has(activeItem.id)}
                         onClick={() => handleRequestClaim(activeItem)}
                       >
                         {activeItemRequestLabel}

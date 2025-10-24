@@ -77,6 +77,7 @@ export async function clearTokens(): Promise<void> {
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
+  // Deprecated: Authorization is now auto-attached when a token exists
   auth?: boolean
   headers?: Record<string, string>
 }
@@ -89,11 +90,14 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const url = `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`
   const headers: Record<string, string> = { ...options.headers }
 
-  if (options.auth) {
-    const tokens = await getTokens()
-    if (tokens?.accessToken) {
-      headers['Authorization'] = `Bearer ${tokens.accessToken}`
+  // Always attach Authorization when a user is logged in (token present)
+  try {
+    const tk = await getTokens()
+    if (tk?.accessToken) {
+      headers['Authorization'] = headers['Authorization'] || `Bearer ${tk.accessToken}`
     }
+  } catch {
+    // ignore token retrieval errors; proceed unauthenticated
   }
 
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
