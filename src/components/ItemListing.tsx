@@ -470,7 +470,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
               >
                 <div className="relative flex aspect-video items-center justify-center bg-muted">
                   {item.photos.length > 0 ? (
-                    <img src={item.photos[0]} alt={item.title} className="h-full w-full object-cover" />
+                    <img src={item.photos[0]} alt={item.title} className="h-full w-full object-cover object-top" />
                   ) : (
                     <Package size={48} className="text-muted-foreground" />
                   )}
@@ -588,19 +588,23 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                       </Badge>
                     </div>
                   ) : (
-                    isOwner ? (
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => onOpenMessages?.({ itemId: item.id, initialView: 'requests' })}
-                      >
-                        {pendingRequests > 0
-                          ? `Review ${pendingRequests} interested collector${pendingRequests > 1 ? 's' : ''}`
-                          : itemRequests.length > 0
-                            ? 'View interested collectors'
-                            : 'No requests yet'}
-                      </Button>
-                    ) : null
+                    isOwner
+                      ? (
+                        (pendingRequests > 0 || itemRequests.length > 0)
+                          ? (
+                            <Button
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => onOpenMessages?.({ itemId: item.id, initialView: 'requests' })}
+                            >
+                              {pendingRequests > 0
+                                ? `Review ${pendingRequests} interested collector${pendingRequests > 1 ? 's' : ''}`
+                                : 'View interested collectors'}
+                            </Button>
+                          )
+                          : null
+                      )
+                      : null
                   )}
                 </CardContent>
               </Card>
@@ -620,7 +624,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
               <div className="space-y-6">
                 <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
                   {activeItem.photos.length > 0 ? (
-                    <img src={activeItem.photos[0]} alt={activeItem.title} className="w-full h-full object-cover rounded-lg" />
+                    <img src={activeItem.photos[0]} alt={activeItem.title} className="w-full h-full object-cover object-top rounded-lg" />
                   ) : (
                     <Package size={64} className="text-muted-foreground" />
                   )}
