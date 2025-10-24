@@ -420,23 +420,21 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                         <CrosshairSimple size={16} />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Use my location</TooltipContent>
-                  </Tooltip>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="flex-1 justify-start px-0 text-xs"
-                    onClick={() => setLocationFilter({ radiusKm: 10 })}
-                  >
-                    Clear location
-                  </Button>
-                </div>
+                  <TooltipContent>Use my location</TooltipContent>
+                </Tooltip>
+              </div>
               </div>
 
               {/* Clear filters at far right */}
-              <div className="flex items-end">
+              <div className="flex flex-col items-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-12 rounded-2xl px-4 text-sm font-medium"
+                  onClick={() => setLocationFilter({ radiusKm: 10 })}
+                >
+                  Clear location
+                </Button>
                 <Button
                   type="button"
                   variant="ghost"
@@ -453,13 +451,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
               </div>
             </div>
 
-            {/* Search button below filters */}
-            <div className="flex">
-              <Button type="submit" className="h-12 rounded-2xl px-6 text-sm font-semibold md:w-auto w-full">
-                <MagnifyingGlass size={16} className="mr-2" />
-                Search listings
-              </Button>
-            </div>
+            {/* Search runs as you type; submit button removed */}
           </form>
         </CardContent>
       </Card>
