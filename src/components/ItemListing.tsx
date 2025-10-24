@@ -16,6 +16,9 @@ import {
   Recycle,
   MagnifyingGlass,
   Leaf,
+  PencilSimple,
+  CrosshairSimple,
+  X,
 } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { useExchangeManager } from '@/hooks'
@@ -289,22 +292,19 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                   value={searchQuery}
                   onChange={handleSearchInputChange}
                   placeholder="Search furniture, electronics, baby essentials..."
-                  className="w-full rounded-2xl border-border/70 bg-background/80 pl-11 pr-4 py-3"
+                  className="h-12 w-full rounded-2xl border-border/70 bg-background/80 pl-11 pr-4"
                 />
               </div>
-              <Button type="submit" className="h-12 min-w-[160px] rounded-2xl px-6 text-sm font-semibold">
-                <MagnifyingGlass size={16} className="mr-2" />
-                Search listings
-              </Button>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-4">
+            {/* Filters row: Category (auto), Condition (auto), Action (auto), Location (fills), Clear (auto) */}
+            <div className="grid gap-4 md:[grid-template-columns:auto_auto_auto_1fr_auto]">
               <div className="rounded-2xl border border-border/60 bg-background/70 p-4 shadow-sm">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</span>
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <SelectTrigger className="mt-2 rounded-xl border-border/50 bg-background/80">
+                      <SelectTrigger className="mt-2 w-auto rounded-xl border-border/50 bg-background/80">
                         <SelectValue placeholder="All categories" />
                       </SelectTrigger>
                     </TooltipTrigger>
@@ -325,7 +325,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                 <Select value={selectedCondition} onValueChange={setSelectedCondition}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <SelectTrigger className="mt-2 rounded-xl border-border/50 bg-background/80">
+                      <SelectTrigger className="mt-2 w-auto rounded-xl border-border/50 bg-background/80">
                         <SelectValue placeholder="All conditions" />
                       </SelectTrigger>
                     </TooltipTrigger>
@@ -346,7 +346,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                 <Select value={selectedType} onValueChange={(value) => setSelectedType(value as typeof selectedType)}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <SelectTrigger className="mt-2 rounded-xl border-border/50 bg-background/80">
+                      <SelectTrigger className="mt-2 w-auto rounded-xl border-border/50 bg-background/80">
                         <SelectValue placeholder="All intents" />
                       </SelectTrigger>
                     </TooltipTrigger>
@@ -362,15 +362,15 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                 </Select>
               </div>
 
-              <div className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/50 p-4 shadow-inner">
+              <div className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/50 p-4 shadow-inner min-w-0">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</span>
-                <div className="flex items-start gap-2 rounded-xl border border-border/60 bg-background/70 p-3">
-                  <MapPin size={16} className="mt-0.5 text-primary" />
-                  <div className="text-sm">
-                    <div className="font-medium line-clamp-2">
+                <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/70 p-3">
+                  <MapPin size={16} className="text-primary" />
+                  <div className="min-w-0 flex-1 text-sm">
+                    <div className="font-medium truncate">
                       {locationFilter?.label || (locationFilter?.lat && locationFilter?.lng ? 'Custom location' : 'Anywhere')}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
+                    <div className="mt-0.5 text-xs text-muted-foreground">
                       {(() => {
                         const km = Math.max(1, Number(locationFilter?.radiusKm) || 10)
                         const mi = Math.round(km * 0.621371)
@@ -378,33 +378,50 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                       })()}
                     </div>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" className="flex-1" onClick={() => setLocationDialogOpen(true)}>
-                    Change
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      if (!navigator.geolocation) return
-                      navigator.geolocation.getCurrentPosition((pos) => {
-                        const { latitude, longitude } = pos.coords
-                        const preciseLat = Number(latitude.toFixed(7))
-                        const preciseLng = Number(longitude.toFixed(7))
-                        setLocationFilter((prev) => ({
-                          ...prev,
-                          lat: preciseLat,
-                          lng: preciseLng,
-                          label: 'Current location',
-                          radiusKm: Math.max(1, Number(prev?.radiusKm) || 10),
-                        }))
-                      })
-                    }}
-                  >
-                    Use my location
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        aria-label="Change location"
+                        onClick={() => setLocationDialogOpen(true)}
+                      >
+                        <PencilSimple size={16} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Change location</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        aria-label="Use my location"
+                        onClick={() => {
+                          if (!navigator.geolocation) return
+                          navigator.geolocation.getCurrentPosition((pos) => {
+                            const { latitude, longitude } = pos.coords
+                            const preciseLat = Number(latitude.toFixed(7))
+                            const preciseLng = Number(longitude.toFixed(7))
+                            setLocationFilter((prev) => ({
+                              ...prev,
+                              lat: preciseLat,
+                              lng: preciseLng,
+                              label: 'Current location',
+                              radiusKm: Math.max(1, Number(prev?.radiusKm) || 10),
+                            }))
+                          })
+                        }}
+                      >
+                        <CrosshairSimple size={16} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Use my location</TooltipContent>
+                  </Tooltip>
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -415,20 +432,33 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                   >
                     Clear location
                   </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="flex-1 justify-start px-0 text-xs"
-                    onClick={() => {
-                      setSelectedCategory('All')
-                      setSelectedCondition('All')
-                      setSelectedType('All')
-                    }}
-                  >
-                    Clear filters
-                  </Button>
                 </div>
               </div>
+
+              {/* Clear filters at far right */}
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-12 rounded-2xl px-4 text-sm font-medium"
+                  onClick={() => {
+                    setSelectedCategory('All')
+                    setSelectedCondition('All')
+                    setSelectedType('All')
+                  }}
+                >
+                  <X size={16} className="mr-2" />
+                  Clear filters
+                </Button>
+              </div>
+            </div>
+
+            {/* Search button below filters */}
+            <div className="flex">
+              <Button type="submit" className="h-12 rounded-2xl px-6 text-sm font-semibold md:w-auto w-full">
+                <MagnifyingGlass size={16} className="mr-2" />
+                Search listings
+              </Button>
             </div>
           </form>
         </CardContent>
@@ -649,15 +679,6 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                   </div>
 
                   <div className="space-y-4">
-                    <div>
-                      <h4 className="font-medium mb-2">Environmental impact</h4>
-                      <div className="bg-green-50 p-3 rounded-lg text-sm">
-                        <p className="text-green-700 font-medium">-{activeItem.co2Impact}kg CO₂ saved</p>
-                        <p className="text-green-600 mt-1">
-                          Choosing reuse prevents manufacturing a new item and keeps materials in circulation.
-                        </p>
-                      </div>
-                    </div>
 
                     <div className="space-y-2">
                       <h4 className="font-medium">{activeItemOwnerLabel}</h4>
