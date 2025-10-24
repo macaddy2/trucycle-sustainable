@@ -363,7 +363,22 @@ export function MyListingsView({
               userName: it.owner?.name || undefined,
             }
           })
-          if (!cancelled) setListings(mapped)
+          if (!cancelled) {
+            // Deduplicate by id in case API returns multiple records for same item
+            const byId = new Map<string, ManagedListing>()
+            for (const m of mapped) {
+              const existing = byId.get(m.id)
+              if (!existing) {
+                byId.set(m.id, m)
+              } else {
+                // Prefer the more recent createdAt if duplicated
+                const a = new Date(existing.createdAt).getTime()
+                const b = new Date(m.createdAt).getTime()
+                byId.set(m.id, b >= a ? m : existing)
+              }
+            }
+            setListings(Array.from(byId.values()))
+          }
         } else {
           const res = await listMyItems({ limit: 50 })
           const items = res?.data?.items || []
@@ -384,7 +399,11 @@ export function MyListingsView({
             aiClassification: undefined,
             moderation: undefined,
           }))
-          if (!cancelled) setListings(mapped)
+          if (!cancelled) {
+            const byId = new Map<string, ManagedListing>()
+            for (const m of mapped) byId.set(m.id, m)
+            setListings(Array.from(byId.values()))
+          }
         }
       } catch (e: any) {
         // Do not use demo/fallback data

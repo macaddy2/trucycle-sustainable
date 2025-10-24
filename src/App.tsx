@@ -35,6 +35,7 @@ import {
   ShopScanner,
   DemoGuide,
   Homepage,
+  QuickClaimScanner,
 } from './components'
 import { ShopScannerOverview } from './components/ShopScannerOverview'
 import { TruCycleGlyph } from './components/icons/TruCycleGlyph'
@@ -77,6 +78,7 @@ function App() {
   const [onboardingMode, setOnboardingMode] = useState<'onboarding' | 'edit'>('onboarding')
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [showShopScanner, setShowShopScanner] = useState(false)
+  const [showClaimScanner, setShowClaimScanner] = useState(false)
   const [shouldResumeListingAfterAuth, setShouldResumeListingAfterAuth] = useState(false)
   const [showDemoGuide, setShowDemoGuide] = useKV<boolean>('show-demo-guide', true)
   const [pendingFulfillmentMethod, setPendingFulfillmentMethod] = useState<'pickup' | 'dropoff' | null>(null)
@@ -595,8 +597,8 @@ function App() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setShowShopScanner(true)}
-                    title={user?.partnerAccess ? 'Open partner shop scanner' : 'View your QR activity'}
+                    onClick={() => (user?.partnerAccess ? setShowShopScanner(true) : setShowClaimScanner(true))}
+                    title={user?.partnerAccess ? 'Open partner shop scanner' : 'Scan to claim an item'}
                     className={user?.partnerAccess ? 'border-primary/50 text-primary' : undefined}
                   >
                     <QrCode size={16} />
@@ -675,8 +677,8 @@ function App() {
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => setShowShopScanner(true)}
-                    title={user?.partnerAccess ? 'Open partner shop scanner' : 'View your QR activity'}
+                    onClick={() => (user?.partnerAccess ? setShowShopScanner(true) : setShowClaimScanner(true))}
+                    title={user?.partnerAccess ? 'Open partner shop scanner' : 'Scan to claim an item'}
                     className={user?.partnerAccess ? 'border-primary/50 text-primary' : undefined}
                   >
                     <QrCode size={16} />
@@ -979,6 +981,10 @@ function App() {
 
       {/* Toast Notifications */}
       <Toaster />
+      {/* Quick Claim Scanner (non-partner) */}
+      {user && !user.partnerAccess && (
+        <QuickClaimScanner open={showClaimScanner} onOpenChange={setShowClaimScanner} />
+      )}
     </div>
   )
 }
