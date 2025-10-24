@@ -720,7 +720,11 @@ export function ItemListingForm({
 
       const images = uploadedPhotoUrls.map((url) => ({ url }))
 
-      const payload = {
+      // Helper to validate UUIDs (backend expects UUID for dropoff_location_id)
+      const isUuid = (value?: string | null) =>
+        typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+
+      const basePayload = {
         title: formData.title,
         description: formData.description || undefined,
         condition: conditionMap[formData.condition as keyof typeof conditionMap] || 'good',
@@ -728,8 +732,8 @@ export function ItemListingForm({
         address_line: addressLine,
         postcode,
         images: images.length ? images : undefined,
-        pickup_option: formData.actionType,
-        dropoff_location_id: isDropoff ? formData.dropOffLocation?.id : undefined,
+        // Only include a valid UUID for dropoff_location_id; otherwise omit to avoid backend errors
+        dropoff_location_id: isDropoff && isUuid(formData.dropOffLocation?.id) ? formData.dropOffLocation?.id : undefined,
         delivery_preferences: formData.handoverNotes || undefined,
         metadata: undefined,
         size_unit: 'm' as const,
@@ -740,8 +744,10 @@ export function ItemListingForm({
       }
 
       const response = isEditingExistingListing
-        ? await updateItem(editingListingId!, payload)
-        : await createItem(payload)
+        // For updates, do NOT send pickup_option (backend rejects it in UpdateItemDto)
+        ? await updateItem(editingListingId!, basePayload)
+        // For creates, pickup_option is required
+        : await createItem({ ...basePayload, pickup_option: formData.actionType })
 
       const server = response?.data
       const listingId = String(server?.id || editingListingId || `listing-${Date.now()}`)
@@ -1392,7 +1398,9 @@ export function ItemListingForm({
             </Button>
           ) : (
             <Button onClick={handleSubmit} disabled={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Listing'}
+              {isSubmitting
+                ? (editingListingId ? 'Updating...' : 'Creating...')
+                : (editingListingId ? 'Update Listing' : 'Create Listing')}
             </Button>
           )}
         </div>

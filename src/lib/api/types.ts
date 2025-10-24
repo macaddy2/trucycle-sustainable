@@ -166,7 +166,6 @@ export interface UpdateItemDto {
   size_height?: number
   weight_kg?: number
   estimated_co2_saved_kg?: number
-  pickup_option?: PickupOption
 }
 
 export interface PublicItemOwner {

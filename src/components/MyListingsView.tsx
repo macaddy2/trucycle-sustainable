@@ -227,6 +227,18 @@ export function MyListingsView({
       toast.error('Select a listing to edit')
       return
     }
+    if (isCollector) {
+      toast.info('Collectors cannot edit items')
+      return
+    }
+    if (selectedListing.status === 'claimed') {
+      toast.info('Claimed items cannot be edited')
+      return
+    }
+    if (selectedListing.status === 'collected') {
+      toast.info('Collected items cannot be edited')
+      return
+    }
     if (detailsLoading) {
       toast.info('Loading item details…')
       return
@@ -655,7 +667,7 @@ if (variant === 'dashboard') {
                 <DialogTitle>{selectedListing?.title ?? 'Listing details'}</DialogTitle>
                 <DialogDescription>Review the full listing, manage collector requests, and keep track of hand-offs.</DialogDescription>
               </div>
-              {selectedListing && onEditListing && (
+              {selectedListing && onEditListing && !isCollector && selectedListing.status !== 'collected' && selectedListing.status !== 'claimed' && (
                 <Button
                   variant="outline"
                   size="sm"
