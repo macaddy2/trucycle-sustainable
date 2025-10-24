@@ -468,7 +468,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                 key={item.id}
                 className="group overflow-hidden rounded-2xl border border-border/60 bg-background/80 shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl"
               >
-                <div className="relative flex aspect-video items-center justify-center bg-muted">
+                <div className="relative flex h-44 w-full items-center justify-center bg-muted">
                   {item.photos.length > 0 ? (
                     <img src={item.photos[0]} alt={item.title} className="h-full w-full object-cover object-top" />
                   ) : (
