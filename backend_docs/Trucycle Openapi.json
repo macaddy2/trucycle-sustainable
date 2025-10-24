@@ -374,7 +374,7 @@
         },
         "responses": {
           "200": {
-            "description": "User upgraded to partner and optional shop created; returns new tokens",
+            "description": "User upgraded to partner and optional shop created",
             "content": {
               "application/json": {
                 "schema": {
@@ -672,9 +672,9 @@
                     "phone_number": "+44 20 7946 0958",
                     "address_line": "1 High St",
                     "postcode": "AB12 3CD",
+                    "operational_notes": "Back entrance on Church St. Ring bell.",
                     "latitude": 51.5,
                     "longitude": -0.12,
-                    "operational_notes": "Back entrance on Church St. Ring bell.",
                     "opening_hours": {
                       "days": [
                         "Mon",
@@ -690,7 +690,9 @@
                       "furniture",
                       "electronics"
                     ],
-                    "active": true
+                    "active": true,
+                    "created_at": "2024-05-20T08:00:00.000Z",
+                    "updated_at": "2024-05-20T08:00:00.000Z"
                   }
                 }
               }
@@ -721,7 +723,31 @@
                   "example": [
                     {
                       "id": "uuid",
-                      "name": "Shop A"
+                      "name": "Shop A",
+                      "phone_number": "+44 20 7946 0958",
+                      "address_line": "1 High St",
+                      "postcode": "AB12 3CD",
+                      "operational_notes": "Back entrance on Church St. Ring bell.",
+                      "latitude": 51.5,
+                      "longitude": -0.12,
+                      "opening_hours": {
+                        "days": [
+                          "Mon",
+                          "Tue",
+                          "Wed",
+                          "Thu",
+                          "Fri"
+                        ],
+                        "open_time": "09:00",
+                        "close_time": "17:00"
+                      },
+                      "acceptable_categories": [
+                        "furniture",
+                        "electronics"
+                      ],
+                      "active": true,
+                      "created_at": "2024-05-20T08:00:00.000Z",
+                      "updated_at": "2024-05-20T08:00:00.000Z"
                     }
                   ]
                 }
@@ -761,7 +787,31 @@
                 "schema": {
                   "example": {
                     "id": "uuid",
-                    "name": "Shop A"
+                    "name": "Shop A",
+                    "phone_number": "+44 20 7946 0958",
+                    "address_line": "1 High St",
+                    "postcode": "AB12 3CD",
+                    "operational_notes": "Back entrance on Church St. Ring bell.",
+                    "latitude": 51.5,
+                    "longitude": -0.12,
+                    "opening_hours": {
+                      "days": [
+                        "Mon",
+                        "Tue",
+                        "Wed",
+                        "Thu",
+                        "Fri"
+                      ],
+                      "open_time": "09:00",
+                      "close_time": "17:00"
+                    },
+                    "acceptable_categories": [
+                      "furniture",
+                      "electronics"
+                    ],
+                    "active": true,
+                    "created_at": "2024-05-20T08:00:00.000Z",
+                    "updated_at": "2024-05-20T08:00:00.000Z"
                   }
                 }
               }
@@ -804,7 +854,31 @@
                 "schema": {
                   "example": {
                     "id": "uuid",
-                    "name": "Updated Name"
+                    "name": "Updated Name",
+                    "phone_number": "+44 20 7946 0958",
+                    "address_line": "1 High St",
+                    "postcode": "AB12 3CD",
+                    "operational_notes": "Back entrance on Church St. Ring bell.",
+                    "latitude": 51.5,
+                    "longitude": -0.12,
+                    "opening_hours": {
+                      "days": [
+                        "Mon",
+                        "Tue",
+                        "Wed",
+                        "Thu",
+                        "Fri"
+                      ],
+                      "open_time": "09:00",
+                      "close_time": "17:00"
+                    },
+                    "acceptable_categories": [
+                      "furniture",
+                      "electronics"
+                    ],
+                    "active": true,
+                    "created_at": "2024-05-20T08:00:00.000Z",
+                    "updated_at": "2024-06-01T08:00:00.000Z"
                   }
                 }
               }
@@ -948,12 +1022,76 @@
               "application/json": {
                 "schema": {
                   "example": {
-                    "items": [],
+                    "items": [
+                      {
+                        "id": "item-id",
+                        "title": "Reusable bottle",
+                        "status": "pending_dropoff",
+                        "pickup_option": "donate",
+                        "qr_code": "https://.../qr.png",
+                        "images": [
+                          {
+                            "url": "https://...",
+                            "alt_text": null
+                          }
+                        ],
+                        "estimated_co2_saved_kg": 1.2,
+                        "metadata": {
+                          "brand": "TruCycle"
+                        },
+                        "location": {
+                          "address_line": "10 Downing St",
+                          "postcode": "SW1A 2AA",
+                          "latitude": 51.5034,
+                          "longitude": -0.1276
+                        },
+                        "created_at": "2024-06-01T10:00:00.000Z",
+                        "claim": {
+                          "id": "claim-id",
+                          "status": "pending_dropoff",
+                          "approved_at": "2024-06-02T09:00:00.000Z",
+                          "completed_at": null,
+                          "collector": {
+                            "id": "collector-id",
+                            "name": "John Smith",
+                            "profile_image": null
+                          }
+                        },
+                        "dropoff_location": {
+                          "id": "shop-id",
+                          "name": "TruCycle Hub",
+                          "phone_number": "+44 20 7946 0958",
+                          "address_line": "1 High St",
+                          "postcode": "AB12 3CD",
+                          "operational_notes": "Back entrance on Church St. Ring bell.",
+                          "latitude": 51.509,
+                          "longitude": -0.133,
+                          "opening_hours": {
+                            "days": [
+                              "Mon",
+                              "Tue",
+                              "Wed",
+                              "Thu",
+                              "Fri"
+                            ],
+                            "open_time": "09:00",
+                            "close_time": "17:00"
+                          },
+                          "acceptable_categories": [
+                            "furniture",
+                            "electronics"
+                          ],
+                          "active": true,
+                          "created_at": "2024-05-20T08:00:00.000Z",
+                          "updated_at": "2024-05-20T08:00:00.000Z"
+                        }
+                      }
+                    ],
                     "pagination": {
                       "page": 1,
                       "limit": 10,
-                      "total": 0,
-                      "total_pages": 0
+                      "total": 1,
+                      "total_pages": 1
                     }
                   }
                 }
@@ -1079,12 +1217,76 @@
               "application/json": {
                 "schema": {
                   "example": {
-                    "items": [],
+                    "items": [
+                      {
+                        "id": "item-id",
+                        "title": "Reusable bottle",
+                        "status": "pending_dropoff",
+                        "pickup_option": "donate",
+                        "qr_code": "https://.../qr.png",
+                        "images": [
+                          {
+                            "url": "https://...",
+                            "alt_text": null
+                          }
+                        ],
+                        "estimated_co2_saved_kg": 1.2,
+                        "metadata": {
+                          "brand": "TruCycle"
+                        },
+                        "location": {
+                          "address_line": "10 Downing St",
+                          "postcode": "SW1A 2AA",
+                          "latitude": 51.5034,
+                          "longitude": -0.1276
+                        },
+                        "created_at": "2024-06-01T10:00:00.000Z",
+                        "claim": {
+                          "id": "claim-id",
+                          "status": "pending_dropoff",
+                          "approved_at": "2024-06-02T09:00:00.000Z",
+                          "completed_at": null,
+                          "collector": {
+                            "id": "collector-id",
+                            "name": "John Smith",
+                            "profile_image": null
+                          }
+                        },
+                        "dropoff_location": {
+                          "id": "shop-id",
+                          "name": "TruCycle Hub",
+                          "phone_number": "+44 20 7946 0958",
+                          "address_line": "1 High St",
+                          "postcode": "AB12 3CD",
+                          "operational_notes": "Back entrance on Church St. Ring bell.",
+                          "latitude": 51.509,
+                          "longitude": -0.133,
+                          "opening_hours": {
+                            "days": [
+                              "Mon",
+                              "Tue",
+                              "Wed",
+                              "Thu",
+                              "Fri"
+                            ],
+                            "open_time": "09:00",
+                            "close_time": "17:00"
+                          },
+                          "acceptable_categories": [
+                            "furniture",
+                            "electronics"
+                          ],
+                          "active": true,
+                          "created_at": "2024-05-20T08:00:00.000Z",
+                          "updated_at": "2024-05-20T08:00:00.000Z"
+                        }
+                      }
+                    ],
                     "pagination": {
                       "page": 1,
                       "limit": 10,
-                      "total": 0,
-                      "total_pages": 0
+                      "total": 1,
+                      "total_pages": 1
                     }
                   }
                 }
@@ -1250,6 +1452,8 @@
                           "id": "item-id",
                           "title": "Reusable bottle",
                           "status": "active",
+                          "condition": "good",
+                          "category": "kitchen",
                           "distance_km": 0.8,
                           "pickup_option": "exchange",
                           "qr_code": "https://cdn.../qr.png",
@@ -1260,6 +1464,39 @@
                             }
                           ],
                           "estimated_co2_saved_kg": 1.2,
+                          "claim": {
+                            "status": "approved",
+                            "requested_at": "2024-06-01T10:00:00.000Z",
+                            "claimed_at": null
+                          },
+                          "dropoff_location": {
+                            "id": "shop-id",
+                            "name": "TruCycle Hub",
+                            "phone_number": "+44 20 7946 0958",
+                            "address_line": "1 High St",
+                            "postcode": "AB12 3CD",
+                            "operational_notes": "Back entrance on Church St. Ring bell.",
+                            "latitude": 51.509,
+                            "longitude": -0.133,
+                            "opening_hours": {
+                              "days": [
+                                "Mon",
+                                "Tue",
+                                "Wed",
+                                "Thu",
+                                "Fri"
+                              ],
+                              "open_time": "09:00",
+                              "close_time": "17:00"
+                            },
+                            "acceptable_categories": [
+                              "furniture",
+                              "electronics"
+                            ],
+                            "active": true,
+                            "created_at": "2024-05-20T08:00:00.000Z",
+                            "updated_at": "2024-05-20T08:00:00.000Z"
+                          },
                           "owner": {
                             "id": "user-id",
                             "name": "Jane Doe",
@@ -1407,6 +1644,8 @@
                           "id": "item-id",
                           "title": "Reusable bottle",
                           "status": "active",
+                          "condition": "good",
+                          "category": "kitchen",
                           "pickup_option": "exchange",
                           "qr_code": "https://...",
                           "images": [
@@ -1422,6 +1661,34 @@
                             "postcode": "SW1A 2AA",
                             "latitude": 51.5034,
                             "longitude": -0.1276
+                          },
+                          "dropoff_location": {
+                            "id": "shop-id",
+                            "name": "TruCycle Hub",
+                            "phone_number": "+44 20 7946 0958",
+                            "address_line": "1 High St",
+                            "postcode": "AB12 3CD",
+                            "operational_notes": "Back entrance on Church St. Ring bell.",
+                            "latitude": 51.509,
+                            "longitude": -0.133,
+                            "opening_hours": {
+                              "days": [
+                                "Mon",
+                                "Tue",
+                                "Wed",
+                                "Thu",
+                                "Fri"
+                              ],
+                              "open_time": "09:00",
+                              "close_time": "17:00"
+                            },
+                            "acceptable_categories": [
+                              "furniture",
+                              "electronics"
+                            ],
+                            "active": true,
+                            "created_at": "2024-05-20T08:00:00.000Z",
+                            "updated_at": "2024-05-20T08:00:00.000Z"
                           },
                           "created_at": "2024-06-01T10:00:00.000Z",
                           "claim": null
@@ -1538,6 +1805,8 @@
                             "id": "item-id",
                             "title": "Aluminum can",
                             "status": "recycled",
+                            "condition": "fair",
+                            "category": "recyclables",
                             "pickup_option": "recycle",
                             "qr_code": "https://...",
                             "images": [
@@ -1552,6 +1821,34 @@
                               "postcode": "RC1 2CL",
                               "latitude": 51.5,
                               "longitude": -0.1
+                            },
+                            "dropoff_location": {
+                              "id": "shop-id",
+                              "name": "TruCycle Hub",
+                              "phone_number": "+44 20 7946 0958",
+                              "address_line": "1 High St",
+                              "postcode": "AB12 3CD",
+                              "operational_notes": "Back entrance on Church St. Ring bell.",
+                              "latitude": 51.509,
+                              "longitude": -0.133,
+                              "opening_hours": {
+                                "days": [
+                                  "Mon",
+                                  "Tue",
+                                  "Wed",
+                                  "Thu",
+                                  "Fri"
+                                ],
+                                "open_time": "09:00",
+                                "close_time": "17:00"
+                              },
+                              "acceptable_categories": [
+                                "furniture",
+                                "electronics"
+                              ],
+                              "active": true,
+                              "created_at": "2024-05-20T08:00:00.000Z",
+                              "updated_at": "2024-05-20T08:00:00.000Z"
                             },
                             "created_at": "2024-06-01T09:00:00.000Z",
                             "owner": {
@@ -1651,7 +1948,77 @@
                     "message": "OK",
                     "data": {
                       "id": "item-id",
-                      "title": "Reusable bottle"
+                      "title": "Reusable bottle",
+                      "description": "A like-new reusable water bottle with bamboo lid.",
+                      "status": "active",
+                      "condition": "like_new",
+                      "category": "kitchen",
+                      "pickup_option": "exchange",
+                      "estimated_co2_saved_kg": 1.2,
+                      "location": {
+                        "postcode": "SW1A 2AA",
+                        "latitude": 51.5034,
+                        "longitude": -0.1276
+                      },
+                      "qr_code": "https://cdn.../qr.png",
+                      "scan_events": [
+                        {
+                          "scan_type": "CLAIM_IN",
+                          "shop_id": "shop-id",
+                          "scanned_at": "2024-06-02T09:00:00.000Z"
+                        }
+                      ],
+                      "images": [
+                        {
+                          "url": "https://...",
+                          "alt_text": null
+                        }
+                      ],
+                      "metadata": {
+                        "colour": "blue",
+                        "capacity_l": 0.75
+                      },
+                      "created_at": "2024-06-01T10:00:00.000Z",
+                      "owner": {
+                        "id": "user-id",
+                        "name": "Jane Doe",
+                        "profile_image": null,
+                        "verification": {
+                          "email_verified": true,
+                          "identity_verified": true,
+                          "address_verified": true
+                        },
+                        "rating": 4.9,
+                        "reviews_count": 12
+                      },
+                      "dropoff_location": {
+                        "id": "shop-id",
+                        "name": "TruCycle Hub",
+                        "phone_number": "+44 20 7946 0958",
+                        "address_line": "1 High St",
+                        "postcode": "AB12 3CD",
+                        "operational_notes": "Back entrance on Church St. Ring bell.",
+                        "latitude": 51.509,
+                        "longitude": -0.133,
+                        "opening_hours": {
+                          "days": [
+                            "Mon",
+                            "Tue",
+                            "Wed",
+                            "Thu",
+                            "Fri"
+                          ],
+                          "open_time": "09:00",
+                          "close_time": "17:00"
+                        },
+                        "acceptable_categories": [
+                          "furniture",
+                          "electronics"
+                        ],
+                        "active": true,
+                        "created_at": "2024-05-20T08:00:00.000Z",
+                        "updated_at": "2024-05-20T08:00:00.000Z"
+                      }
                     }
                   }
                 }

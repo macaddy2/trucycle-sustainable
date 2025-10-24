@@ -1192,7 +1192,7 @@ export function ItemListingForm({
             </div>
               </div>
             )}
-            {false && (classificationLoading || classificationResult || moderationLoading || moderationResult) && (
+            {(classificationLoading || classificationResult || moderationLoading || moderationResult) && (
               <div className="grid gap-4 md:grid-cols-2">
                 {(classificationLoading || classificationResult) && (
                   <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">
@@ -1357,7 +1357,7 @@ export function ItemListingForm({
                   <div><span className="font-medium">Photos:</span> {formData.photos.length} uploaded</div>
                 )}
               </div>
-              {valuationSummary && (
+              {false && (
                 <div className="grid gap-3 text-xs text-muted-foreground md:grid-cols-3">
                   <div className="rounded-md border border-primary/30 bg-background/60 p-3">
                     <p className="font-semibold text-primary">
