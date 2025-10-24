@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ChatCircle, CheckCircle, Clock } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { useExchangeManager } from '@/hooks'
+import { useMessaging } from '@/hooks/useMessaging'
 
 interface MessageNotificationProps {
   onOpenMessages: () => void
@@ -31,11 +32,18 @@ interface Chat {
 
 export function MessageNotification({ onOpenMessages }: MessageNotificationProps) {
   const [currentUser] = useKV('current-user', null)
-  const [chats] = useKV('user-chats', [] as Chat[])
+  const { chats, refreshActiveRooms, getTotalUnreadCount } = useMessaging()
   const [showTooltip, setShowTooltip] = useState(false)
   const { pendingRequestCountByItem } = useExchangeManager()
 
-  const totalUnread = chats.reduce((sum, chat) => sum + chat.unreadCount, 0)
+  useEffect(() => {
+    if (currentUser) {
+      // Ensure we load active rooms from backend for the header tooltip
+      refreshActiveRooms()
+    }
+  }, [currentUser, refreshActiveRooms])
+
+  const totalUnread = getTotalUnreadCount()
   const activeChats = chats.filter(chat => chat.status === 'active')
   const pendingRequests = currentUser?.userType === 'donor'
     ? Object.values(pendingRequestCountByItem).reduce((sum, count) => sum + count, 0)

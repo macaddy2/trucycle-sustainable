@@ -476,7 +476,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {filteredItems.map((item) => {
             const Icon = actionIcon[item.actionType]
             const collectionStatus = getItemCollectionStatus(item.id)
