@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Progress } from '@/components/ui/progress'
@@ -19,6 +18,7 @@ import {
   Shield
 } from '@phosphor-icons/react'
 import { kvGet, kvSet } from '@/lib/kvStore'
+import { me as apiMe, updateMyProfile } from '@/lib/api'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
@@ -175,12 +175,28 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
 
       const formattedPostcode = formatPostcode(profileData.postcode)
 
-      // Update user profile with verified address data
+      // Update backend profile with verified postcode from auth/me context
+      let apiFirstName = user?.name?.split(' ')[0] || ''
+      let apiLastName = (user?.name?.split(' ').slice(1).join(' ')) || apiFirstName || ''
+      try {
+        const meRes = await apiMe()
+        const meUser = meRes?.data?.user
+        if (meUser) {
+          apiFirstName = meUser.firstName || apiFirstName
+          apiLastName = meUser.lastName || apiLastName
+          // Persist to backend profile
+          await updateMyProfile({ first_name: apiFirstName, last_name: apiLastName, postcode: formattedPostcode })
+        }
+      } catch {
+        // If /auth/me or update fails, continue local onboarding to avoid blocking UX
+      }
+
+      // Update local user profile with verified address data
       const updatedUser: UserProfile = {
         ...(user || {}),
         id: user?.id || `user_${Date.now()}`,
         email: user?.email || '',
-        name: user?.name || '',
+        name: user?.name || [apiFirstName, apiLastName].filter(Boolean).join(' '),
         userType: profileData.userType as 'donor' | 'collector',
         postcode: formattedPostcode,
         area: verificationData.area ?? formattedPostcode.split(' ')[0],
@@ -191,12 +207,14 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
         addressVerified: true,
         addressVerifiedAt: new Date().toISOString(),
         verificationLevel: {
+          // Always take email/identity/address verification from auth/me if available later
           email: true,
           identity: user?.verificationLevel?.identity ?? false,
           address: true,
         },
         rewardsBalance: user?.rewardsBalance ?? 0,
-        partnerAccess: Boolean(profileData.partnerAccess)
+        // Partner access will be resolved from auth/me elsewhere
+        partnerAccess: Boolean(user?.partnerAccess)
       }
 
       // Save to user profiles
@@ -317,34 +335,7 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
               </Card>
             </RadioGroup>
 
-            <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-medium">Partner shop tools</p>
-                <p className="text-xs text-muted-foreground">
-                  Toggle this on if you run a partner site and need QR check-in and collection logs.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="partner-access"
-                  checked={profileData.partnerAccess}
-                  onCheckedChange={(checked) =>
-                    setProfileData(prev => ({ ...prev, partnerAccess: Boolean(checked) }))
-                  }
-                />
-                <Label htmlFor="partner-access" className="text-xs text-muted-foreground">
-                  I manage a TruCycle partner location
-                </Label>
-              </div>
-            </div>
-
-            <Card className="bg-muted/30">
-              <CardContent className="pt-4">
-                <p className="text-xs text-muted-foreground text-center">
-                  You can adjust your profile type or partner access later from settings.
-                </p>
-              </CardContent>
-            </Card>
+            {/* Partner tools toggle removed per requirements */}
           </div>
         )
 
@@ -425,11 +416,7 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
                       </p>
                     </div>
                   </div>
-                  {profileData.partnerAccess && (
-                    <Badge variant="outline" className="uppercase tracking-wide text-xs">
-                      Partner tools enabled
-                    </Badge>
-                  )}
+                  {/* Partner tools status removed per requirements */}
 
                   <div className="space-y-2">
                     <h4 className="font-medium text-sm">What's next?</h4>

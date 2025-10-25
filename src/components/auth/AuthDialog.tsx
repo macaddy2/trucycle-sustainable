@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Eye, EyeSlash, EnvelopeSimple } from '@phosphor-icons/react'
-import { login as apiLogin, register as apiRegister } from '@/lib/api'
+import { login as apiLogin, register as apiRegister, me as apiMe } from '@/lib/api'
 import type { RegisterDto } from '@/lib/api'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
@@ -118,7 +118,7 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
         const res = await apiLogin({ email: normalizedEmail, password: formData.password })
         const user = res?.data?.user as { id: string; email: string; firstName?: string; lastName?: string; status?: string; roles?: string[]; role?: string } | undefined
         if (user) {
-          const profile: UserProfile = {
+          let profile: UserProfile = {
             id: user.id,
             email: user.email,
             name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
@@ -127,6 +127,23 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
             verified: user.status === 'active',
             partnerAccess: Array.isArray(user.roles) ? user.roles.includes('partner') : (user.role === 'partner'),
           }
+          try {
+            const meRes = await apiMe()
+            const meUser = meRes?.data?.user
+            if (meUser) {
+              profile = {
+                ...profile,
+                name: [meUser.firstName, meUser.lastName].filter(Boolean).join(' ') || profile.name,
+                postcode: meUser.postcode ?? profile.postcode,
+                partnerAccess: Array.isArray(meUser.roles) ? meUser.roles.includes('partner') : (meUser.role === 'partner'),
+                verificationLevel: {
+                  email: Boolean(meUser.verifications?.email_verified),
+                  identity: Boolean(meUser.verifications?.identity_verified),
+                  address: Boolean(meUser.verifications?.address_verified),
+                },
+              }
+            }
+          } catch {}
           setUser(profile)
           toast.success(`Welcome back${profile.name ? `, ${profile.name.split(' ')[0]}` : ''}!`)
           onOpenChange(false)

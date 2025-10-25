@@ -44,6 +44,7 @@ import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
 import { messageSocket } from '@/lib/messaging/socket'
+import { me as apiMe } from '@/lib/api'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import { useRecommendationNotifications, useNotifications, useExchangeManager, usePresence } from '@/hooks'
 import type { ListingCompletionDetails, ListingEditDraft } from './components/ItemListingForm'
@@ -108,6 +109,40 @@ function App() {
       messageSocket.disconnect()
     }
   }, [user])
+  // Always sync role, postcode and verification from auth/me when available
+  useEffect(() => {
+    let active = true
+    async function syncMe() {
+      try {
+        const meRes = await apiMe()
+        const meUser = meRes?.data?.user
+        if (!active || !meUser) return
+        const existingType = user?.userType ?? 'donor'
+        const merged = {
+          id: user?.id || meUser.id,
+          name: [meUser.firstName, meUser.lastName].filter(Boolean).join(' ') || user?.name || meUser.email,
+          email: meUser.email,
+          userType: existingType as 'donor' | 'collector',
+          onboardingCompleted: Boolean(user?.onboardingCompleted),
+          postcode: meUser.postcode || user?.postcode,
+          rating: user?.rating,
+          verificationLevel: {
+            email: Boolean(meUser.verifications?.email_verified),
+            identity: Boolean(meUser.verifications?.identity_verified),
+            address: Boolean(meUser.verifications?.address_verified),
+          },
+          rewardsBalance: user?.rewardsBalance,
+          partnerAccess: Array.isArray(meUser.roles) ? meUser.roles.includes('partner') : (meUser.role === 'partner'),
+        }
+        setUser(merged as any)
+      } catch {
+        // ignore when unauthenticated
+      }
+    }
+    syncMe()
+    return () => { active = false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const pendingListingRequests = useMemo(() => {
     if (!user) return 0
     return getRequestsForDonor(user.id).filter((r) => r.status === 'pending').length

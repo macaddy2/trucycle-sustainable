@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { verify as apiVerify, resendVerification as apiResendVerification } from '@/lib/api'
+import { verify as apiVerify, resendVerification as apiResendVerification, me as apiMe } from '@/lib/api'
 import { useKV } from '@/hooks/useKV'
 
 type UserProfile = {
@@ -31,20 +31,34 @@ export function VerifyEmailPage() {
       try {
         setStatus('verifying')
         const res = await apiVerify({ token })
-        const user = res?.data?.user as { id: string; email: string; firstName?: string; lastName?: string; status?: string; roles?: string[]; role?: string } | undefined
-        if (user) {
-          const profile: UserProfile = {
-            id: user.id,
-            email: user.email,
-            name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+        const loginUser = res?.data?.user as { id: string; email: string; firstName?: string; lastName?: string; status?: string; roles?: string[]; role?: string } | undefined
+        if (loginUser) {
+          let profile: UserProfile = {
+            id: loginUser.id,
+            email: loginUser.email,
+            name: [loginUser.firstName, loginUser.lastName].filter(Boolean).join(' ') || loginUser.email,
             userType: 'donor',
             createdAt: new Date().toISOString(),
-            verified: user.status === 'active',
-            // Derive partner access from roles after verification
-            // If roles are missing, default to false
-            // (user can later upgrade via Partner portal)
-            partnerAccess: Array.isArray(user.roles) ? user.roles.includes('partner') : (user.role === 'partner'),
+            verified: loginUser.status === 'active',
+            partnerAccess: Array.isArray(loginUser.roles) ? loginUser.roles.includes('partner') : (loginUser.role === 'partner'),
           }
+          try {
+            const meRes = await apiMe()
+            const meUser = meRes?.data?.user
+            if (meUser) {
+              profile = {
+                ...profile,
+                name: [meUser.firstName, meUser.lastName].filter(Boolean).join(' ') || profile.name,
+                postcode: meUser.postcode ?? profile.postcode,
+                partnerAccess: Array.isArray(meUser.roles) ? meUser.roles.includes('partner') : (meUser.role === 'partner'),
+                verificationLevel: {
+                  email: Boolean(meUser.verifications?.email_verified),
+                  identity: Boolean(meUser.verifications?.identity_verified),
+                  address: Boolean(meUser.verifications?.address_verified),
+                },
+              }
+            }
+          } catch {}
           setUser(profile)
         }
         setStatus('success')

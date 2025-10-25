@@ -16,10 +16,11 @@ export interface MinimalUser {
   email: string
   firstName?: string
   lastName?: string
+  postcode?: string
   status?: string
   roles?: string[]
   role?: string
-  verification?: {
+  verifications?: {
     email_verified?: boolean
     identity_verified?: boolean
     address_verified?: boolean
@@ -60,6 +61,13 @@ export interface ResetPasswordDto {
 
 export interface MeResponse {
   user: MinimalUser
+}
+
+// Users/Profile
+export interface UpdateProfileDto {
+  first_name?: string
+  last_name?: string
+  postcode?: string
 }
 
 export interface LoginResponse {

@@ -45,6 +45,7 @@ import type {
   DropoffScanDto,
   ShopScanDto,
   ImpactMetrics,
+  UpdateProfileDto,
 } from './types'
 
 export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '') || ''
@@ -196,6 +197,15 @@ export const tokens = {
   get: getTokens,
   set: setTokens,
   clear: clearTokens,
+}
+
+// USERS ENDPOINTS
+export async function updateMyProfile(dto: UpdateProfileDto) {
+  return request<ApiEnvelope<any>>('/users/me/profile', {
+    method: 'PATCH',
+    auth: true,
+    body: dto,
+  })
 }
 
 // Helper: build query string from params

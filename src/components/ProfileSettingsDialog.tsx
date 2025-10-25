@@ -4,10 +4,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { useKV } from '@/hooks/useKV'
+import { updateMyProfile, me as apiMe } from '@/lib/api'
 import { kvGet, kvSet } from '@/lib/kvStore'
 
 interface ProfileSettingsDialogProps {
@@ -160,11 +160,20 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
 
     const formattedPostcode = formatPostcode(formState.postcode)
 
+    // Update backend profile
+    const [firstName, ...rest] = formState.name.trim().split(' ')
+    try {
+      await updateMyProfile({ first_name: firstName || '', last_name: rest.join(' ') || firstName || '', postcode: formattedPostcode })
+    } catch (err: any) {
+      console.error('Failed to update profile via API', err)
+      // continue to update local state to keep UX fluid
+    }
+
     const updatedUser: UserProfile = {
       ...user,
       name: formState.name.trim(),
       postcode: formattedPostcode,
-      partnerAccess: formState.partnerAccess,
+      partnerAccess: user.partnerAccess,
       verificationLevel: {
         ...user.verificationLevel,
         address: user.verificationLevel.address || Boolean(formattedPostcode),
@@ -203,7 +212,28 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
     await kvSet(`user-preferences-${updatedUser.id}`, updatedPreferences)
 
     setPreferences(updatedPreferences)
-    setUser(updatedUser)
+    // Refresh partner role, postcode, verifications from auth/me
+    try {
+      const meRes = await apiMe()
+      const meUser = meRes?.data?.user
+      if (meUser) {
+        setUser({
+          ...updatedUser,
+          name: [meUser.firstName, meUser.lastName].filter(Boolean).join(' ') || updatedUser.name,
+          postcode: meUser.postcode ?? updatedUser.postcode,
+          partnerAccess: Array.isArray(meUser.roles) ? meUser.roles.includes('partner') : (meUser.role === 'partner'),
+          verificationLevel: {
+            email: Boolean(meUser.verifications?.email_verified),
+            identity: Boolean(meUser.verifications?.identity_verified),
+            address: Boolean(meUser.verifications?.address_verified) || Boolean(formattedPostcode),
+          },
+        })
+      } else {
+        setUser(updatedUser)
+      }
+    } catch {
+      setUser(updatedUser)
+    }
     toast.success('Profile settings updated')
     onOpenChange(false)
   }
@@ -214,7 +244,7 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
         <DialogHeader>
           <DialogTitle className="text-h3">Account settings</DialogTitle>
           <DialogDescription>
-            Manage your core profile details, notification preferences, and partner access tools.
+            Manage your core profile details and notification preferences.
           </DialogDescription>
         </DialogHeader>
 
@@ -238,7 +268,7 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
               <TabsList className="grid grid-cols-2">
                 <TabsTrigger value="account">Account</TabsTrigger>
-                <TabsTrigger value="partner">Partner tools</TabsTrigger>
+                <TabsTrigger value="partner">Partner</TabsTrigger>
               </TabsList>
 
               <TabsContent value="account" className="space-y-4 pt-4">
@@ -297,26 +327,26 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
               </TabsContent>
 
               <TabsContent value="partner" className="space-y-4 pt-4">
-                <div className="rounded-lg border border-border p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-medium">Partner shop tools</p>
-                      <p className="text-sm text-muted-foreground">
-                        Enable the full shop scanner, attendant logs, and impact dashboards for partner locations.
-                      </p>
-                    </div>
-                    <Switch
-                      checked={formState.partnerAccess}
-                      onCheckedChange={(checked) =>
-                        setFormState((prev) => ({ ...prev, partnerAccess: Boolean(checked) }))
-                      }
-                    />
+                <div className="rounded-lg border border-border p-4 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Partner shop</p>
+                    <p className="text-sm text-muted-foreground">
+                      Access partner tools for QR check-in and collection logs.
+                    </p>
                   </div>
+                  <Button
+                    onClick={() => {
+                      const base = (import.meta as any).env?.BASE_URL || '/'
+                      if (user?.partnerAccess) {
+                        window.location.assign(String(base || '/').replace(/\/$/, '') + '/partner')
+                      } else {
+                        window.location.assign(String(base || '/').replace(/\/$/, '') + '/partner/register')
+                      }
+                    }}
+                  >
+                    {user?.partnerAccess ? 'Go to Shop' : 'Become a Partner'}
+                  </Button>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Turn this on if you manage a collection hub or donation point. We review partner access requests to keep the
-                  network trusted.
-                </p>
               </TabsContent>
             </Tabs>
 
