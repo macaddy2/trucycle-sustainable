@@ -58,11 +58,8 @@ interface UserProfile {
   rating?: number
   verificationLevel: {
     email: boolean
-    phone: boolean
     identity: boolean
     address: boolean
-    payment: boolean
-    community: boolean
   }
   rewardsBalance?: number
   partnerAccess?: boolean

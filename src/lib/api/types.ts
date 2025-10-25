@@ -19,6 +19,11 @@ export interface MinimalUser {
   status?: string
   roles?: string[]
   role?: string
+  verification?: {
+    email_verified?: boolean
+    identity_verified?: boolean
+    address_verified?: boolean
+  }
 }
 
 // Auth DTOs from OpenAPI

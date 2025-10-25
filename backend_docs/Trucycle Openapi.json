@@ -332,11 +332,17 @@
                         "email": "jane@example.com",
                         "firstName": "Jane",
                         "lastName": "Doe",
+                        "postcode": "SW1A 2AA",
                         "status": "active",
                         "roles": [
                           "customer",
                           "partner"
-                        ]
+                        ],
+                        "verification": {
+                          "email_verified": true,
+                          "identity_verified": false,
+                          "address_verified": true
+                        }
                       }
                     }
                   }
@@ -1329,6 +1335,11 @@
         },
         "tags": [
           "items"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
         ]
       }
     },
@@ -1521,6 +1532,11 @@
         },
         "tags": [
           "items"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
         ]
       },
       "post": {
@@ -2028,6 +2044,11 @@
         },
         "tags": [
           "items"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
         ]
       },
       "patch": {

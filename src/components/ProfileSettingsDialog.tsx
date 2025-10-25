@@ -24,11 +24,8 @@ interface UserProfile {
   onboardingCompleted?: boolean
   verificationLevel: {
     email: boolean
-    phone: boolean
     identity: boolean
     address: boolean
-    payment: boolean
-    community: boolean
   }
   rewardsBalance?: number
   partnerAccess?: boolean
@@ -171,7 +168,6 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
       verificationLevel: {
         ...user.verificationLevel,
         address: user.verificationLevel.address || Boolean(formattedPostcode),
-        community: formState.partnerAccess ? true : user.verificationLevel.community,
       },
     }
 

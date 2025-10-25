@@ -80,12 +80,9 @@ function calculateVerificationScore(verification: VerificationLevel): number {
   }
   
   const weights = {
-    email: 5,      // Basic requirement
-    phone: 8,      // Important for contact
-    identity: 10,  // High trust factor
-    address: 7,    // Location verification
-    payment: 8,    // Financial verification
-    community: 12  // Earned through good behavior
+    email: 8,      // Basic requirement
+    identity: 12,  // High trust factor
+    address: 10,   // Location verification
   }
   
   return Object.entries(verification).reduce((score, [key, verified]) => {
@@ -155,8 +152,8 @@ function getTrustFactors(factors: TrustFactors): string[] {
   
   // Verification factors
   const verificationCount = Object.values(factors.verificationLevel || {}).filter(Boolean).length
-  if (verificationCount >= 5) positiveFactors.push('Fully verified identity')
-  else if (verificationCount >= 3) positiveFactors.push('Well-verified profile')
+  if (verificationCount >= 3) positiveFactors.push('Fully verified identity')
+  else if (verificationCount >= 2) positiveFactors.push('Well-verified profile')
   
   // Rating factors
   if (factors.ratingStats.averageRating >= 4.5) {
@@ -183,9 +180,8 @@ function getImprovementSuggestions(factors: TrustFactors): string[] {
   
   // Verification improvements
   const verification = factors.verificationLevel
-  if (!verification.phone) suggestions.push('Verify your phone number')
   if (!verification.identity) suggestions.push('Complete identity verification')
-  if (!verification.payment) suggestions.push('Add a verified payment method')
+  if (!verification.address) suggestions.push('Complete address verification')
   
   // Rating improvements
   if (factors.ratingStats.totalRatings < 5) {

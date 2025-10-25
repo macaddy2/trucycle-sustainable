@@ -6,15 +6,12 @@ import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { 
-  CheckCircle, 
-  Clock, 
-  Shield, 
-  Phone, 
-  CreditCard, 
-  MapPin, 
-  Certificate, 
-  Medal,
+import {
+  CheckCircle,
+  Clock,
+  Shield,
+  MapPin,
+  Certificate,
   Upload,
   Info,
   Star
@@ -53,16 +50,6 @@ const verificationSteps: VerificationStep[] = [
     trustBoost: 10
   },
   {
-    id: 'phone',
-    title: 'Phone Verification',
-    description: 'Add and verify your phone number for secure communication',
-    icon: <Phone size={20} />,
-    requirement: 'UK mobile number and SMS verification',
-    estimatedTime: '5 minutes',
-    difficulty: 'Easy',
-    trustBoost: 15
-  },
-  {
     id: 'address',
     title: 'Address Verification',
     description: 'Confirm your London address for local exchanges',
@@ -73,16 +60,6 @@ const verificationSteps: VerificationStep[] = [
     trustBoost: 20
   },
   {
-    id: 'payment',
-    title: 'Payment Method',
-    description: 'Add a verified payment method for premium features',
-    icon: <CreditCard size={20} />,
-    requirement: 'Valid UK debit/credit card',
-    estimatedTime: '5 minutes',
-    difficulty: 'Easy',
-    trustBoost: 15
-  },
-  {
     id: 'identity',
     title: 'Identity Verification',
     description: 'Verify your identity for the highest trust level',
@@ -91,16 +68,6 @@ const verificationSteps: VerificationStep[] = [
     estimatedTime: '15 minutes',
     difficulty: 'Hard',
     trustBoost: 25
-  },
-  {
-    id: 'community',
-    title: 'Community Standing',
-    description: 'Earned through successful exchanges and positive reviews',
-    icon: <Medal size={20} />,
-    requirement: '5+ successful exchanges with 4.5+ average rating',
-    estimatedTime: 'Ongoing',
-    difficulty: 'Medium',
-    trustBoost: 15
   }
 ]
 
@@ -108,7 +75,6 @@ export function VerificationCenter({ currentVerification, onVerificationUpdate }
   const [selectedStep, setSelectedStep] = useState<VerificationStep | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
-    phone: '',
     addressDoc: null as File | null,
     identityDoc: null as File | null
   })
@@ -129,16 +95,6 @@ export function VerificationCenter({ currentVerification, onVerificationUpdate }
         const updatedVerification = { ...currentVerification, email: true }
         onVerificationUpdate(updatedVerification)
         toast.success('Email verification completed!')
-      } else if (step.id === 'phone') {
-        // In real app, this would send SMS
-        const updatedVerification = { ...currentVerification, phone: true }
-        onVerificationUpdate(updatedVerification)
-        toast.success('Phone verification completed!')
-      } else if (step.id === 'payment') {
-        // In real app, this would integrate with payment provider
-        const updatedVerification = { ...currentVerification, payment: true }
-        onVerificationUpdate(updatedVerification)
-        toast.success('Payment method verified!')
       } else {
         toast.success(`${step.title} verification submitted for review. We'll notify you within 24 hours.`)
       }
@@ -359,20 +315,7 @@ export function VerificationCenter({ currentVerification, onVerificationUpdate }
               </div>
 
               {/* Verification Form Content */}
-              {selectedStep.id === 'phone' && (
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="phone">UK Mobile Number</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+44 7123 456789"
-                      value={formData.phone}
-                      onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                    />
-                  </div>
-                </div>
-              )}
+              {/* No phone verification step */}
 
               {selectedStep.id === 'address' && (
                 <div className="space-y-4">

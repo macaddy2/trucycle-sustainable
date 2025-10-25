@@ -44,11 +44,8 @@ interface UserProfile {
   addressVerifiedAt?: string
   verificationLevel?: {
     email: boolean
-    phone: boolean
     identity: boolean
     address: boolean
-    payment: boolean
-    community: boolean
   }
   rewardsBalance?: number
   partnerAccess?: boolean
@@ -195,11 +192,8 @@ export function ProfileOnboarding({ open, onOpenChange, onComplete, mode = 'onbo
         addressVerifiedAt: new Date().toISOString(),
         verificationLevel: {
           email: true,
-          phone: user?.verificationLevel?.phone ?? false,
           identity: user?.verificationLevel?.identity ?? false,
           address: true,
-          payment: user?.verificationLevel?.payment ?? false,
-          community: Boolean(profileData.partnerAccess)
         },
         rewardsBalance: user?.rewardsBalance ?? 0,
         partnerAccess: Boolean(profileData.partnerAccess)

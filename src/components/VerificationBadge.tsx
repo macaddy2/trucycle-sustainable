@@ -24,11 +24,8 @@ export function VerificationBadge({
 }: VerificationBadgeProps) {
   const normalizedVerification: VerificationLevel = {
     email: false,
-    phone: false,
     identity: false,
     address: false,
-    payment: false,
-    community: false,
     ...(verified ?? {}),
   };
   const status = getVerificationStatus(normalizedVerification)

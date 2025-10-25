@@ -15,8 +15,8 @@ interface UserProfile {
   rating?: number
   completedVerifications: {
     email: boolean
-    phone: boolean
     identity: boolean
+    address: boolean
   }
   avatar?: string
   partnerAccess?: boolean

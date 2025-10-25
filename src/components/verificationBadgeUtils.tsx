@@ -3,28 +3,19 @@ import {
   CheckCircle,
   Star,
   Certificate,
-  Phone,
-  CreditCard,
   MapPin,
-  Medal,
 } from '@phosphor-icons/react'
 
-export interface VerificationLevel { 
+export interface VerificationLevel {
   email: boolean
-  phone: boolean
   identity: boolean
   address: boolean
-  payment: boolean
-  community: boolean
 }
 
 export const verificationDetailConfig = [
   { key: 'email', label: 'Email Verified', icon: <CheckCircle size={12} /> },
-  { key: 'phone', label: 'Phone Verified', icon: <Phone size={12} /> },
   { key: 'identity', label: 'Identity Verified', icon: <Certificate size={12} /> },
   { key: 'address', label: 'Address Verified', icon: <MapPin size={12} /> },
-  { key: 'payment', label: 'Payment Verified', icon: <CreditCard size={12} /> },
-  { key: 'community', label: 'Community Verified', icon: <Medal size={12} /> },
 ] satisfies Array<{ key: keyof VerificationLevel; label: string; icon: JSX.Element }>
 
 export function getVerificationStatus(verified: VerificationLevel) {
@@ -36,9 +27,9 @@ export function getVerificationStatus(verified: VerificationLevel) {
   const completedChecks = checks.filter(Boolean).length
   const totalChecks = checks.length
 
-  if (completedChecks === totalChecks) return 'fully-verified'
-  if (completedChecks >= 4) return 'highly-verified'
-  if (completedChecks >= 2) return 'partially-verified'
+  if (completedChecks === totalChecks && totalChecks > 0) return 'fully-verified'
+  if (completedChecks >= 2) return 'highly-verified'
+  if (completedChecks >= 1) return 'partially-verified'
   return 'basic'
 }
 

@@ -31,11 +31,8 @@ interface UserProfile {
   rating?: number
   verificationLevel: {
     email: boolean
-    phone: boolean
     identity: boolean
     address: boolean
-    payment: boolean
-    community: boolean
   }
   rewardsBalance?: number
   partnerAccess?: boolean
@@ -43,15 +40,12 @@ interface UserProfile {
 
 type ListingStatus = ManagedListing['status']
 
-const VERIFICATION_KEYS: Array<keyof UserProfile['verificationLevel']> = ['email', 'phone', 'identity', 'address']
+const VERIFICATION_KEYS: Array<keyof UserProfile['verificationLevel']> = ['email', 'identity', 'address']
 
 const DEFAULT_VERIFICATION_LEVEL: UserProfile['verificationLevel'] = {
   email: false,
-  phone: false,
   identity: false,
   address: false,
-  payment: false,
-  community: false,
 }
 
 export function ProfileDashboard({ onCreateListing: _onCreateListing, onOpenMessages: _onOpenMessages, initialActiveTab = 'overview' }: ProfileDashboardProps) {

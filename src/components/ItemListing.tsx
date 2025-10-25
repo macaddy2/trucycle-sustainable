@@ -160,11 +160,8 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
     const verification = owner?.verification || {}
     const ownerVerificationLevel: VerificationLevel = {
       email: Boolean(verification.email_verified),
-      phone: false,
       identity: Boolean(verification.identity_verified),
       address: Boolean(verification.address_verified),
-      payment: false,
-      community: false,
     }
     const photos = Array.isArray(it?.images) ? it.images.map((img: any) => img?.url).filter(Boolean) : []
     // Display distance in miles (backend supplies km)
