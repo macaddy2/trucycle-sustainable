@@ -1192,55 +1192,6 @@ export function ItemListingForm({
             </div>
               </div>
             )}
-            {(classificationLoading || classificationResult || moderationLoading || moderationResult) && (
-              <div className="grid gap-4 md:grid-cols-2">
-                {(classificationLoading || classificationResult) && (
-                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">
-                    <p className="text-sm font-semibold text-primary">AI category guidance</p>
-                    {classificationLoading ? (
-                      <p className="text-xs text-muted-foreground">Analysing your listing details.</p>
-                    ) : classificationResult ? (
-                      <>
-                        <Badge variant="outline" className="uppercase tracking-wide">
-                          {CLASSIFICATION_LABELS[classificationResult.recommendedAction]}
-                        </Badge>
-                        <p className="text-sm">{classificationResult.reasoning}</p>
-                        {classificationResult.highlights.length > 0 && (
-                          <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-                            {classificationResult.highlights.map((point, index) => (
-                              <li key={index}>{point}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">Provide more detail to receive tailored recommendations.</p>
-                    )}
-                  </div>
-                )}
-                {(moderationLoading || moderationResult) && (
-                  <div className={`rounded-lg border p-4 space-y-2 ${moderationResult?.status === 'flagged' ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'bg-muted/40'}`}>
-                    <p className="text-sm font-semibold">Image safety check</p>
-                    {moderationLoading ? (
-                      <p className="text-xs text-muted-foreground">Reviewing photos for safety.</p>
-                    ) : moderationResult ? (
-                      <>
-                        <p className="text-sm">{moderationResult.message}</p>
-                        {moderationResult.labels.length > 0 && (
-                          <div className="flex flex-wrap gap-2 text-xs">
-                            {moderationResult.labels.map((label) => (
-                              <Badge key={label} variant="outline">{label}</Badge>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">Add a photo or description to run an automated safety check.</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
 
 
         {/* Step 2 merged into Step 1; Step 3 removed */}
@@ -1453,6 +1404,7 @@ export function ItemListingForm({
             )}
           </div>
         )}
+        
           </CardContent>
         </Card>
       </div>

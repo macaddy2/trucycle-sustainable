@@ -696,9 +696,8 @@ function App() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => (user?.partnerAccess ? setShowShopScanner(true) : setShowClaimScanner(true))}
-                    title={user?.partnerAccess ? 'Open partner shop scanner' : 'Scan to claim an item'}
-                    className={user?.partnerAccess ? 'border-primary/50 text-primary' : undefined}
+                    onClick={() => setShowClaimScanner(true)}
+                    title="Open scanner"
                   >
                     <QrCode size={16} />
                   </Button>
@@ -799,9 +798,8 @@ function App() {
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => (user?.partnerAccess ? setShowShopScanner(true) : setShowClaimScanner(true))}
-                    title={user?.partnerAccess ? 'Open partner shop scanner' : 'Scan to claim an item'}
-                    className={user?.partnerAccess ? 'border-primary/50 text-primary' : undefined}
+                    onClick={() => setShowClaimScanner(true)}
+                    title="Open scanner"
                   >
                     <QrCode size={16} />
                   </Button>
@@ -1103,8 +1101,8 @@ function App() {
 
       {/* Toast Notifications */}
       <Toaster />
-      {/* Quick Claim Scanner (non-partner) */}
-      {user && !user.partnerAccess && (
+      {/* Scanner Modal */}
+      {user && (
         <QuickClaimScanner open={showClaimScanner} onOpenChange={setShowClaimScanner} />
       )}
     </div>
