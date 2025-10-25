@@ -13,7 +13,6 @@ import {
   Clock,
   X
 } from '@phosphor-icons/react'
-import { toast } from 'sonner'
 
 export interface Notification {
   id: string
@@ -30,6 +29,7 @@ export interface Notification {
     itemTitle?: string
     requesterId?: string
     requesterName?: string
+    rawType?: string
   }
 }
 
@@ -38,6 +38,7 @@ interface NotificationListProps {
   onMarkAsRead?: (notificationId: string) => void
   onMarkAllAsRead?: () => void
   onDeleteNotification?: (notificationId: string) => void
+  onClickNotification?: (notification: Notification) => void
   className?: string
 }
 
@@ -46,6 +47,7 @@ export function NotificationList({
   onMarkAsRead,
   onMarkAllAsRead,
   onDeleteNotification,
+  onClickNotification,
   className 
 }: NotificationListProps) {
   const unreadCount = notifications.filter(n => !n.read).length
@@ -103,11 +105,20 @@ export function NotificationList({
     if (!notification.read && onMarkAsRead) {
       onMarkAsRead(notification.id)
     }
-    
-    // Handle action URL if provided
+    if (onClickNotification) {
+      onClickNotification(notification)
+      return
+    }
+    // Fallback: navigate by actionUrl if provided
     if (notification.actionUrl) {
-      // In a real app, you'd navigate to the URL
-      toast.info(`Would navigate to: ${notification.actionUrl}`)
+      if (notification.actionUrl.startsWith('http')) {
+        window.location.href = notification.actionUrl
+      } else {
+        const base = (import.meta as any).env?.BASE_URL || '/'
+        const normalized = String(base || '/').replace(/\/$/, '')
+        const target = notification.actionUrl.startsWith('/') ? notification.actionUrl : `/${notification.actionUrl}`
+        window.location.href = `${normalized}${target}`
+      }
     }
   }
 

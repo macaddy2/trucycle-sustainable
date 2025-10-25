@@ -36,6 +36,7 @@ import {
   DemoGuide,
   Homepage,
   QuickClaimScanner,
+  NotificationList,
 } from './components'
 import { ShopScannerOverview } from './components/ShopScannerOverview'
 import { TruCycleGlyph } from './components/icons/TruCycleGlyph'
@@ -44,9 +45,11 @@ import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
 import { messageSocket } from '@/lib/messaging/socket'
+import { notificationSocket } from '@/lib/notifications/socket'
 import { me as apiMe } from '@/lib/api'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import { useRecommendationNotifications, useNotifications, useExchangeManager, usePresence } from '@/hooks'
+import { useIsMobile } from '@/hooks/use-mobile'
 import type { ListingCompletionDetails, ListingEditDraft } from './components/ItemListingForm'
 
 interface UserProfile {
@@ -87,6 +90,7 @@ function App() {
   const [messageCenterItemId, setMessageCenterItemId] = useState<string | undefined>()
   const [messageCenterChatId, setMessageCenterChatId] = useState<string | undefined>()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const isMobile = useIsMobile()
   
   const {
     notifications: systemNotifications,
@@ -107,6 +111,7 @@ function App() {
   useEffect(() => {
     if (!user) {
       messageSocket.disconnect()
+      notificationSocket.disconnect()
     }
   }, [user])
   // Always sync role, postcode and verification from auth/me when available
@@ -421,6 +426,45 @@ function App() {
     setNotificationsOpen(false)
   }, [markAllSystemNotifications, markRecommendationAsRead, recommendationNotifications, setNotificationsOpen])
 
+  const handleNotificationOpen = useCallback((n: Notification) => {
+    // Close the tray first for better UX
+    setNotificationsOpen(false)
+    const rawType = (n.metadata as any)?.rawType as string | undefined
+    const itemId = n.metadata?.itemId
+    const type = String(rawType || '').toLowerCase()
+
+    if (type === 'item.claim.request') {
+      // Donor sees a new request – open Message Center to Requests or Listings
+      if (itemId) {
+        handleOpenMessages({ itemId, initialView: 'requests' })
+      } else {
+        navigateToTab('listings')
+      }
+      return
+    }
+    if (type === 'item.claim.approved') {
+      // Collector claim approved – jump to chat for coordination
+      handleOpenMessages({ itemId: itemId, initialView: 'chats' })
+      return
+    }
+    if (type === 'item.collection' || type === 'dropoff.created' || type === 'dropin.created' || type === 'pickup.created') {
+      // Status/operational updates – go to My Listings
+      navigateToTab('listings')
+      return
+    }
+    // Fallback: respect actionUrl if present
+    if (n.actionUrl) {
+      if (n.actionUrl.startsWith('http')) {
+        window.location.href = n.actionUrl
+      } else {
+        const base = import.meta.env.BASE_URL || '/'
+        const normalized = String(base || '/').replace(/\/$/, '')
+        const target = n.actionUrl.startsWith('/') ? n.actionUrl : `/${n.actionUrl}`
+        window.location.href = `${normalized}${target}`
+      }
+    }
+  }, [handleOpenMessages, navigateToTab, setNotificationsOpen])
+
   useEffect(() => {
     const handleClaimRequested = (event: Event) => {
       const detail = (event as CustomEvent<{ request: ClaimRequest }>).detail
@@ -623,8 +667,31 @@ function App() {
               {user ? (
                 <div className="flex items-center space-x-2">
                   <MessageNotification onOpenMessages={handleOpenMessages} />
-
-                  {/* Notifications disabled until backend ready */}
+                  {!isMobile && (
+                  <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="icon" aria-label="Notifications">
+                        <div className="relative">
+                          <Bell size={18} />
+                          {totalUnreadNotifications > 0 && (
+                            <span className="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] px-1.5 h-4 min-w-4">
+                              {totalUnreadNotifications}
+                            </span>
+                          )}
+                        </div>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-[420px] p-0">
+                      <NotificationList
+                        notifications={trayNotifications.map(t => t.notification)}
+                        onMarkAsRead={handleNotificationMarkAsRead}
+                        onMarkAllAsRead={handleNotificationsMarkAll}
+                        onDeleteNotification={handleNotificationDelete}
+                        onClickNotification={handleNotificationOpen}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  )}
 
                   <Button
                     variant="outline"
@@ -703,8 +770,31 @@ function App() {
               {user ? (
                 <div className="flex items-center space-x-1">
                   <MessageNotification onOpenMessages={handleOpenMessages} />
-
-                  {/* Notifications disabled until backend ready */}
+                  {isMobile && (
+                  <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="icon" aria-label="Notifications">
+                        <div className="relative">
+                          <Bell size={18} />
+                          {totalUnreadNotifications > 0 && (
+                            <span className="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] px-1.5 h-4 min-w-4">
+                              {totalUnreadNotifications}
+                            </span>
+                          )}
+                        </div>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-[420px] p-0">
+                      <NotificationList
+                        notifications={trayNotifications.map(t => t.notification)}
+                        onMarkAsRead={handleNotificationMarkAsRead}
+                        onMarkAllAsRead={handleNotificationsMarkAll}
+                        onDeleteNotification={handleNotificationDelete}
+                        onClickNotification={handleNotificationOpen}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  )}
 
                   <Button
                     variant="outline"

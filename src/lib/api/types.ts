@@ -373,6 +373,20 @@ export interface ListRoomMessagesResponse {
   nextCursor?: string | null
 }
 
+// Notifications
+export interface NotificationViewModel {
+  id: string
+  type: string
+  title: string
+  body: string | null
+  data: any | null
+  read: boolean
+  readAt: string | null
+  createdAt: string
+}
+
+export interface UnreadCountResponse { count: number }
+
 // QR scanning and item view
 export interface QrItemView {
   id: string

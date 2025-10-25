@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ChatCircle, CheckCircle, Clock, MapPin, Package, PencilSimpleLine, Phone, Plus, QrCode, ShieldCheck } from '@phosphor-icons/react'
-import { useMessaging, useExchangeManager, useNotifications } from '@/hooks'
+import { useMessaging, useExchangeManager } from '@/hooks'
 import { listMyItems, listMyCollectedItems, createOrFindRoom, collectItem, getItemById } from '@/lib/api'
 import { messageSocket } from '@/lib/messaging/socket'
 import ListingsSkeleton from '@/components/skeletons/ListingsSkeleton'
@@ -86,7 +86,6 @@ export function MyListingsView({
     getRequestsForItem,
     confirmClaimRequest,
   } = useExchangeManager()
-  const { addNotification } = useNotifications()
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [loading, setLoading] = useState<boolean>(false)
@@ -452,15 +451,6 @@ export function MyListingsView({
       )
       // Update chat to reflect arrangement
       updateChatStatus(chatId, 'collection_arranged')
-      addNotification({
-        userId: approved.collectorId,
-        type: 'exchange_request',
-        title: `${approved.donorName} accepted your request`,
-        message: `You're approved to collect "${approved.itemTitle}".`,
-        urgency: 'medium',
-        read: false,
-        metadata: { itemId: approved.itemId, itemTitle: approved.itemTitle }
-      })
       window.dispatchEvent(new CustomEvent('exchange-claim-approved', {
         detail: { request: approved, chatId }
       }))
@@ -998,3 +988,5 @@ function CollectorRequestsList({
     </div>
   )
 }
+
+

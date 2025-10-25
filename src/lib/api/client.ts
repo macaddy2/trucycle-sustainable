@@ -46,6 +46,7 @@ import type {
   ShopScanDto,
   ImpactMetrics,
   UpdateProfileDto,
+  NotificationViewModel,
 } from './types'
 
 export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '') || ''
@@ -433,4 +434,17 @@ export async function qrClaimOut(itemId: string, dto?: ShopScanDto) {
 // IMPACT ENDPOINTS
 export async function getMyImpactMetrics() {
   return request<ApiEnvelope<ImpactMetrics>>('/items/me/impact', { auth: true })
+}
+
+// NOTIFICATIONS ENDPOINTS
+export async function listNotifications(params?: { unread?: boolean; limit?: number }) {
+  const sp = new URLSearchParams()
+  if (params?.unread === true) sp.append('unread', 'true')
+  if (typeof params?.limit === 'number') sp.append('limit', String(Math.min(Math.max(params.limit, 1), 100)))
+  const qs = sp.toString() ? `?${sp.toString()}` : ''
+  return request<ApiEnvelope<NotificationViewModel[]>>(`/notifications${qs}`, { auth: true })
+}
+
+export async function getUnreadCount() {
+  return request<ApiEnvelope<{ count: number }>>('/notifications/unread-count', { auth: true })
 }

@@ -27,6 +27,14 @@ export function useRecommendationNotifications(user: UserProfile | null) {
   const [notifications, setNotifications] = useKV<RecommendationNotification[]>('recommendation-notifications', [])
   const [lastCheckTime, setLastCheckTime] = useKV<string | null>('last-notification-check', null)
 
+  // Clear any legacy/demo notifications persisted locally
+  useEffect(() => {
+    // Remove any previously stored demo notifications and reset last check timestamp
+    setNotifications([])
+    setLastCheckTime(null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const checkForNewRecommendations = useCallback(async () => {
     // Demo recommendation notifications disabled for now
     return
