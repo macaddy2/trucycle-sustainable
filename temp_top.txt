@@ -1,0 +1,240 @@
+import { kvGet, kvSet, kvDelete } from '@/lib/kvStore'
+import { startLoading, finishLoading } from '@/lib/loadingStore'
+import type {
+  ApiEnvelope,
+  ForgetPasswordDto,
+  LoginDto,
+  LoginResponse,
+  RegisterDto,
+  RegisterResponse,
+  ResendVerificationDto,
+  ResetPasswordDto,
+  Tokens,
+  VerifyDto,
+  MeResponse,
+  // items
+  CreateItemDto,
+  SearchItemsResponse,
+  CreateItemResponse,
+  UpdateItemDto,
+  UpdateItemResponse,
+  PublicItem,
+  MyListedItemsResponse,
+  MyCollectedItemsResponse,
+  // claims
+  CreateClaimDto,
+  CreateClaimResponse,
+  ApproveClaimResponse,
+  CollectItemDto,
+  CollectItemResponse,
+  // messaging
+  DMRoom,
+  ListRoomMessagesResponse,
+  DMMessageView,
+  // shops
+  CreateShopDto,
+  NearbyShop,
+  ShopDto,
+  ListMyShopItemsResponse,
+  MinimalUser,
+  // qr
+  QrItemView,
+  QrScanAck,
+  DropoffInResult,
+  ClaimOutResult,
+  DropoffScanDto,
+  ShopScanDto,
+  ImpactMetrics,
+  UpdateProfileDto,
+  NotificationViewModel,
+} from './types'
+
+export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '') || ''
+
+const TOKENS_KEY = 'auth.tokens'
+
+export class ApiError extends Error {
+  status: number
+  details?: unknown
+  constructor(message: string, status: number, details?: unknown) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.details = details
+  }
+}
+
+async function getTokens(): Promise<Tokens | undefined> {
+  return kvGet<Tokens>(TOKENS_KEY)
+}
+
+async function setTokens(tokens: Tokens): Promise<void> {
+  await kvSet<Tokens>(TOKENS_KEY, tokens)
+}
+
+export async function clearTokens(): Promise<void> {
+  await kvDelete(TOKENS_KEY)
+}
+
+type RequestOptions = {
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+  body?: unknown
+  // Deprecated: Authorization is now auto-attached when a token exists
+  auth?: boolean
+  headers?: Record<string, string>
+}
+
+// Deduplicate concurrent GET requests to the same URL to avoid duplicate work
+const inflight = new Map<string, Promise<any>>()
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  if (!API_BASE_URL) {
+    throw new Error('VITE_API_BASE_URL is not set. Add it to your .env file.')
+  }
+
+  const url = `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`
+  const headers: Record<string, string> = { ...options.headers }
+
+  // Always attach Authorization when a user is logged in (token present)
+  try {
+    const tk = await getTokens()
+    if (tk?.accessToken) {
+      headers['Authorization'] = headers['Authorization'] || `Bearer ${tk.accessToken}`
+    }
+  } catch {
+    // ignore token retrieval errors; proceed unauthenticated
+  }
+
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
+  if (!isFormData) {
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json'
+  }
+
+  // If this is a GET without a body, dedupe concurrent identical requests
+  const isGetLike = (options.method ?? (options.body ? 'POST' : 'GET')) === 'GET' && !options.body
+  const inflightKey = isGetLike ? `GET ${url}` : ''
+
+  if (isGetLike && inflight.has(inflightKey)) {
+    return inflight.get(inflightKey) as Promise<T>
+  }
+
+  startLoading()
+  const fetchPromise = fetch(url, {
+    method: options.method ?? (options.body ? 'POST' : 'GET'),
+    headers,
+    body: options.body ? (isFormData ? (options.body as any) : JSON.stringify(options.body)) : undefined,
+  })
+  const res = await (isGetLike ? (inflight.set(inflightKey, fetchPromise.then(async (r) => {
+    // Store the original Response.json() result so consumers share it
+    let data: any
+    try { data = await r.clone().json() } catch { data = undefined }
+    return { res: r, data }
+  })), inflight.get(inflightKey)!.then((p: any) => p.res)) : fetchPromise).finally(() => {
+    // Ensure we always signal completion regardless of success/failure
+    finishLoading()
+    if (isGetLike) inflight.delete(inflightKey)
+  })
+
+  let payload: any = undefined
+  try {
+    if (isGetLike && inflightKey) {
+      // If we produced a shared json above, reuse it
+      const shared = (inflight.get(inflightKey) as any)?.then ? undefined : undefined
+    }
+    payload = await res.json()
+  } catch {
+    // ignore JSON parse error for non-JSON responses
+  }
+
+  if (!res.ok) {
+    const message = (payload && (payload.message || payload.error || payload.status)) || res.statusText || 'Request failed'
+    throw new ApiError(String(message), res.status, payload)
+  }
+
+  return payload as T
+}
+
+// AUTH ENDPOINTS
+export async function authHealth() {
+  return request<ApiEnvelope<{ status: string }>>('/auth/health')
+}
+
+export async function register(dto: RegisterDto) {
+  return request<ApiEnvelope<RegisterResponse>>('/auth/register', {
+    method: 'POST',
+    body: dto,
+  })
+}
+
+export async function login(dto: LoginDto) {
+  const result = await request<ApiEnvelope<LoginResponse>>('/auth/login', {
+    method: 'POST',
+    body: dto,
+  })
+  if (result?.data?.tokens) {
+    await setTokens(result.data.tokens)
+  }
+  return result
+}
+
+export async function resendVerification(dto: ResendVerificationDto) {
+  return request<ApiEnvelope<null>>('/auth/resend-verification', {
+    method: 'POST',
+    body: dto,
+  })
+}
+
+export async function forgetPassword(dto: ForgetPasswordDto) {
+  return request<ApiEnvelope<null>>('/auth/forget-password', {
+    method: 'POST',
+    body: dto,
+  })
+}
+
+export async function verify(dto: VerifyDto) {
+  const result = await request<ApiEnvelope<LoginResponse>>('/auth/verify', {
+    method: 'POST',
+    body: dto,
+  })
+  if (result?.data?.tokens) {
+    await setTokens(result.data.tokens)
+  }
+  return result
+}
+
+export async function resetPassword(dto: ResetPasswordDto) {
+  return request<ApiEnvelope<null>>('/auth/reset-password', {
+    method: 'POST',
+    body: dto,
+  })
+}
+
+export async function me() {
+  return request<ApiEnvelope<MeResponse>>('/auth/me', {
+    method: 'GET',
+    auth: true,
+  })
+}
+
+export const tokens = {
+  get: getTokens,
+  set: setTokens,
+  clear: clearTokens,
+}
+
+// USERS ENDPOINTS
+export async function updateMyProfile(dto: UpdateProfileDto) {
+  return request<ApiEnvelope<any>>('/users/me/profile', {
+    method: 'PATCH',
+    auth: true,
+    body: dto,
+  })
+}
+
+// Helper: build query string from params
+function toQuery(params: Record<string, any> | undefined): string {
+  if (!params) return ''
+  const sp = new URLSearchParams()
+  Object.entries(params).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === '') return
+    if (k === 'limit') {

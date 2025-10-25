@@ -84,6 +84,9 @@ type RequestOptions = {
   headers?: Record<string, string>
 }
 
+// Deduplicate concurrent GET requests to the same URL to avoid duplicate work
+const inflight = new Map<string, Promise<any>>()
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   if (!API_BASE_URL) {
     throw new Error('VITE_API_BASE_URL is not set. Add it to your .env file.')
@@ -107,29 +110,51 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     headers['Content-Type'] = headers['Content-Type'] || 'application/json'
   }
 
-  startLoading()
-  const res = await fetch(url, {
-    method: options.method ?? (options.body ? 'POST' : 'GET'),
-    headers,
-    body: options.body ? (isFormData ? (options.body as any) : JSON.stringify(options.body)) : undefined,
-  }).finally(() => {
-    // Ensure we always signal completion regardless of success/failure
-    finishLoading()
-  })
+  // If this is a GET without a body, dedupe concurrent identical requests
+  const isGetLike = (options.method ?? (options.body ? 'POST' : 'GET')) === 'GET' && !options.body
+  const inflightKey = isGetLike ? `GET ${url}` : ''
 
-  let payload: any = undefined
-  try {
-    payload = await res.json()
-  } catch {
-    // ignore JSON parse error for non-JSON responses
+  const doFetch = async (): Promise<T> => {
+    startLoading()
+    try {
+      const res = await fetch(url, {
+        method: options.method ?? (options.body ? 'POST' : 'GET'),
+        headers,
+        body: options.body ? (isFormData ? (options.body as any) : JSON.stringify(options.body)) : undefined,
+      })
+
+      let payload: any = undefined
+      try {
+        payload = await res.json()
+      } catch {
+        // ignore JSON parse error for non-JSON responses
+      }
+
+      if (!res.ok) {
+        const message = (payload && (payload.message || payload.error || payload.status)) || res.statusText || 'Request failed'
+        throw new ApiError(String(message), res.status, payload)
+      }
+
+      return payload as T
+    } finally {
+      finishLoading()
+    }
   }
 
-  if (!res.ok) {
-    const message = (payload && (payload.message || payload.error || payload.status)) || res.statusText || 'Request failed'
-    throw new ApiError(String(message), res.status, payload)
+  if (isGetLike) {
+    if (inflight.has(inflightKey)) {
+      return inflight.get(inflightKey) as Promise<T>
+    }
+    const p = doFetch()
+    inflight.set(inflightKey, p)
+    try {
+      return await p
+    } finally {
+      inflight.delete(inflightKey)
+    }
   }
 
-  return payload as T
+  return doFetch()
 }
 
 // AUTH ENDPOINTS

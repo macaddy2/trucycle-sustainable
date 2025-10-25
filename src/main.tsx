@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client'
 import { ErrorBoundary } from "react-error-boundary";
 
 import RootRouter from './RootRouter'
+import { startAppPrefetch } from '@/lib/appPrefetch'
 import GlobalLoading, { AppBootReady } from './components/GlobalLoading'
 import { ErrorFallback } from './ErrorFallback.tsx'
 
@@ -16,3 +17,6 @@ createRoot(document.getElementById('root')!).render(
     <AppBootReady />
   </ErrorBoundary>
 )
+
+// Kick off background prefetching and socket init without blocking UI
+startAppPrefetch().catch(() => {})
