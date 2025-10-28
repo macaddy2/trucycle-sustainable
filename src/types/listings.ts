@@ -37,4 +37,9 @@ export interface ManagedListing {
   userName?: string
   handoverNotes?: string
   preferPartnerSupport?: boolean
+  claimId?: string
+  claimStatus?: 'pending' | 'approved' | 'declined' | 'completed'
+  claimCreatedAt?: string
+  claimApprovedAt?: string
+  claimCompletedAt?: string
 }

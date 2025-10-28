@@ -6,9 +6,8 @@ import { Input } from '@/components/ui/input'
 import { QrCode, Camera, SpinnerGap, CheckCircle, XCircle } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import jsQR from 'jsqr'
-import { createClaim, collectItem } from '@/lib/api'
+import { collectItem } from '@/lib/api'
 import { useKV } from '@/hooks/useKV'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type QuickClaimScannerProps = {
   open: boolean
@@ -28,17 +27,13 @@ export function QuickClaimScanner({ open, onOpenChange }: QuickClaimScannerProps
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
   const [manualInput, setManualInput] = useState('')
-  const [claimingId, setClaimingId] = useState<string | null>(null)
+  const [collectingId, setCollectingId] = useState<string | null>(null)
   const [resultMessage, setResultMessage] = useState<string | null>(null)
+  const [resultStatus, setResultStatus] = useState<'success' | 'error' | null>(null)
   const lastDetectedRef = useRef<string | null>(null)
-  const [mode, setMode] = useState<'claim' | 'collect'>('claim')
-  const claimingRef = useRef<boolean>(false)
+  const collectingRef = useRef<boolean>(false)
   const lastScanTsRef = useRef<number>(0)
   const detectorRef = useRef<any | null>(null)
-  const DETECT_INTERVAL_MS = 0 // rAF loop like partner scanner
-  const timerRef = useRef<number | null>(null)
-
-  const canScan = open && !claimingId
 
   const extractItemId = useCallback((payload: string): string | null => {
     if (!payload) return null
@@ -104,7 +99,7 @@ export function QuickClaimScanner({ open, onOpenChange }: QuickClaimScannerProps
       const vids = devices.filter(d => d.kind === 'videoinput')
       setCameras(vids)
       if (!cameraId && vids[0]) setCameraId(vids[0].deviceId)
-    } catch (err) {
+    } catch {
       // ignore
     }
   }, [cameraId])
@@ -131,7 +126,7 @@ export function QuickClaimScanner({ open, onOpenChange }: QuickClaimScannerProps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  useEffect(() => { claimingRef.current = Boolean(claimingId) }, [claimingId])
+  useEffect(() => { collectingRef.current = Boolean(collectingId) }, [collectingId])
 
   const switchCamera = async (id: string) => {
     setCameraId(id)
@@ -141,33 +136,29 @@ export function QuickClaimScanner({ open, onOpenChange }: QuickClaimScannerProps
   const attemptAction = useCallback(async (id: string) => {
     if (!id) return
     if (!currentUser) {
-      toast.error('Please sign in to claim items')
+      toast.error('Please sign in to collect items')
       return
     }
-    setClaimingId(id)
+    setCollectingId(id)
     setResultMessage(null)
+    setResultStatus(null)
     try {
-      if (mode === 'claim') {
-        const res = await createClaim({ item_id: id })
-        const status = String((res as any)?.data?.status || 'pending')
-        setResultMessage(`Claim ${status.replace(/_/g, ' ')}`)
-        toast.success('Claim requested')
-      } else {
-        const res = await collectItem(id)
-        const status = String((res as any)?.data?.status || (res as any)?.status || 'complete')
-        setResultMessage(`Collection ${status.replace(/_/g, ' ')}`)
-        toast.success('Collection submitted')
-      }
+      const res = await collectItem(id)
+      const status = String((res as any)?.data?.status || (res as any)?.status || 'complete')
+      setResultMessage(`Collection ${status.replace(/_/g, ' ')}`)
+      setResultStatus('success')
+      toast.success('Collection submitted')
     } catch (err: any) {
-      const msg = err?.message || 'Failed to create claim'
+      const msg = err?.message || 'Failed to register collection'
       setResultMessage(msg)
+      setResultStatus('error')
       toast.error(msg)
     } finally {
-      setClaimingId(null)
+      setCollectingId(null)
       // Allow detecting same or next code again after action completes
       setTimeout(() => { lastDetectedRef.current = null }, 200)
     }
-  }, [currentUser, mode])
+  }, [currentUser])
 
   // Scan loop (rAF-based, modeled after PartnerScanModal)
   useEffect(() => {
@@ -190,7 +181,7 @@ export function QuickClaimScanner({ open, onOpenChange }: QuickClaimScannerProps
       if (video.readyState < HTMLMediaElement.HAVE_ENOUGH_DATA) { scheduleNext(); return }
 
       const processFrame = async () => {
-        if (claimingRef.current) { scheduleNext(); return }
+        if (collectingRef.current) { scheduleNext(); return }
         let detected: string | null = null
 
         const detector = detectorRef.current
@@ -228,7 +219,7 @@ export function QuickClaimScanner({ open, onOpenChange }: QuickClaimScannerProps
           if (normalized && normalized !== lastDetectedRef.current) {
             lastDetectedRef.current = normalized
             const id = extractItemId(normalized)
-            if (id && !claimingId) {
+            if (id && !collectingRef.current) {
               // Fire and forget to avoid blocking the scan loop
               void attemptAction(id)
             }
@@ -246,7 +237,7 @@ export function QuickClaimScanner({ open, onOpenChange }: QuickClaimScannerProps
       cancelled = true
       if (rafId !== null) cancelAnimationFrame(rafId)
     }
-  }, [open])
+  }, [open, attemptAction, extractItemId])
 
   const handleManualSubmit = async () => {
     const id = extractItemId(manualInput)
@@ -258,20 +249,20 @@ export function QuickClaimScanner({ open, onOpenChange }: QuickClaimScannerProps
   }
 
   const headerStatus = useMemo(() => {
-    if (claimingId) return (
-      <Badge variant="secondary" className="gap-1 text-[10px]">
-        <SpinnerGap size={12} className="animate-spin" /> Claiming
-      </Badge>
-    )
+    if (collectingId) {
+      return (
+        <Badge variant="secondary" className="gap-1 text-[10px]">
+          <SpinnerGap size={12} className="animate-spin" /> Collecting
+        </Badge>
+      )
+    }
     if (scanning) return <Badge variant="outline" className="text-[10px]">Scanning</Badge>
     return <Badge variant="outline" className="text-[10px]">Idle</Badge>
-  }, [scanning, claimingId])
+  }, [scanning, collectingId])
 
-  const descriptionText = mode === 'claim'
-    ? 'Point your camera at the item QR. We’ll try to create a claim automatically.'
-    : 'Point your camera at the item QR. We’ll try to register your collection automatically.'
+  const descriptionText = 'Point your camera at the item QR. We’ll try to register your collection automatically.'
 
-  const overlayText = mode === 'claim' ? 'Claiming item...' : 'Collecting item...'
+  const overlayText = 'Collecting item...'
 
   return (
     <Dialog open={open} onOpenChange={(v) => onOpenChange(v)}>
@@ -280,14 +271,8 @@ export function QuickClaimScanner({ open, onOpenChange }: QuickClaimScannerProps
           <div className="flex items-center justify-between gap-2">
             <DialogTitle className="flex items-center gap-2 text-h3">
               <QrCode size={22} className="text-primary" />
-              {mode === 'claim' ? 'Scan to claim' : 'Scan to collect'}
+              Scan to collect
             </DialogTitle>
-            <Tabs value={mode} onValueChange={(v) => setMode(v as 'claim' | 'collect')}>
-              <TabsList className="grid grid-cols-2">
-                <TabsTrigger value="claim">Claim</TabsTrigger>
-                <TabsTrigger value="collect">Collect</TabsTrigger>
-              </TabsList>
-            </Tabs>
           </div>
           <DialogDescription>{descriptionText}</DialogDescription>
         </DialogHeader>
@@ -323,7 +308,7 @@ export function QuickClaimScanner({ open, onOpenChange }: QuickClaimScannerProps
               ) : (
                 <video ref={videoRef} className="h-56 w-full object-cover" muted playsInline autoPlay />
               )}
-              {claimingId && (
+              {collectingId && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                   <div className="flex items-center gap-2 rounded-md bg-background/90 px-3 py-2 text-sm">
                     <SpinnerGap size={16} className="animate-spin" />
@@ -340,20 +325,20 @@ export function QuickClaimScanner({ open, onOpenChange }: QuickClaimScannerProps
               <label className="text-sm font-medium text-foreground" htmlFor="manual-qr">QR payload or item id</label>
               <div className="flex gap-2">
                 <Input id="manual-qr" value={manualInput} onChange={(e) => setManualInput(e.target.value)} placeholder="Paste QR payload or UUID" />
-                <Button onClick={handleManualSubmit} disabled={!!claimingId}>
-                  {claimingId ? <SpinnerGap size={16} className="mr-2 animate-spin" /> : null}
-                  {claimingId ? (mode === 'claim' ? 'Claiming...' : 'Collecting...') : (mode === 'claim' ? 'Claim' : 'Collect')}
+                <Button onClick={handleManualSubmit} disabled={!!collectingId}>
+                  {collectingId ? <SpinnerGap size={16} className="mr-2 animate-spin" /> : null}
+                  {collectingId ? 'Collecting...' : 'Collect'}
                 </Button>
               </div>
               {!currentUser && (
-                <p className="text-[11px] text-destructive">Sign in is required to {mode === 'claim' ? 'claim' : 'collect'} items.</p>
+                <p className="text-[11px] text-destructive">Sign in is required to collect items.</p>
               )}
             </div>
 
             {resultMessage && (
               <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
                 <div className="flex items-center gap-2">
-                  {resultMessage.toLowerCase().startsWith('claim') || resultMessage.toLowerCase().includes('success')
+                  {resultStatus === 'success'
                     ? <CheckCircle size={16} className="text-emerald-600" />
                     : <XCircle size={16} className="text-destructive" />}
                   <span>{resultMessage}</span>
@@ -362,7 +347,7 @@ export function QuickClaimScanner({ open, onOpenChange }: QuickClaimScannerProps
             )}
 
             <div className="text-[11px] text-muted-foreground">
-              We’ll attempt a single claim per scan to avoid duplicates. You can scan again if needed.
+              We’ll attempt a single collection per scan to avoid duplicates. You can scan again if needed.
             </div>
           </div>
         </div>

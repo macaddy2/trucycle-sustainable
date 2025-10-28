@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ChatCircle, CheckCircle, Clock, MapPin, Package, PencilSimpleLine, Phone, Plus, QrCode, ShieldCheck } from '@phosphor-icons/react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { ChatCircle, CheckCircle, Clock, MapPin, Package, PencilSimpleLine, Phone, Plus, QrCode, ShieldCheck, CaretLeft, CaretRight, UserCircle } from '@phosphor-icons/react'
 import { useMessaging, useExchangeManager } from '@/hooks'
 import { listMyItems, listMyCollectedItems, createOrFindRoom, collectItem, getItemById } from '@/lib/api'
 import { messageSocket } from '@/lib/messaging/socket'
@@ -54,6 +55,20 @@ const REQUEST_STATUS_BADGE: Record<ClaimRequest['status'], { label: string; vari
   completed: { label: 'Collected', variant: 'default' },
 }
 
+const CLAIM_STATUS_DESCRIPTION: Record<ClaimRequest['status'], string> = {
+  pending: 'Your request is waiting for donor approval. We will notify you once they respond.',
+  approved: 'Your request has been approved. Coordinate the hand-off with the donor via chat.',
+  declined: 'This request was declined. You can browse for other items that might fit your needs.',
+  completed: 'Collection is confirmed. Feel free to follow up with the donor if needed.',
+}
+
+const formatCategoryDisplay = (value?: string | null) => {
+  const normalized = String(value ?? '').trim()
+  if (!normalized) return 'Not specified'
+  if (normalized.toLowerCase() === 'other') return 'Not specified'
+  return normalized
+}
+
 const formatDate = (value: string) => {
   const date = new Date(value)
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -92,6 +107,8 @@ export function MyListingsView({
   const [selectedItemDetails, setSelectedItemDetails] = useState<PublicItem | null>(null)
   const [detailsLoading, setDetailsLoading] = useState(false)
   const [detailsError, setDetailsError] = useState<string | null>(null)
+  const [imageViewerOpen, setImageViewerOpen] = useState(false)
+  const [activeImageIndex, setActiveImageIndex] = useState(0)
 
   const sortedListings = useMemo(() => {
     // Show all items for donors and collectors; order by newest first
@@ -281,10 +298,58 @@ export function MyListingsView({
   const dropOffLocationDetail = useMemo(() => (
     selectedListing ? deriveDropOffLocation(selectedListing, detailItem) : null
   ), [selectedListing, detailItem])
-  const qrImageUrl = detailItem?.qr_code ?? null
-  const galleryImages = detailItem
-    ? detailItem.images?.map((img) => img?.url).filter(Boolean) ?? []
-    : selectedListing?.photos ?? []
+  const qrImageUrl = isCollector ? null : detailItem?.qr_code ?? null
+  const galleryImages = useMemo(() => {
+    const detailImages = detailItem?.images?.map((img) => img?.url).filter(Boolean) ?? []
+    const listingPhotos = selectedListing?.photos ?? []
+    const images = detailImages.length > 0 ? detailImages : listingPhotos
+    return Array.from(new Set(images.filter(Boolean)))
+  }, [detailItem, selectedListing])
+  useEffect(() => {
+    if (galleryImages.length === 0) {
+      setActiveImageIndex(0)
+      setImageViewerOpen(false)
+      return
+    }
+    if (activeImageIndex >= galleryImages.length) {
+      setActiveImageIndex(galleryImages.length - 1)
+    }
+  }, [galleryImages.length, activeImageIndex])
+
+  const openImageViewer = useCallback((index: number) => {
+    if (galleryImages.length === 0) return
+    setActiveImageIndex(Math.max(0, Math.min(index, galleryImages.length - 1)))
+    setImageViewerOpen(true)
+  }, [galleryImages.length])
+
+  const goToPreviousImage = useCallback(() => {
+    if (galleryImages.length <= 1) return
+    setActiveImageIndex(prev => (prev - 1 + galleryImages.length) % galleryImages.length)
+  }, [galleryImages.length])
+
+  const goToNextImage = useCallback(() => {
+    if (galleryImages.length <= 1) return
+    setActiveImageIndex(prev => (prev + 1) % galleryImages.length)
+  }, [galleryImages.length])
+
+  useEffect(() => {
+    if (!imageViewerOpen) return
+    const handleKey = (event: KeyboardEvent) => {
+      if (galleryImages.length <= 1) return
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        goToPreviousImage()
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        goToNextImage()
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [imageViewerOpen, galleryImages.length, goToNextImage, goToPreviousImage])
+
+  const activeImage = galleryImages[activeImageIndex] ?? null
+
   const detailDescription = detailItem?.description?.trim() || selectedListing?.description?.trim() || 'No description added yet. Share a few highlights to attract collectors.'
   const handoffDisplay = selectedListing?.fulfillmentMethod === 'dropoff'
     ? (selectedListing.dropOffLocation
@@ -292,6 +357,35 @@ export function MyListingsView({
         : detailItem?.location?.address_line || 'Partner location shared after confirmation')
     : (selectedListing?.location || detailItem?.location?.address_line || 'Pickup location to be confirmed in chat')
   const isDonation = selectedListing?.actionType === 'donate'
+  const detailOwner = detailItem?.owner
+
+  const collectorRequestForItem = useMemo(() => {
+    if (!selectedListing || !isCollector || !currentUser) return null
+    const existing = listingRequests.find((request) => request.itemId === selectedListing.id && request.collectorId === currentUser.id)
+    if (existing) return existing
+    if (!selectedListing.claimId || !selectedListing.claimStatus) return null
+    const donorId = selectedListing.userId || detailOwner?.id
+    if (!donorId) return null
+    const derived: ClaimRequest = {
+      id: selectedListing.claimId,
+      itemId: selectedListing.id,
+      itemTitle: selectedListing.title,
+      itemImage: selectedListing.photos?.[0],
+      donorId,
+      donorName: selectedListing.userName || detailOwner?.name || 'Donor',
+      collectorId: currentUser.id,
+      collectorName: currentUser.name || 'You',
+      collectorAvatar: undefined,
+      note: undefined,
+      status: selectedListing.claimStatus,
+      createdAt: selectedListing.claimCreatedAt || selectedListing.createdAt,
+      decisionAt: selectedListing.claimApprovedAt || selectedListing.claimCompletedAt,
+    }
+    return derived
+  }, [selectedListing, isCollector, currentUser, listingRequests, detailOwner])
+
+  const collectorClaimStatus = collectorRequestForItem?.status || selectedListing?.claimStatus
+  const canOpenCollectorChat = Boolean(collectorClaimStatus && (collectorClaimStatus === 'approved' || collectorClaimStatus === 'completed'))
 
   const handleOpenConversation = async (request: ClaimRequest) => {
     let room: any = null
@@ -327,6 +421,11 @@ export function MyListingsView({
     openMessages?.({ chatId: (room as any)?.id || chatId })
   }
 
+  const handleCollectorConversation = () => {
+    if (!collectorRequestForItem || !canOpenCollectorChat) return
+    void handleOpenConversation(collectorRequestForItem)
+  }
+
   // Load server-backed data for my listed / collected items
   useEffect(() => {
     let cancelled = false
@@ -342,6 +441,7 @@ export function MyListingsView({
             const claimStatus = String(e?.claim_status || '').toLowerCase()
             const statusFromItem = mapServerStatusToClient(it.status)
             const statusForUi: ManagedListing['status'] = claimStatus === 'complete' ? 'collected' : statusFromItem
+            const normalizedClaimStatus = mapServerClaimStatus(e?.claim_status)
             return {
               id: String(it.id || crypto.randomUUID()),
               title: String(it.title || 'Untitled'),
@@ -359,7 +459,13 @@ export function MyListingsView({
               aiClassification: undefined,
               moderation: undefined,
               // For collectors, store donor name for table display
+              userId: it.owner?.id || undefined,
               userName: it.owner?.name || undefined,
+              claimId: e?.claim_id ? String(e.claim_id) : undefined,
+              claimStatus: normalizedClaimStatus,
+              claimCreatedAt: e?.claim_created_at ? String(e.claim_created_at) : undefined,
+              claimApprovedAt: e?.claim_approved_at ? String(e.claim_approved_at) : undefined,
+              claimCompletedAt: e?.claim_completed_at ? String(e.claim_completed_at) : undefined,
             }
           })
           if (!cancelled) {
@@ -418,11 +524,19 @@ export function MyListingsView({
 
   function mapServerStatusToClient(status: unknown): ManagedListing['status'] {
     const s = String(status || '').toLowerCase()
-    if (s === 'pending_dropoff') return 'pending_dropoff'
+    if (s === 'pending_dropoff' || s === 'pending_drop-off') return 'pending_dropoff'
     if (s === 'claimed' || s === 'awaiting_collection') return 'claimed'
-    if (s === 'complete' || s === 'recycled') return 'collected'
-    if (s === 'active' || !s) return 'active'
+    if (s === 'complete' || s === 'completed' || s === 'recycled') return 'collected'
+    if (s === 'expired') return 'expired'
     return 'active'
+  }
+
+  function mapServerClaimStatus(status: unknown): ClaimRequest['status'] {
+    const s = String(status || '').toLowerCase()
+    if (s === 'approved' || s === 'awaiting_collection') return 'approved'
+    if (s === 'complete' || s === 'completed') return 'completed'
+    if (s === 'rejected' || s === 'declined' || s === 'cancelled') return 'declined'
+    return 'pending'
   }
 
   const handleApproveRequest = async (request: ClaimRequest) => {
@@ -540,7 +654,7 @@ export function MyListingsView({
             <TableCell>
               <div className="space-y-1">
                 <p className="font-medium">{listing.title}</p>
-                <p className="text-xs text-muted-foreground capitalize">{listing.category}</p>
+                <p className="text-xs text-muted-foreground capitalize">{formatCategoryDisplay(listing.category)}</p>
               </div>
             </TableCell>
             <TableCell>
@@ -666,6 +780,8 @@ if (variant === 'dashboard') {
             setSelectedListingId(null)
             setSelectedItemDetails(null)
             setDetailsError(null)
+            setImageViewerOpen(false)
+            setActiveImageIndex(0)
           }
         }}
       >
@@ -734,7 +850,7 @@ if (variant === 'dashboard') {
                 <div className="grid gap-2 md:grid-cols-2">
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground uppercase">Category</p>
-                    <p className="capitalize">{detailItem?.category || selectedListing.category}</p>
+                    <p className="capitalize">{formatCategoryDisplay(detailItem?.category || selectedListing.category)}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground uppercase">Hand-off location</p>
@@ -748,12 +864,19 @@ if (variant === 'dashboard') {
                   <h3 className="text-sm font-semibold mb-2">Photos</h3>
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                     {galleryImages.map((photo, index) => (
-                      <img
+                      <button
                         key={`${photo}-${index}`}
-                        src={photo}
-                        alt={`${selectedListing.title} photo ${index + 1}`}
-                        className="h-32 w-full rounded-md object-cover"
-                      />
+                        type="button"
+                        onClick={() => openImageViewer(index)}
+                        className="group relative h-32 w-full overflow-hidden rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                      >
+                        <img
+                          src={photo}
+                          alt={`${selectedListing.title} photo ${index + 1}`}
+                          className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                        />
+                        <span className="sr-only">View photo {index + 1}</span>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -771,12 +894,25 @@ if (variant === 'dashboard') {
               )}
               </div>
               <aside className="space-y-4">
-                <DropOffQrPanel
-                  listing={selectedListing}
-                  dropOffLocation={dropOffLocationDetail}
-                  qrImageUrl={qrImageUrl}
-                  isLoading={detailsLoading}
-                />
+                {isCollector ? (
+                  <DonorInfoPanel
+                    donorName={detailOwner?.name || selectedListing.userName}
+                    donorAvatar={detailOwner?.profile_image || null}
+                    donorVerification={detailOwner?.verification ?? null}
+                    claimStatus={collectorClaimStatus}
+                    claimApprovedAt={selectedListing.claimApprovedAt ?? null}
+                    claimCompletedAt={selectedListing.claimCompletedAt ?? null}
+                    canOpenConversation={canOpenCollectorChat}
+                    onOpenConversation={handleCollectorConversation}
+                  />
+                ) : (
+                  <DropOffQrPanel
+                    listing={selectedListing}
+                    dropOffLocation={dropOffLocationDetail}
+                    qrImageUrl={qrImageUrl}
+                    isLoading={detailsLoading}
+                  />
+                )}
                 {!isCollector && (
                   <CollectorRequestsPanel
                     requests={listingRequests}
@@ -791,6 +927,47 @@ if (variant === 'dashboard') {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">Select a listing to see details.</p>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={imageViewerOpen} onOpenChange={(open) => setImageViewerOpen(open)}>
+        <DialogContent className="max-w-4xl border-none bg-black p-0 text-white shadow-2xl sm:max-w-5xl max-h-[90vh] overflow-hidden [&>button]:text-white [&>button:hover]:text-white">
+          {activeImage ? (
+            <div className="flex h-full flex-col">
+              <div className="relative flex min-h-[50vh] flex-1 items-center justify-center bg-black">
+                <img
+                  src={activeImage}
+                  alt={`${selectedListing?.title || 'Listing'} photo ${activeImageIndex + 1}`}
+                  className="max-h-[80vh] w-full object-contain"
+                />
+                {galleryImages.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={goToPreviousImage}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/50"
+                      aria-label="View previous photo"
+                    >
+                      <CaretLeft size={24} weight="bold" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={goToNextImage}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/50"
+                      aria-label="View next photo"
+                    >
+                      <CaretRight size={24} weight="bold" />
+                    </button>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-4 border-t border-white/10 px-4 py-3 text-xs text-white/80">
+                <span className="truncate">{selectedListing?.title || 'Listing photo'}</span>
+                <span>{`Photo ${activeImageIndex + 1} of ${galleryImages.length}`}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-60 items-center justify-center bg-black text-sm text-white/70">No image selected.</div>
           )}
         </DialogContent>
       </Dialog>
@@ -887,6 +1064,86 @@ function DropOffQrPanel({ listing, dropOffLocation, qrImageUrl, isLoading }: Dro
             </p>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+interface DonorInfoPanelProps {
+  donorName?: string | null
+  donorAvatar?: string | null
+  donorVerification?: { email_verified?: boolean; identity_verified?: boolean; address_verified?: boolean } | null
+  claimStatus?: ClaimRequest['status']
+  claimApprovedAt?: string | null
+  claimCompletedAt?: string | null
+  canOpenConversation: boolean
+  onOpenConversation: () => void
+}
+
+function DonorInfoPanel({
+  donorName,
+  donorAvatar,
+  donorVerification,
+  claimStatus,
+  claimApprovedAt,
+  claimCompletedAt,
+  canOpenConversation,
+  onOpenConversation,
+}: DonorInfoPanelProps) {
+  const status = claimStatus ?? 'pending'
+  const badgeMeta = REQUEST_STATUS_BADGE[status] ?? REQUEST_STATUS_BADGE.pending
+  const statusCopy = CLAIM_STATUS_DESCRIPTION[status]
+  const verified = Boolean(donorVerification?.identity_verified || donorVerification?.address_verified || donorVerification?.email_verified)
+  const approvedDate = claimApprovedAt ? new Date(claimApprovedAt).toLocaleString() : null
+  const completedDate = claimCompletedAt ? new Date(claimCompletedAt).toLocaleString() : null
+
+  const chatHelperText = status === 'declined'
+    ? 'Messaging is unavailable because this request was declined.'
+    : 'Messaging unlocks once the donor approves your request.'
+
+  return (
+    <div className="space-y-4 rounded-lg border bg-background p-4 shadow-sm">
+      <div className="flex items-center gap-3">
+        <Avatar className="h-12 w-12">
+          <AvatarImage src={donorAvatar ?? undefined} alt={donorName ?? 'Donor avatar'} />
+          <AvatarFallback className="bg-muted text-muted-foreground">
+            <UserCircle size={24} />
+          </AvatarFallback>
+        </Avatar>
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground uppercase">Donor</p>
+          <p className="text-sm font-semibold text-foreground">{donorName || 'Community donor'}</p>
+          {verified && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <ShieldCheck size={14} />
+              <span>Verified donor</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2 rounded-md border bg-muted/30 p-3 text-sm">
+        <div className="flex items-center justify-between">
+          <span className="text-xs uppercase text-muted-foreground">Request status</span>
+          <Badge variant={badgeMeta.variant} className="text-xs">{badgeMeta.label}</Badge>
+        </div>
+        <p className="text-xs leading-snug text-muted-foreground">{statusCopy}</p>
+        {approvedDate && status === 'approved' && (
+          <p className="text-xs text-muted-foreground">Approved on {approvedDate}</p>
+        )}
+        {completedDate && status === 'completed' && (
+          <p className="text-xs text-muted-foreground">Completed on {completedDate}</p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Button onClick={onOpenConversation} disabled={!canOpenConversation} className="w-full">
+          <ChatCircle size={16} className="mr-2" />
+          Open conversation
+        </Button>
+        {!canOpenConversation && (
+          <p className="text-xs text-muted-foreground">{chatHelperText}</p>
+        )}
       </div>
     </div>
   )
