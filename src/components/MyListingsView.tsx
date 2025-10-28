@@ -176,6 +176,11 @@ export function MyListingsView({
     const listing = listings.find(item => item.id === listingId)
     if (!listing) return
 
+    if (listing.actionType === 'donate') {
+      toast.info('Partner shops confirm donated drop-offs on your behalf.')
+      return
+    }
+
     try {
       await collectItem(listingId)
 
@@ -357,6 +362,7 @@ export function MyListingsView({
         : detailItem?.location?.address_line || 'Partner location shared after confirmation')
     : (selectedListing?.location || detailItem?.location?.address_line || 'Pickup location to be confirmed in chat')
   const isDonation = selectedListing?.actionType === 'donate'
+  const showCollectorRequests = !isCollector && !isDonation
   const detailOwner = detailItem?.owner
 
   const collectorRequestForItem = useMemo(() => {
@@ -702,7 +708,7 @@ export function MyListingsView({
               ) : (
                 <Badge variant={collectorsBadgeVariant} className="text-xs">{collectorsBadgeText}</Badge>
               )}
-              {listing.status === 'claimed' && (
+              {listing.status === 'claimed' && listing.actionType !== 'donate' && (
                 <Button
                   size="sm"
                   onClick={(event) => {
@@ -882,7 +888,7 @@ if (variant === 'dashboard') {
                 </div>
               )}
 
-              {isDonation && (
+              {showCollectorRequests && (
                 <CollectorRequestsSection
                   requests={listingRequests}
                   getChatForItem={getChatForItem}
@@ -913,7 +919,7 @@ if (variant === 'dashboard') {
                     isLoading={detailsLoading}
                   />
                 )}
-                {!isCollector && (
+                {showCollectorRequests && (
                   <CollectorRequestsPanel
                     requests={listingRequests}
                     getChatForItem={getChatForItem}
@@ -990,79 +996,89 @@ function DropOffQrPanel({ listing, dropOffLocation, qrImageUrl, isLoading }: Dro
       : 'donation drop-off'
 
   const isDonation = listing.actionType === 'donate'
-  const heading = 'QR Code'
+  const heading = 'Item successfully posted'
+  const descriptionCopy = isDonation
+    ? 'Your drop-off QR is ready. Present this code at the partner shop to record your donation.'
+    : 'Share this code with the collector to complete the request.'
   return (
-    <div className="space-y-4 rounded-lg border bg-background p-4 shadow-sm">
-      <div className="space-y-1">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
-          <QrCode size={18} />
+    <div className="space-y-6 rounded-2xl border bg-background p-6 shadow-sm">
+      <div className="space-y-2">
+        <h3 className="flex items-center gap-2 text-base font-semibold">
+          <QrCode size={20} />
           {heading}
         </h3>
-        <p className="text-xs text-muted-foreground">
-          {isDonation
-            ? <>Present this code at the partner shop to record your {actionCopy}.</>
-            : 'Share this code with the collector to complete the request.'}
-        </p>
+        <p className="text-sm text-muted-foreground">{descriptionCopy}</p>
       </div>
 
-      <div className="flex justify-center">
-        {qrImageUrl ? (
-          <div className="rounded-lg border bg-white p-3 shadow-sm">
-            <img
-              src={qrImageUrl}
-              alt={`${heading} for ${listing.title}`}
-              className="h-48 w-48 object-contain"
-            />
-          </div>
-        ) : (
-          <div className="flex h-48 w-full max-w-[15rem] items-center justify-center rounded-lg border border-dashed bg-muted/40 p-4 text-center text-xs text-muted-foreground">
-            {isLoading ? 'Loading QR code…' : 'QR code becomes available once the listing is confirmed.'}
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-3 text-sm">
-        <div>
-          <p className="text-xs text-muted-foreground uppercase">Drop-off location</p>
-          {dropOffLocation ? (
-            <div className="mt-2 space-y-2">
-              <div className="flex items-start gap-2">
-                <MapPin size={16} className="mt-1 text-muted-foreground" />
-                <div className="space-y-1">
-                  <p className="font-medium leading-tight">{dropOffLocation.name}</p>
-                  {dropOffLocation.address && (
-                    <p className="text-sm leading-snug text-muted-foreground">{dropOffLocation.address}</p>
-                  )}
-                  {dropOffLocation.postcode && (
-                    <p className="text-sm leading-snug text-muted-foreground">{dropOffLocation.postcode}</p>
-                  )}
-                  {dropOffLocation.distance && (
-                    <p className="text-xs leading-snug text-muted-foreground">About {dropOffLocation.distance} away</p>
-                  )}
-                </div>
-              </div>
-              {(dropOffLocation.openHours || dropOffLocation.phone) && (
-                <div className="space-y-2 rounded-md bg-muted/30 p-3 text-xs text-muted-foreground">
-                  {dropOffLocation.openHours && (
-                    <div className="flex items-center gap-2">
-                      <Clock size={14} />
-                      <span>{dropOffLocation.openHours}</span>
-                    </div>
-                  )}
-                  {dropOffLocation.phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone size={14} />
-                      <span>{dropOffLocation.phone}</span>
-                    </div>
-                  )}
-                </div>
-              )}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,auto)_minmax(0,1fr)] items-start">
+        <div className="flex flex-col items-center gap-4">
+          {qrImageUrl ? (
+            <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <img
+                src={qrImageUrl}
+                alt={`${heading} for ${listing.title}`}
+                className="h-56 w-56 object-contain"
+              />
             </div>
           ) : (
-            <p className="mt-1 text-sm text-muted-foreground">
-              Partner location details will appear once a drop-off slot is confirmed.
-            </p>
+            <div className="flex h-56 w-full max-w-[18rem] items-center justify-center rounded-xl border border-dashed bg-muted/40 p-4 text-center text-sm text-muted-foreground">
+              {isLoading ? 'Loading QR code…' : 'QR code becomes available once the listing is confirmed.'}
+            </div>
           )}
+          <Badge variant={isDonation ? 'default' : 'secondary'} className="uppercase tracking-wide">
+            {isDonation ? 'Donation drop-off' : 'Pickup hand-off'}
+          </Badge>
+        </div>
+
+        <div className="space-y-4 text-sm">
+          <div>
+            <p className="text-xs text-muted-foreground uppercase">Drop-off location</p>
+            {dropOffLocation ? (
+              <div className="mt-2 space-y-3">
+                <div className="flex items-start gap-3">
+                  <MapPin size={18} className="mt-1 text-muted-foreground" />
+                  <div className="space-y-1">
+                    <p className="font-medium leading-tight text-foreground">{dropOffLocation.name}</p>
+                    {dropOffLocation.address && (
+                      <p className="text-sm leading-snug text-muted-foreground">{dropOffLocation.address}</p>
+                    )}
+                    {dropOffLocation.postcode && (
+                      <p className="text-sm leading-snug text-muted-foreground">{dropOffLocation.postcode}</p>
+                    )}
+                    {dropOffLocation.distance && (
+                      <p className="text-xs leading-snug text-muted-foreground">About {dropOffLocation.distance} away</p>
+                    )}
+                  </div>
+                </div>
+                {(dropOffLocation.openHours || dropOffLocation.phone) && (
+                  <div className="space-y-2 rounded-lg bg-muted/30 p-3 text-xs text-muted-foreground">
+                    {dropOffLocation.openHours && (
+                      <div className="flex items-center gap-2">
+                        <Clock size={14} />
+                        <span>{dropOffLocation.openHours}</span>
+                      </div>
+                    )}
+                    {dropOffLocation.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone size={14} />
+                        <span>{dropOffLocation.phone}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Partner location details will appear once a drop-off slot is confirmed.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-4 text-xs text-muted-foreground">
+            {isDonation
+              ? <>Bring this QR to the partner shop so staff can confirm your {actionCopy} and award your points.</>
+              : 'Share the QR code with the collector when you hand over the item.'}
+          </div>
         </div>
       </div>
     </div>

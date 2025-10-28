@@ -665,6 +665,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
       linkedRequest &&
       currentUser &&
       selectedChat &&
+      listingForChat?.actionType !== 'donate' &&
       linkedRequest.status === 'approved' &&
       (selectedChat.donorId === currentUser.id || selectedChat.collectorId === currentUser.id)
     ) {
@@ -678,7 +679,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     }
 
     return actions.filter(action => action.visible)
-  }, [currentUser, handleConfirmCollection, linkedRequest, selectedChat, shareLocation])
+  }, [currentUser, handleConfirmCollection, linkedRequest, listingForChat, selectedChat, shareLocation])
 
   if (!currentUser) {
     if (isPage) {

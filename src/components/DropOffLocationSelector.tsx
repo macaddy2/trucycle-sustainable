@@ -81,7 +81,11 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
   }
 
   const [remoteLocations, setRemoteLocations] = useState<DropOffLocation[]>([])
-  const [user] = useKV<{ postcode?: string } | null>('current-user', null)
+  const [user] = useKV<{ postcode?: string; lat?: number; lng?: number; latitude?: number; longitude?: number } | null>('current-user', null)
+  const rawLat = (user as any)?.lat ?? (user as any)?.latitude
+  const rawLng = (user as any)?.lng ?? (user as any)?.longitude
+  const userLat = typeof rawLat === 'number' ? rawLat : null
+  const userLng = typeof rawLng === 'number' ? rawLng : null
   const [activeLocationId, setActiveLocationId] = useState<string | null>(selectedLocation?.id ?? null)
 
   useEffect(() => {
@@ -89,7 +93,12 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
     async function load() {
       try {
         const postcode = user?.postcode?.trim()
-        const res = await shopsNearby(postcode ? { postcode } : { postcode: 'SW1A 1AA' })
+        const params = postcode
+          ? { postcode }
+          : (typeof userLat === 'number' && typeof userLng === 'number'
+            ? { lat: userLat, lon: userLng }
+            : { postcode: 'SW1A 1AA' })
+        const res = await shopsNearby(params)
         const data = Array.isArray((res as any)?.data)
           ? ((res as any).data as NearbyShop[])
           : Array.isArray(res)
@@ -107,7 +116,7 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
     }
     load()
     return () => { cancelled = true }
-  }, [activeLocationId, selectedLocation, user?.postcode])
+  }, [activeLocationId, selectedLocation, user?.postcode, userLat, userLng])
 
   useEffect(() => {
     if (selectedLocation) {

@@ -105,7 +105,11 @@ function RecenterMap({ center }: { center: [number, number] }) {
   const [remoteLocations, setRemoteLocations] = useState<DropOffLocation[]>([])
   const [loadingNearby, setLoadingNearby] = useState(false)
   const [nearbyError, setNearbyError] = useState<string | null>(null)
-  const [user] = useKV<{ postcode?: string } | null>('current-user', null)
+  const [user] = useKV<{ postcode?: string; lat?: number; lng?: number; latitude?: number; longitude?: number } | null>('current-user', null)
+  const rawLat = (user as any)?.lat ?? (user as any)?.latitude
+  const rawLng = (user as any)?.lng ?? (user as any)?.longitude
+  const userLat = typeof rawLat === 'number' ? rawLat : null
+  const userLng = typeof rawLng === 'number' ? rawLng : null
 
   useEffect(() => {
     let cancelled = false
@@ -115,7 +119,12 @@ function RecenterMap({ center }: { center: [number, number] }) {
       setNearbyError(null)
       try {
         const postcode = user?.postcode?.trim()
-        const response = await shopsNearby(postcode ? { postcode } : { postcode: 'SW1A 1AA' })
+        const params = postcode
+          ? { postcode }
+          : (typeof userLat === 'number' && typeof userLng === 'number'
+            ? { lat: userLat, lon: userLng }
+            : { postcode: 'SW1A 1AA' })
+        const response = await shopsNearby(params)
         const data = Array.isArray((response as any)?.data)
           ? ((response as any).data as NearbyShop[])
           : Array.isArray(response)
@@ -144,7 +153,7 @@ function RecenterMap({ center }: { center: [number, number] }) {
     return () => {
       cancelled = true
     }
-  }, [user?.postcode])
+  }, [user?.postcode, userLat, userLng])
 
   const locations = useMemo(() => {
     const merged = new Map<string, DropOffLocation>()

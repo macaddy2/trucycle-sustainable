@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
@@ -22,7 +20,6 @@ import {
   ArrowClockwise,
   Camera,
   SpinnerGap,
-  ShieldCheck,
 } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
@@ -70,7 +67,6 @@ function formatDateTime(value?: string | null) {
 const UUID_RE = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/
 
 export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModalProps) {
-  const [mode, setMode] = useState<ScanMode>('dropoff')
   const [input, setInput] = useState('')
   const [notes, setNotes] = useState('')
   const [history, setHistory] = useKV<ScanRecord[]>('partner-scan-history', [])
@@ -123,16 +119,6 @@ export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModal
   }, [hasShops, shops, shopsById])
 
   useEffect(() => {
-    setInput('')
-    setNotes('')
-    setItemId(null)
-    setItemView(null)
-    setItemDetails(null)
-    setIsFetchingItem(false)
-    lastDetectedRef.current = null
-  }, [mode])
-
-  useEffect(() => {
     if (!input) {
       lastDetectedRef.current = null
     }
@@ -157,13 +143,15 @@ export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModal
   const dropoffAllowed = itemDetails?.status === 'pending_dropoff'
   const pickupStatus = itemDetails?.status ?? itemView?.status
   const pickupOption = itemDetails?.pickup_option ?? itemView?.pickup_option
-  const pickupAllowed = pickupStatus === 'active' && pickupOption === 'donate'
+  const pickupAllowed = pickupStatus === 'awaiting_collection'
+  const hasStatusContext = Boolean(itemDetails?.status || itemView?.status)
+  const actionMode: ScanMode = dropoffAllowed ? 'dropoff' : (hasStatusContext ? 'pickup' : 'dropoff')
   const confirmDisabled =
     isProcessing ||
     !hasShops ||
     !selectedShopId ||
     !itemId ||
-    (mode === 'dropoff' ? !dropoffAllowed : !pickupAllowed)
+    (actionMode === 'dropoff' ? !dropoffAllowed : !pickupAllowed)
 
   const extractItemId = useCallback((payload: string): string | null => {
     const match = payload.match(UUID_RE)
@@ -380,19 +368,20 @@ export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModal
       toast.error('Select a partner shop before confirming the scan')
       return
     }
-    if (mode === 'dropoff' && !dropoffAllowed) {
+    const currentMode = actionMode
+    if (currentMode === 'dropoff' && !dropoffAllowed) {
       toast.error('Item must be pending drop-off before it can be accepted')
       return
     }
-    if (mode === 'pickup' && !pickupAllowed) {
-      toast.error("Only active donation items can be released for pickup")
+    if (currentMode === 'pickup' && !pickupAllowed) {
+      toast.error('Item must be awaiting collection before it can be released')
       return
     }
     const trimmedNotes = notes.trim()
     const shopName = selectedShop?.name ?? null
     setIsProcessing(true)
     try {
-      if (mode === 'dropoff') {
+      if (currentMode === 'dropoff') {
         const res = await qrDropoffIn(id, {
           shop_id: selectedShopId,
           action: 'accept',
@@ -404,9 +393,9 @@ export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModal
         await fetchItem(id)
         const record: ScanRecord = {
           id: generateId(),
-          mode,
+          mode: currentMode,
           reference: id,
-          notes: trimmedNotes || undefined,
+          ...(trimmedNotes ? { notes: trimmedNotes } : {}),
           scannedAt: new Date().toISOString(),
           shopId: selectedShopId,
           shopName,
@@ -414,10 +403,8 @@ export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModal
         }
         setHistory(prev => [record, ...prev].slice(0, 25))
       } else {
-        const pickupMessage = 'Pickup confirmed by partner'
         const res = await qrClaimOut(id, {
           shop_id: selectedShopId,
-          notes: pickupMessage,
         })
         toast.success(res?.data?.scan_result ? `Pickup ${res.data.scan_result}` : 'Pickup confirmed', {
           description: shopName ? `Logged at ${shopName}` : undefined,
@@ -425,9 +412,8 @@ export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModal
         await fetchItem(id)
         const record: ScanRecord = {
           id: generateId(),
-          mode,
+          mode: currentMode,
           reference: id,
-          notes: pickupMessage,
           scannedAt: new Date().toISOString(),
           shopId: selectedShopId,
           shopName,
@@ -537,89 +523,50 @@ export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModal
                 </p>
               )}
             </div>
-            <Tabs value={mode} onValueChange={value => setMode(value as ScanMode)}>
-              <TabsList className="grid grid-cols-2">
-                <TabsTrigger value="dropoff">Drop-off</TabsTrigger>
-                <TabsTrigger value="pickup">Pickup</TabsTrigger>
-              </TabsList>
-              <TabsContent value="dropoff" className="mt-4 space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground" htmlFor="dropoff-scan">
-                    QR payload or manual code
-                  </label>
-                  <Input
-                    id="dropoff-scan"
-                    value={input}
-                    onChange={event => setInput(event.target.value)}
-                    placeholder="Paste QR payload or item id"
-                  />
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Textarea
-                      id="dropoff-notes"
-                      value={notes}
-                      onChange={event => setNotes(event.target.value)}
-                      aria-label="Drop-off notes"
-                      rows={3}
-                    />
-                  </div>
-                </div>
-                <div className="rounded-lg border border-dashed border-border bg-background/60 p-3 text-xs">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <CheckCircle size={16} />
-                    Drop-off requirement
-                  </p>
-                  <p className="mt-1 text-muted-foreground">
-                    Confirm drop-off is enabled only when the item is marked as pending drop-off.
-                  </p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Current status:</span>
-                    <Badge variant={dropoffAllowed ? 'secondary' : 'outline'} className="capitalize">
-                      {formatStatusLabel(itemDetails?.status)}
-                    </Badge>
-                    {!dropoffAllowed && (
-                      <span className="text-[11px] text-destructive">Awaiting donor arrival</span>
-                    )}
-                  </div>
-                </div>
-              </TabsContent>
-              <TabsContent value="pickup" className="mt-4 space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground" htmlFor="pickup-scan">
-                    QR payload or manual code
-                  </label>
-                  <Input
-                    id="pickup-scan"
-                    value={input}
-                    onChange={event => setInput(event.target.value)}
-                    placeholder="Paste QR payload or item id"
-                  />
-                </div>
-                <div className="rounded-lg border border-dashed border-border bg-background/60 p-3 text-xs">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <ShieldCheck size={16} />
-                    Pickup requirement
-                  </p>
-                  <p className="mt-1 text-muted-foreground">
-                    Items must be active donation listings before they can be released to collectors.
-                  </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <Badge variant={pickupAllowed ? 'secondary' : 'outline'} className="capitalize">
-                      {formatStatusLabel(pickupStatus)}
-                    </Badge>
-                    {pickupOption && (
-                      <Badge variant="outline" className="capitalize">
-                        {pickupOption}
-                      </Badge>
-                    )}
-                    {!pickupAllowed && (
-                      <span className="text-[11px] text-destructive">Activate item to hand it over</span>
-                    )}
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-foreground" htmlFor="scan-input">
+                  QR payload or manual code
+                </label>
+                <Input
+                  id="scan-input"
+                  value={input}
+                  onChange={event => setInput(event.target.value)}
+                  placeholder="Paste QR payload or item id"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <Badge variant="secondary" className="uppercase tracking-wide">
+                  {actionMode === 'dropoff' ? 'Drop-off' : 'Pickup'} mode
+                </Badge>
+                {itemDetails?.status ? (
+                  <Badge
+                    variant={actionMode === 'dropoff' ? (dropoffAllowed ? 'secondary' : 'outline') : (pickupAllowed ? 'secondary' : 'outline')}
+                    className="capitalize"
+                  >
+                    {formatStatusLabel(itemDetails.status)}
+                  </Badge>
+                ) : itemView?.status ? (
+                  <Badge variant={pickupAllowed ? 'secondary' : 'outline'} className="capitalize">
+                    {formatStatusLabel(itemView.status)}
+                  </Badge>
+                ) : null}
+                {actionMode === 'pickup' && pickupOption && (
+                  <Badge variant="outline" className="capitalize">
+                    {pickupOption}
+                  </Badge>
+                )}
+                {!dropoffAllowed && actionMode === 'dropoff' && hasStatusContext && (
+                  <span className="text-[11px] text-destructive">Waiting for pending drop-off</span>
+                )}
+                {!pickupAllowed && actionMode === 'pickup' && hasStatusContext && (
+                  <span className="text-[11px] text-destructive">Status must be awaiting collection</span>
+                )}
+                {!hasStatusContext && !itemId && (
+                  <span className="text-[11px] text-muted-foreground">Scan an item to determine the action</span>
+                )}
+              </div>
+            </div>
 
             <div className="flex flex-wrap items-center gap-3">
               <Button onClick={handleConfirm} disabled={confirmDisabled} aria-busy={isProcessing}>
@@ -628,7 +575,7 @@ export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModal
                 ) : (
                   <CheckCircle size={18} className="mr-2" />
                 )}
-                {isProcessing ? 'Processing…' : `Confirm ${mode === 'dropoff' ? 'drop-off' : 'pickup'}`}
+                {isProcessing ? 'Processing…' : `Confirm ${actionMode === 'dropoff' ? 'drop-off' : 'pickup'}`}
               </Button>
               <Button variant="outline" onClick={handleClearHistory}>
                 <ArrowClockwise size={18} className="mr-2" />

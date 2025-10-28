@@ -19,6 +19,8 @@ import {
   PencilSimple,
   CrosshairSimple,
   X,
+  Storefront,
+  Phone,
 } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { useExchangeManager } from '@/hooks'
@@ -55,6 +57,15 @@ export interface ListingItem {
   ownerAvatar?: string
   ownerRating?: number
   ownerVerificationLevel?: VerificationLevel
+  partnerLocation?: {
+    id?: string
+    name: string
+    addressLine?: string | null
+    postcode?: string | null
+    phoneNumber?: string | null
+    openingHours?: string | null
+    operationalNotes?: string | null
+  } | null
   claim?: {
     status: 'approved' | 'pending_approval' | string
     requestedAt?: string
@@ -180,6 +191,18 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
             : (typeof claimRaw.claimed_at === 'string' ? String(claimRaw.claimed_at) : undefined),
         }
       : null
+    const dropLocation = it?.dropoff_location
+    const partnerLocation = dropLocation
+      ? {
+          id: dropLocation.id ? String(dropLocation.id) : undefined,
+          name: dropLocation.name || 'Partner shop',
+          addressLine: dropLocation.address_line ?? null,
+          postcode: dropLocation.postcode ?? null,
+          phoneNumber: dropLocation.phone_number ?? null,
+          openingHours: formatPartnerOpeningHours(dropLocation.opening_hours ?? null),
+          operationalNotes: dropLocation.operational_notes ?? null,
+        }
+      : null
 
     return {
       id: String(it?.id || crypto.randomUUID()),
@@ -199,6 +222,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
       ownerAvatar: owner?.profile_image || undefined,
       ownerRating: typeof owner?.rating === 'number' ? owner.rating : undefined,
       ownerVerificationLevel,
+      partnerLocation,
       claim,
     }
   }
@@ -262,6 +286,18 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
     if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
     const days = Math.floor(hours / 24)
     return `${days} day${days === 1 ? '' : 's'} ago`
+  }
+
+  const formatPartnerOpeningHours = (
+    opening?: { days?: string[]; open_time?: string | null; close_time?: string | null } | null
+  ): string | null => {
+    if (!opening) return null
+    const days = Array.isArray(opening.days) && opening.days.length > 0 ? opening.days.join(' · ') : null
+    const base = days ?? 'Daily'
+    if (opening.open_time && opening.close_time) return `${base} ${opening.open_time} - ${opening.close_time}`
+    if (opening.open_time) return `${base} from ${opening.open_time}`
+    if (opening.close_time) return `${base} until ${opening.close_time}`
+    return days
   }
 
   const handleSearchInputChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -561,7 +597,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                         Collected
                       </Badge>
                     )}
-                    {isOwner && pendingRequests > 0 && !collectionStatus?.collected && (
+                    {isOwner && item.actionType !== 'donate' && pendingRequests > 0 && !collectionStatus?.collected && (
                       <Badge variant="outline" className="bg-background/80 backdrop-blur">
                         {pendingRequests} interested
                       </Badge>
@@ -660,7 +696,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                       </Badge>
                     </div>
                   ) : (
-                    isOwner
+                    isOwner && item.actionType !== 'donate'
                       ? (
                         (pendingRequests > 0 || itemRequests.length > 0)
                           ? (
@@ -724,26 +760,74 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
 
                     <div className="space-y-2">
                       <h4 className="font-medium">{activeItemOwnerLabel}</h4>
-                      <div className="p-3 bg-muted rounded-lg space-y-2">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-primary rounded-full overflow-hidden flex items-center justify-center text-primary-foreground">
-                            {activeItem.ownerAvatar ? (
-                              <img src={activeItem.ownerAvatar} alt={activeItem.ownerName || 'Owner avatar'} className="w-full h-full object-cover" />
-                            ) : (
-                              activeItem.ownerName?.charAt(0) ?? '?'
+                      {activeItem.actionType === 'donate' ? (
+                        activeItem.partnerLocation ? (
+                          <div className="space-y-3 rounded-lg bg-muted p-4 text-sm">
+                            <div className="flex items-start gap-3">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                <Storefront size={18} />
+                              </div>
+                              <div className="space-y-1">
+                                <p className="font-medium leading-tight text-foreground">
+                                  {activeItem.partnerLocation.name}
+                                </p>
+                                {activeItem.partnerLocation.addressLine && (
+                                  <p className="text-sm leading-snug text-muted-foreground">
+                                    {activeItem.partnerLocation.addressLine}
+                                  </p>
+                                )}
+                                {activeItem.partnerLocation.postcode && (
+                                  <p className="text-sm leading-snug text-muted-foreground">
+                                    {activeItem.partnerLocation.postcode}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            {activeItem.partnerLocation.openingHours && (
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Clock size={14} />
+                                <span>{activeItem.partnerLocation.openingHours}</span>
+                              </div>
+                            )}
+                            {activeItem.partnerLocation.phoneNumber && (
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Phone size={14} />
+                                <span>{activeItem.partnerLocation.phoneNumber}</span>
+                              </div>
+                            )}
+                            {activeItem.partnerLocation.operationalNotes && (
+                              <p className="text-xs leading-snug text-muted-foreground">
+                                {activeItem.partnerLocation.operationalNotes}
+                              </p>
                             )}
                           </div>
-                          <div>
-                            <p className="font-medium">{activeItem.ownerName}</p>
-                            {activeItem.ownerVerificationLevel && (
-                              <VerificationBadge verified={activeItem.ownerVerificationLevel} variant="compact" />
-                            )}
+                        ) : (
+                          <div className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">
+                            Pickup partner details will appear once the donor assigns a shop.
                           </div>
+                        )
+                      ) : (
+                        <div className="space-y-2 rounded-lg bg-muted p-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground overflow-hidden">
+                              {activeItem.ownerAvatar ? (
+                                <img src={activeItem.ownerAvatar} alt={activeItem.ownerName || 'Owner avatar'} className="h-full w-full object-cover" />
+                              ) : (
+                                activeItem.ownerName?.charAt(0) ?? '?'
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium">{activeItem.ownerName}</p>
+                              {activeItem.ownerVerificationLevel && (
+                                <VerificationBadge verified={activeItem.ownerVerificationLevel} variant="compact" />
+                              )}
+                            </div>
+                          </div>
+                          {activeItem.ownerRating && (
+                            <RatingDisplay rating={activeItem.ownerRating} totalRatings={12} size="sm" />
+                          )}
                         </div>
-                        {activeItem.ownerRating && (
-                          <RatingDisplay rating={activeItem.ownerRating} totalRatings={12} size="sm" />
-                        )}
-                      </div>
+                      )}
                     </div>
 
                     {activeItemCollectionStatus?.collected ? (
@@ -751,7 +835,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                         Item collected on {new Date(activeItemCollectionStatus.confirmedAt).toLocaleDateString()}.
                         Thank you for completing the exchange!
                       </div>
-                    ) : activeItemIsOwner ? (
+                    ) : activeItemIsOwner && activeItem.actionType !== 'donate' ? (
                       <div className="space-y-3">
                         <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 text-sm">
                           <p className="font-medium">Requests</p>
