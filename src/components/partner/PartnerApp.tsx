@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { House, Package, Storefront as StorefrontIcon, UserCircle, WarningCircle, QrCode } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { clearTokens, listMyShops, listPartnerItems, type MinimalUser, type PartnerShopItem, type ShopDto } from '@/lib/api'
+import { kvDelete } from '@/lib/kvStore'
 import { toast } from 'sonner'
 import { PartnerHome } from './PartnerHome'
 import { PartnerItems } from './PartnerItems'
@@ -70,11 +71,15 @@ export function PartnerApp({ route, onNavigate }: PartnerAppProps) {
   }, [fetchData])
 
   const handleSignOut = useCallback(async () => {
-    await clearTokens()
+    try { await clearTokens() } catch {}
+    try { await kvDelete('current-user') } catch {}
     setPartner(null)
-    toast.success('Signed out of the partner console')
-    onNavigate('login', true)
-  }, [onNavigate, setPartner])
+    toast.success('Signed out')
+    const base = (import.meta as any).env?.BASE_URL || '/'
+    const baseNormalized = String(base || '/').replace(/\/$/, '')
+    const target = `${baseNormalized}/home`.replace(/\/+/g, '/').replace(/\/$/, '')
+    window.location.href = target
+  }, [setPartner])
 
   const activeNav = navItems.find(item => item.key === route) ?? navItems[0]
 
