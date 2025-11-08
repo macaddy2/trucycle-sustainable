@@ -498,7 +498,7 @@ export function MyListingsView({
             title: String(it.title || 'Untitled'),
             description: '',
             status: mapServerStatusToClient(it.status),
-            category: 'Other',
+            category: String(it.category || 'Other'),
             createdAt: String(it.created_at || new Date().toISOString()),
             actionType: (it.pickup_option || 'donate') as ManagedListing['actionType'],
             fulfillmentMethod: (it.pickup_option === 'donate' ? 'dropoff' : 'pickup'),
@@ -660,7 +660,9 @@ export function MyListingsView({
             <TableCell>
               <div className="space-y-1">
                 <p className="font-medium">{listing.title}</p>
-                <p className="text-xs text-muted-foreground capitalize">{formatCategoryDisplay(listing.category)}</p>
+                {Boolean(String(listing.category || '').trim()) && String(listing.category).trim().toLowerCase() !== 'other' && (
+                  <p className="text-xs text-muted-foreground capitalize">{String(listing.category).trim()}</p>
+                )}
               </div>
             </TableCell>
             <TableCell>
