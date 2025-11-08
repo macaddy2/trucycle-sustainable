@@ -46,7 +46,7 @@ import { AuthDialog, ProfileOnboarding } from './components/auth'
 import { MessageCenter, MessageNotification } from './components/messaging'
 import { messageSocket } from '@/lib/messaging/socket'
 import { notificationSocket } from '@/lib/notifications/socket'
-import { me as apiMe } from '@/lib/api'
+import { me as apiMe, clearTokens } from '@/lib/api'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import { useRecommendationNotifications, useNotifications, useExchangeManager, usePresence } from '@/hooks'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -741,6 +741,7 @@ function App() {
                         <DropdownMenuItem
                           variant="destructive"
                           onSelect={() => {
+                            try { void clearTokens() } catch {}
                             setUser(null as any)
                             navigateToTab('home')
                           }}
@@ -842,6 +843,7 @@ function App() {
                       <DropdownMenuItem
                         variant="destructive"
                         onSelect={() => {
+                          try { void clearTokens() } catch {}
                           setUser(null as any)
                           navigateToTab('home')
                         }}

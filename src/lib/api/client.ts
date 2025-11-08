@@ -52,6 +52,12 @@ import type {
 export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '') || ''
 
 const TOKENS_KEY = 'auth.tokens'
+const TOKENS_META_KEY = 'auth.tokens.meta'
+
+// Auto-logout after 24h of inactivity
+const AUTH_MAX_IDLE_MS = 24 * 60 * 60 * 1000
+
+type TokensMeta = { lastActiveAt: number }
 
 export class ApiError extends Error {
   status: number
@@ -65,15 +71,33 @@ export class ApiError extends Error {
 }
 
 async function getTokens(): Promise<Tokens | undefined> {
-  return kvGet<Tokens>(TOKENS_KEY)
+  const [tk, meta] = await Promise.all([
+    kvGet<Tokens>(TOKENS_KEY),
+    kvGet<TokensMeta>(TOKENS_META_KEY),
+  ])
+  if (!tk) return undefined
+  const last = meta?.lastActiveAt ?? 0
+  const now = Date.now()
+  // If idle beyond threshold, clear tokens and cached profiles
+  if (last > 0 && now - last > AUTH_MAX_IDLE_MS) {
+    try {
+      await clearTokens()
+    } catch {}
+    try { await kvDelete('current-user') } catch {}
+    try { await kvDelete('partner-user') } catch {}
+    return undefined
+  }
+  return tk
 }
 
 async function setTokens(tokens: Tokens): Promise<void> {
   await kvSet<Tokens>(TOKENS_KEY, tokens)
+  try { await kvSet<TokensMeta>(TOKENS_META_KEY, { lastActiveAt: Date.now() }) } catch {}
 }
 
 export async function clearTokens(): Promise<void> {
   await kvDelete(TOKENS_KEY)
+  try { await kvDelete(TOKENS_META_KEY) } catch {}
 }
 
 type RequestOptions = {
@@ -100,6 +124,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     const tk = await getTokens()
     if (tk?.accessToken) {
       headers['Authorization'] = headers['Authorization'] || `Bearer ${tk.accessToken}`
+      // Touch last active timestamp on any authenticated request
+      try { await kvSet<TokensMeta>(TOKENS_META_KEY, { lastActiveAt: Date.now() }) } catch {}
     }
   } catch {
     // ignore token retrieval errors; proceed unauthenticated

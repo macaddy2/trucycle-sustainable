@@ -61,12 +61,27 @@ export function PartnerRouter({ basePath, initialPath }: PartnerRouterProps) {
       setHasAuthToken(false)
     })
 
+    // React to token changes across app/tabs to keep auth state fresh
+    const handleTokenChange = () => {
+      tokens.get().then(t => {
+        if (!mounted) return
+        setHasAuthToken(Boolean(t?.accessToken))
+      }).catch(() => {
+        if (!mounted) return
+        setHasAuthToken(false)
+      })
+    }
+    window.addEventListener('storage', handleTokenChange)
+    window.addEventListener('kv-change' as any, handleTokenChange as any)
+
     const handlePop = () => {
       setRoute(parseRoute(window.location.pathname))
     }
     window.addEventListener('popstate', handlePop)
     return () => {
       window.removeEventListener('popstate', handlePop)
+      window.removeEventListener('storage', handleTokenChange)
+      window.removeEventListener('kv-change' as any, handleTokenChange as any)
       mounted = false
     }
   }, [parseRoute])
