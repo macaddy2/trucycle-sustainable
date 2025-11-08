@@ -448,6 +448,9 @@ export function MyListingsView({
             const statusFromItem = mapServerStatusToClient(it.status)
             const statusForUi: ManagedListing['status'] = claimStatus === 'complete' ? 'collected' : statusFromItem
             const normalizedClaimStatus = mapServerClaimStatus(e?.claim_status)
+            // Rewards can be present on either the entry or the item payload depending on backend
+            const rawReward = (e?.reward ?? (it as any)?.reward)
+            const rawCurrency = (e?.reward_currency ?? (it as any)?.reward_currency)
             return {
               id: String(it.id || crypto.randomUUID()),
               title: String(it.title || 'Untitled'),
@@ -461,6 +464,8 @@ export function MyListingsView({
               photos: Array.isArray(it.images) ? it.images.map((img: any) => img?.url).filter(Boolean) : undefined,
               valuation: undefined,
               rewardPoints: undefined,
+              reward: typeof rawReward === 'number' ? rawReward : undefined,
+              reward_currency: typeof rawCurrency === 'string' ? rawCurrency : undefined,
               co2Impact: typeof it.estimated_co2_saved_kg === 'number' ? it.estimated_co2_saved_kg : undefined,
               aiClassification: undefined,
               moderation: undefined,
@@ -506,6 +511,8 @@ export function MyListingsView({
             photos: Array.isArray(it.images) ? it.images.map((img: any) => img?.url).filter(Boolean) : undefined,
             valuation: undefined,
             rewardPoints: undefined,
+            reward: typeof (it as any)?.reward === 'number' ? (it as any).reward : undefined,
+            reward_currency: typeof (it as any)?.reward_currency === 'string' ? (it as any).reward_currency : undefined,
             co2Impact: typeof it.estimated_co2_saved_kg === 'number' ? it.estimated_co2_saved_kg : undefined,
             aiClassification: undefined,
             moderation: undefined,
@@ -636,7 +643,9 @@ export function MyListingsView({
       {sortedListings.map(listing => {
         const status = statusCopy[listing.status]
         const chat = getChatForItem(listing.id)
-        const reward = listing.rewardPoints ?? listing.valuation?.rewardPoints
+        const isCollected = listing.status === 'collected' || listing.claimStatus === 'completed'
+        const rewardValue = listing.reward ?? listing.rewardPoints ?? listing.valuation?.rewardPoints
+        const rewardCurrency = listing.reward_currency ?? (typeof rewardValue === 'number' ? 'PTS' : undefined)
         const requests = getRequestsForItem(listing.id)
         const approvedRequest = requests.find(r => r.status === 'approved')
         const collectorsBadgeText = isCollector
@@ -688,10 +697,14 @@ export function MyListingsView({
               </span>
             </TableCell>
             <TableCell>
-              {typeof reward === 'number' ? (
-                <span className="text-sm font-medium text-primary">+{reward} pts</span>
-              ) : (
+              {!isCollected ? (
                 <span className="text-xs text-muted-foreground">Pending</span>
+              ) : (
+                typeof rewardValue === 'number' ? (
+                  <span className="text-sm font-medium text-primary">+{rewardValue} {rewardCurrency || 'PTS'}</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Pending</span>
+                )
               )}
             </TableCell>
             <TableCell className="text-right space-x-2">
@@ -836,7 +849,15 @@ if (variant === 'dashboard') {
                 </div>
                 <div className="rounded-md border p-3 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase">Reward</p>
-                  <span>{selectedListing.rewardPoints ?? selectedListing.valuation?.rewardPoints ?? 'Pending'} pts</span>
+                  {selectedListing.status !== 'collected' && selectedListing.claimStatus !== 'completed' ? (
+                    <span className="text-muted-foreground">Pending</span>
+                  ) : (
+                    <span>
+                      {(typeof (selectedListing.reward ?? selectedListing.rewardPoints ?? selectedListing.valuation?.rewardPoints) === 'number')
+                        ? `${selectedListing.reward ?? selectedListing.rewardPoints ?? selectedListing.valuation?.rewardPoints} ${selectedListing.reward_currency || 'PTS'}`
+                        : 'Pending'}
+                    </span>
+                  )}
                 </div>
                 <div className="rounded-md border p-3 space-y-1">
                   <p className="text-xs text-muted-foreground uppercase">Listed</p>

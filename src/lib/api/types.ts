@@ -257,6 +257,9 @@ export interface MyListedItem {
   }
   created_at: string
   claim?: MyListedItemClaim | null
+  // New rewards fields from API (when available)
+  reward?: number
+  reward_currency?: string
 }
 
 export interface MyListedItemsResponse {
@@ -274,6 +277,9 @@ export interface MyCollectedItemEntry {
     location?: { address_line?: string; postcode?: string; latitude?: number; longitude?: number }
     owner?: { id: string; name?: string | null; profile_image?: string | null }
   }
+  // New rewards fields from API (when available)
+  reward?: number
+  reward_currency?: string
 }
 
 export interface MyCollectedItemsResponse {

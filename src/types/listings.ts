@@ -30,6 +30,9 @@ export interface ManagedListing {
   photos?: string[]
   valuation?: ListingValuation
   rewardPoints?: number
+  // New API fields
+  reward?: number
+  reward_currency?: string
   co2Impact?: number
   aiClassification?: ListingClassificationResult
   moderation?: ModerationResult
