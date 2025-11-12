@@ -553,7 +553,8 @@ export function MyListingsView({
   }
 
   const handleApproveRequest = async (request: ClaimRequest) => {
-    const approved = await confirmClaimRequest(request.id)
+    const approval = await confirmClaimRequest(request.id)
+    const approved = approval?.request
     if (!approved) {
       toast.error('Unable to approve this request')
       return
@@ -579,9 +580,8 @@ export function MyListingsView({
       // Update chat to reflect arrangement
       updateChatStatus(chatId, 'collection_arranged')
       window.dispatchEvent(new CustomEvent('exchange-claim-approved', {
-        detail: { request: approved, chatId }
+        detail: { request: approved, chatId, qrCodes: approval?.qrCodes }
       }))
-      toast.success(`Approved ${approved.collectorName} for "${approved.itemTitle}"`)
       openMessages({ chatId })
     } catch (error) {
       console.error('Failed to create chat for approved request', error)

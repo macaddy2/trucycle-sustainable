@@ -558,7 +558,8 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
 
   const handleApproveRequest = async (request: ClaimRequest) => {
     if (!currentUser) return
-    const approved = await confirmClaimRequest(request.id)
+    const approval = await confirmClaimRequest(request.id)
+    const approved = approval?.request
     if (!approved) return
 
     const chatIdentifier = await createOrGetChat(
@@ -574,7 +575,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
       { linkedRequestId: approved.id }
     )
 
-    toast.success(`Confirmed ${approved.collectorName} for "${approved.itemTitle}"`)
     updateChatStatus(chatIdentifier, 'collection_arranged')
     setActivePanel('chats')
     setSelectedChatId(chatIdentifier)
@@ -586,7 +586,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     )
 
     window.dispatchEvent(new CustomEvent('exchange-claim-approved', {
-      detail: { request: approved, chatId: chatIdentifier }
+      detail: { request: approved, chatId: chatIdentifier, qrCodes: approval?.qrCodes }
     }))
   }
 

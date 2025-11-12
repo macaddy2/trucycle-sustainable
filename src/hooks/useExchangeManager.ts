@@ -34,6 +34,14 @@ interface CompleteRequestResult {
   alreadyCompleted?: boolean
 }
 
+export interface ConfirmClaimResult {
+  request: ClaimRequest
+  qrCodes?: QRCodeData[]
+  listing?: ManagedListing | null
+}
+
+type RefreshReason = 'initial' | 'notification' | 'approval' | 'manual'
+
 export function useExchangeManager() {
   // Stop persisting demo claims/rewards/collections; hold minimal session state only
   const [claimRequests, setClaimRequests] = useState<ClaimRequest[]>([])
@@ -55,11 +63,11 @@ export function useExchangeManager() {
   }, [])
 
   // Seed claim requests from server "my listed items" for donors
-  useEffect(() => {
-    let cancelled = false
-    async function loadServerClaims() {
+  const refreshClaimRequests = useCallback(
+    async (options: { reason?: RefreshReason; silent?: boolean } = {}) => {
+      if (!currentUser || currentUser.userType !== 'donor') return []
+
       try {
-        if (!currentUser || currentUser.userType !== 'donor') return
         const res = await listMyItems({ limit: 50 })
         const items: MyListedItem[] = Array.isArray(res?.data?.items) ? res.data.items : []
         const mapped: ClaimRequest[] = items
@@ -83,21 +91,52 @@ export function useExchangeManager() {
             } as ClaimRequest
           })
 
-        if (cancelled) return
-        // Merge by id with any existing in-session requests (server wins)
         setClaimRequests((prev) => {
-          const byId = new Map<string, ClaimRequest>()
-          for (const r of prev) byId.set(r.id, r)
-          for (const r of mapped) byId.set(r.id, r)
-          return Array.from(byId.values())
+          const serverIds = new Set(mapped.map(request => request.id))
+          const merged = [...mapped]
+          for (const existing of prev) {
+            if (!serverIds.has(existing.id)) merged.push(existing)
+          }
+          return merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         })
-      } catch {
-        // silently ignore; UI will fall back to local state
+
+        window.dispatchEvent(
+          new CustomEvent('exchange-claims-refreshed', {
+            detail: { reason: options.reason ?? 'manual', requests: mapped },
+          }),
+        )
+
+        return mapped
+      } catch (error) {
+        if (!options.silent) {
+          console.error('Failed to refresh claim requests', error)
+        }
+        return []
       }
+    },
+    [currentUser, mapClaimStatus],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      if (cancelled) return
+      await refreshClaimRequests({ reason: 'initial', silent: true })
+    })()
+
+    const handleRefreshRequest = (event: Event) => {
+      if (cancelled) return
+      const detail = (event as CustomEvent<{ reason?: RefreshReason; silent?: boolean }>).detail
+      refreshClaimRequests({ reason: detail?.reason ?? 'manual', silent: detail?.silent ?? true }).catch(() => {})
     }
-    loadServerClaims()
-    return () => { cancelled = true }
-  }, [currentUser, mapClaimStatus])
+
+    window.addEventListener('exchange-claims-refresh-requested', handleRefreshRequest as EventListener)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener('exchange-claims-refresh-requested', handleRefreshRequest as EventListener)
+    }
+  }, [refreshClaimRequests])
 
   const submitClaimRequest = useCallback(
     async (
@@ -189,10 +228,12 @@ export function useExchangeManager() {
     toast.success('QR codes prepared for this exchange', {
       description: 'Both parties can now access the hand-off codes from the QR hub.',
     })
+
+    return { donorQr, collectorQr }
   }, [setUserQrCodes])
 
   const confirmClaimRequest = useCallback(
-    async (requestId: string): Promise<ClaimRequest | null> => {
+    async (requestId: string): Promise<ConfirmClaimResult | null> => {
       // Try to find local record for richer UI context
       const target = claimRequests.find(request => request.id === requestId) || null
       try {
@@ -218,20 +259,36 @@ export function useExchangeManager() {
         return req
       }))
 
+      let generatedQrCodes: { donorQr: QRCodeData; collectorQr: QRCodeData } | null = null
+      let relatedListing: ManagedListing | null = null
+
       if (approvedRequest) {
         toast.success(`${approvedRequest.collectorName} has been approved for this exchange.`)
 
-        const relatedListing = globalListings.find(listing => listing.id === approvedRequest!.itemId)
+        relatedListing = globalListings.find(listing => listing.id === approvedRequest!.itemId)
           || userListings.find(listing => listing.id === approvedRequest!.itemId)
+          || null
 
         if (relatedListing) {
-          await createQrCodesForExchange(relatedListing, approvedRequest)
+          generatedQrCodes = await createQrCodesForExchange(relatedListing, approvedRequest)
         }
       }
 
-      return approvedRequest
+      const refreshed = refreshClaimRequests({ reason: 'approval', silent: true }).catch(() => [])
+
+      if (approvedRequest) {
+        const qrCodes = generatedQrCodes ? [generatedQrCodes.donorQr, generatedQrCodes.collectorQr] : []
+        window.dispatchEvent(new CustomEvent('partner-claim-ready', { detail: { request: approvedRequest, qrCodes, listing: relatedListing } }))
+      }
+
+      await refreshed
+
+      if (!approvedRequest) return null
+
+      const qrCodes = generatedQrCodes ? [generatedQrCodes.donorQr, generatedQrCodes.collectorQr] : undefined
+      return { request: approvedRequest, qrCodes, listing: relatedListing }
     },
-    [claimRequests, globalListings, userListings, createQrCodesForExchange],
+    [claimRequests, globalListings, userListings, createQrCodesForExchange, refreshClaimRequests],
   )
 
   const completeClaimRequest = useCallback((requestId: string, rewardPoints = 25): CompleteRequestResult | null => {
@@ -320,6 +377,7 @@ export function useExchangeManager() {
     submitClaimRequest,
     confirmClaimRequest,
     completeClaimRequest,
+    refreshClaimRequests,
     getRequestsForItem,
     getRequestsForDonor,
     getClaimRequestById,

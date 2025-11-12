@@ -7,12 +7,19 @@ import type { NotificationViewModel } from '@/lib/api/types'
 
 import type { Notification } from '@/components/NotificationList'
 
+type NotificationData = Record<string, any>
+
+function normalizeData(data: unknown): NotificationData {
+  if (data && typeof data === 'object') return data as NotificationData
+  return {}
+}
+
 type NotificationInput = Omit<Notification, 'id' | 'createdAt'>
 
 const generateNotificationId = () =>
   `notif_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
 
-function mapServerToUi(n: NotificationViewModel): Notification {
+export function mapServerToUi(n: NotificationViewModel): Notification {
   // Map backend types to UI categories/urgency
   let uiType: Notification['type'] = 'system'
   let urgency: Notification['urgency'] = 'low'
@@ -22,6 +29,18 @@ function mapServerToUi(n: NotificationViewModel): Notification {
   else if (t === 'item.collection' || t === 'dropoff.created' || t === 'dropin.created' || t === 'pickup.created') {
     uiType = 'system'; urgency = 'medium'
   } else { uiType = 'system'; urgency = 'low' }
+
+  const data = normalizeData(n?.data)
+  const nestedItem = normalizeData(data.item)
+  const nestedClaim = normalizeData(data.claim)
+  const nestedRequester = normalizeData(data.requester || data.collector || data.user)
+
+  const itemId = data.itemId || data.item_id || nestedItem.id || nestedClaim.item_id || nestedClaim.itemId
+  const itemTitle = data.itemTitle || nestedItem.title || nestedClaim.item_title || undefined
+  const claimId = data.claimId || data.claim_id || nestedClaim.id
+  const requesterId = data.requesterId || data.collectorId || nestedRequester.id
+  const requesterName = data.requesterName || nestedRequester.name || [nestedRequester.first_name, nestedRequester.last_name].filter(Boolean).join(' ')
+  const requesterAvatar = data.requesterAvatar || nestedRequester.avatar || nestedRequester.profile_image
 
   return {
     id: n.id,
@@ -33,18 +52,21 @@ function mapServerToUi(n: NotificationViewModel): Notification {
     createdAt: n.createdAt,
     read: Boolean(n.read),
     actionUrl: undefined,
-    metadata: n?.data && typeof n.data === 'object' ? {
-      itemId: (n.data as any).itemId,
-      itemTitle: (n.data as any).itemTitle,
-      requesterId: (n.data as any).requesterId,
-      requesterName: (n.data as any).requesterName,
+    metadata: {
+      itemId: itemId ? String(itemId) : undefined,
+      itemTitle: itemTitle ? String(itemTitle) : undefined,
+      claimId: claimId ? String(claimId) : undefined,
+      requesterId: requesterId ? String(requesterId) : undefined,
+      requesterName: requesterName ? String(requesterName) : undefined,
+      requesterAvatar: requesterAvatar ? String(requesterAvatar) : undefined,
       rawType: n.type,
-    } : undefined,
+    },
   }
 }
 
 export function useNotifications() {
   const [notifications, setNotifications] = useKV<Notification[]>('user-notifications', [])
+  const [currentUser] = useKV<{ id: string; userType?: string } | null>('current-user', null)
 
   // Load unread notifications from server and connect WS
   useEffect(() => {
@@ -80,13 +102,25 @@ export function useNotifications() {
       if (ui.title) {
         toast.info(ui.title, { description: ui.message })
       }
+
+      if (String(n.type || '').toLowerCase() === 'item.claim.request' && currentUser?.userType === 'donor') {
+        window.dispatchEvent(new CustomEvent('exchange-claims-refresh-requested', {
+          detail: {
+            reason: 'notification',
+            silent: true,
+            itemId: ui.metadata?.itemId,
+            claimId: ui.metadata?.claimId,
+            requesterId: ui.metadata?.requesterId,
+          },
+        }))
+      }
     }
     notificationSocket.onNotificationNew(onNew)
     return () => {
       cancelled = true
       notificationSocket.offNotificationNew(onNew)
     }
-  }, [setNotifications])
+  }, [setNotifications, currentUser?.userType])
 
   // Allow local/manual injection (used by some flows)
   const addNotification = useCallback(

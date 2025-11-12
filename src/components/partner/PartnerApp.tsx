@@ -1,17 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { House, Package, Storefront as StorefrontIcon, UserCircle, WarningCircle, QrCode } from '@phosphor-icons/react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { House, Package, Storefront as StorefrontIcon, UserCircle, WarningCircle, QrCode, CheckCircle } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { clearTokens, listMyShops, listPartnerItems, type MinimalUser, type PartnerShopItem, type ShopDto } from '@/lib/api'
-import { kvDelete } from '@/lib/kvStore'
+import { kvDelete, kvGet } from '@/lib/kvStore'
 import { toast } from 'sonner'
 import { PartnerHome } from './PartnerHome'
 import { PartnerItems } from './PartnerItems'
 import { PartnerShops } from './PartnerShops'
 import { PartnerProfile } from './PartnerProfile'
 import { PartnerScanModal } from './PartnerScanModal'
+import type { QRCodeData } from '@/components/QRCode'
+import type { ClaimRequest } from '@/hooks/useExchangeManager'
 
 interface PartnerAppProps {
   route: 'home' | 'items' | 'shops' | 'profile'
@@ -31,6 +33,7 @@ export function PartnerApp({ route, onNavigate }: PartnerAppProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [scanOpen, setScanOpen] = useState(false)
+  const [latestReadyForPickup, setLatestReadyForPickup] = useState<{ request: ClaimRequest; qrCodes: QRCodeData[] } | null>(null)
 
   const navItems: NavItem[] = useMemo(() => [
     { key: 'home', label: 'Overview', icon: House },
@@ -70,6 +73,48 @@ export function PartnerApp({ route, onNavigate }: PartnerAppProps) {
     fetchData(true)
   }, [fetchData])
 
+  useEffect(() => {
+    const handlePartnerReady = (event: Event) => {
+      const detail = (event as CustomEvent<{ request: ClaimRequest; qrCodes?: QRCodeData[] }>).detail
+      if (!detail?.request) return
+
+      setItems(prev => prev.map(item => (
+        item.id === detail.request.itemId
+          ? {
+              ...item,
+              status: 'awaiting_collection',
+              claim_status: 'approved',
+              updated_at: new Date().toISOString(),
+            }
+          : item
+      )))
+
+      void (async () => {
+        let qrCodes = Array.isArray(detail.qrCodes) ? detail.qrCodes : []
+        if (!qrCodes.length) {
+          try {
+            const stored = await kvGet<QRCodeData[]>('global-qr-codes') || []
+            qrCodes = stored.filter(code => code.itemId === detail.request.itemId)
+          } catch (err) {
+            console.error('Failed to load QR codes for partner view', err)
+          }
+        }
+
+        setLatestReadyForPickup({ request: detail.request, qrCodes })
+        toast.success(`"${detail.request.itemTitle}" ready for pickup`, {
+          description: `${detail.request.collectorName} can now collect this item at your shop.`,
+        })
+      })()
+
+      void fetchData()
+    }
+
+    window.addEventListener('partner-claim-ready', handlePartnerReady as EventListener)
+    return () => {
+      window.removeEventListener('partner-claim-ready', handlePartnerReady as EventListener)
+    }
+  }, [fetchData])
+
   const handleSignOut = useCallback(async () => {
     try { await clearTokens() } catch {}
     try { await kvDelete('current-user') } catch {}
@@ -83,7 +128,7 @@ export function PartnerApp({ route, onNavigate }: PartnerAppProps) {
 
   const activeNav = navItems.find(item => item.key === route) ?? navItems[0]
 
-  let content = null
+  let content: ReactNode = null
   if (!partner) {
     content = (
       <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
@@ -168,6 +213,44 @@ export function PartnerApp({ route, onNavigate }: PartnerAppProps) {
           <Alert variant="destructive" className="mb-6">
             <WarningCircle size={18} />
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {latestReadyForPickup && (
+          <Alert className="mb-6 border-l-4 border-l-emerald-500 bg-emerald-500/5">
+            <CheckCircle size={18} className="text-emerald-600" />
+            <AlertTitle>Ready for pickup</AlertTitle>
+            <AlertDescription className="space-y-3">
+              <div>
+                <p className="text-sm text-foreground">
+                  "{latestReadyForPickup.request.itemTitle}" has been approved for {latestReadyForPickup.request.collectorName}.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Share the QR codes below to release the item once the collector arrives.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {latestReadyForPickup.qrCodes.length === 0 ? (
+                  <p className="text-xs italic text-muted-foreground">
+                    QR codes are syncing from the donor dashboard. Refresh if they do not appear.
+                  </p>
+                ) : (
+                  latestReadyForPickup.qrCodes.map(code => (
+                    <Badge key={code.id} variant="outline" className="text-xs">
+                      {code.type === 'donor' ? 'Donor QR' : 'Collector QR'} · {code.transactionId.slice(-6)}
+                    </Badge>
+                  ))
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={() => setScanOpen(true)}>
+                  <QrCode size={14} className="mr-1" />
+                  Open QR hub
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setLatestReadyForPickup(null)}>
+                  Dismiss
+                </Button>
+              </div>
+            </AlertDescription>
           </Alert>
         )}
         {content}
