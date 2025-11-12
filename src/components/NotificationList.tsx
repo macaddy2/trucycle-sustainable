@@ -11,7 +11,8 @@ import {
   Heart,
   ArrowsClockwise,
   Clock,
-  X
+  X,
+  UserCircle
 } from '@phosphor-icons/react'
 
 export interface Notification {
@@ -27,8 +28,10 @@ export interface Notification {
   metadata?: {
     itemId?: string
     itemTitle?: string
+    claimId?: string
     requesterId?: string
     requesterName?: string
+    requesterAvatar?: string
     rawType?: string
   }
 }
@@ -202,6 +205,17 @@ export function NotificationList({
                               <Package size={10} className="mr-1" />
                               {notification.metadata.itemTitle}
                             </Badge>
+                          </div>
+                        )}
+                        {notification.metadata?.requesterName && (
+                          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                            <UserCircle size={12} />
+                            <span>Requester: {notification.metadata.requesterName}</span>
+                          </div>
+                        )}
+                        {notification.metadata?.claimId && (
+                          <div className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground/80">
+                            Claim #{notification.metadata.claimId}
                           </div>
                         )}
                       </div>
