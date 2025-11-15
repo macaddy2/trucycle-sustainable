@@ -8,6 +8,8 @@ type ReadAckHandler = (p: { count: number }) => void
 class NotificationSocket {
   private socket: Socket | null = null
   private connecting = false
+  private newHandlers: NotificationNewHandler[] = []
+  private readAckHandlers: ReadAckHandler[] = []
 
   async connect(): Promise<Socket | null> {
     if (this.socket && this.socket.connected) return this.socket
@@ -24,6 +26,9 @@ class NotificationSocket {
         auth: { token },
         transports: ['websocket'],
       })
+      // Re-attach any handlers registered before connection was created
+      this.newHandlers.forEach(h => this.socket!.on('notification:new', h))
+      this.readAckHandlers.forEach(h => this.socket!.on('notification:read:ack', h))
       this.socket.once('connect', () => { this.connecting = false })
       this.socket.once('connect_error', () => { this.connecting = false })
       return this.socket
@@ -67,10 +72,29 @@ class NotificationSocket {
     })
   }
 
-  onNotificationNew(handler: NotificationNewHandler) { this.socket?.on('notification:new', handler) }
-  offNotificationNew(handler: NotificationNewHandler) { this.socket?.off('notification:new', handler) }
-  onReadAck(handler: ReadAckHandler) { this.socket?.on('notification:read:ack', handler) }
-  offReadAck(handler: ReadAckHandler) { this.socket?.off('notification:read:ack', handler) }
+  onNotificationNew(handler: NotificationNewHandler) {
+    this.newHandlers.push(handler)
+    if (this.socket) {
+      this.socket.on('notification:new', handler)
+    }
+  }
+
+  offNotificationNew(handler: NotificationNewHandler) {
+    this.newHandlers = this.newHandlers.filter(h => h !== handler)
+    this.socket?.off('notification:new', handler)
+  }
+
+  onReadAck(handler: ReadAckHandler) {
+    this.readAckHandlers.push(handler)
+    if (this.socket) {
+      this.socket.on('notification:read:ack', handler)
+    }
+  }
+
+  offReadAck(handler: ReadAckHandler) {
+    this.readAckHandlers = this.readAckHandlers.filter(h => h !== handler)
+    this.socket?.off('notification:read:ack', handler)
+  }
 }
 
 export const notificationSocket = new NotificationSocket()

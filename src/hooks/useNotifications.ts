@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { listNotifications } from '@/lib/api/client'
 import { notificationSocket } from '@/lib/notifications/socket'
 import type { NotificationViewModel } from '@/lib/api/types'
+import { playNotificationSound } from '@/lib/notificationSound'
 
 import type { Notification } from '@/components/NotificationList'
 
@@ -80,6 +81,7 @@ export function useNotifications() {
       if (ui.title) {
         toast.info(ui.title, { description: ui.message })
       }
+      playNotificationSound()
     }
     notificationSocket.onNotificationNew(onNew)
     return () => {

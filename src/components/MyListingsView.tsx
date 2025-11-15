@@ -362,7 +362,7 @@ export function MyListingsView({
         : detailItem?.location?.address_line || 'Partner location shared after confirmation')
     : (selectedListing?.location || detailItem?.location?.address_line || 'Pickup location to be confirmed in chat')
   const isDonation = selectedListing?.actionType === 'donate'
-  const showCollectorRequests = !isCollector && !isDonation
+  const showCollectorRequests = !isCollector
   const detailOwner = detailItem?.owner
 
   const collectorRequestForItem = useMemo(() => {
