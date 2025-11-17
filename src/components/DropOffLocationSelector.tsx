@@ -8,6 +8,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { MapPin, Clock, Phone, NavigationArrow, Storefront, XCircle } from '@phosphor-icons/react'
 import type { DropOffLocation } from './dropOffLocations'
+import { DROP_OFF_LOCATIONS } from './dropOffLocations'
 import { useKV } from '@/hooks/useKV'
 import { shopsNearby, type NearbyShop } from '@/lib/api'
 
@@ -106,12 +107,16 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
             : (((res as any)?.data ?? []) as NearbyShop[])
         if (cancelled) return
         const mapped = data.map((s, i) => shopToLocation(s, i))
-        setRemoteLocations(mapped)
-        if (!selectedLocation && mapped.length > 0 && !activeLocationId) {
-          setActiveLocationId(mapped[0].id)
+        const locations = mapped.length > 0 ? mapped : DROP_OFF_LOCATIONS
+        setRemoteLocations(locations)
+        if (!selectedLocation && locations.length > 0 && !activeLocationId) {
+          setActiveLocationId(locations[0].id)
         }
       } catch {
-        setRemoteLocations([])
+        setRemoteLocations(DROP_OFF_LOCATIONS)
+        if (!selectedLocation && !activeLocationId && DROP_OFF_LOCATIONS.length > 0) {
+          setActiveLocationId(DROP_OFF_LOCATIONS[0].id)
+        }
       }
     }
     load()
