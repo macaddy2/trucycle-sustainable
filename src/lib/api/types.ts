@@ -419,6 +419,7 @@ export interface DropoffScanDto {
 export interface ShopScanDto {
   shop_id: string
   notes?: string
+  claim_id?: string
 }
 
 export interface DropoffInResult {
