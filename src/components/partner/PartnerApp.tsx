@@ -173,6 +173,10 @@ export function PartnerApp({ route, onNavigate }: PartnerAppProps) {
                 </Button>
               ))}
             </nav>
+            <Button className="gap-2" onClick={() => setScanOpen(true)}>
+              <QrCode size={18} />
+              Scan QR code
+            </Button>
             <Button variant="outline" className="gap-2" asChild>
               <a href={homeHref}>
                 <ArrowSquareOut size={18} />
