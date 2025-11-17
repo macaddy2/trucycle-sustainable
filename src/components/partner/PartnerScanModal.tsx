@@ -190,6 +190,15 @@ export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModal
       itemView?.claim?.id ||
       itemView?.claim_id
   )
+  const claimId = useMemo(() => {
+    return (
+      itemDetails?.claim_id ||
+      itemDetails?.claim?.id ||
+      itemView?.claim?.id ||
+      itemView?.claim_id ||
+      null
+    )
+  }, [itemDetails, itemView])
   const { dropoffAllowed, pickupAllowed, actionMode } = useMemo(
     () => computePartnerScanState({ pickupStatus, pickupOption, hasClaimContext }),
     [pickupStatus, pickupOption, hasClaimContext]
@@ -201,7 +210,7 @@ export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModal
     !selectedShopId ||
     !itemId ||
     (actionMode === 'dropoff' && !dropoffAllowed) ||
-    (actionMode === 'pickup' && !pickupAllowed)
+    (actionMode === 'pickup' && (!pickupAllowed || !claimId))
 
   const extractItemId = useCallback((payload: string): string | null => {
     const match = payload.match(UUID_RE)
@@ -455,6 +464,7 @@ export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModal
       } else {
         const res = await qrClaimOut(id, {
           shop_id: selectedShopId,
+          ...(claimId ? { claim_id: claimId } : {}),
         })
         toast.success(res?.data?.scan_result ? `Pickup ${res.data.scan_result}` : 'Pickup confirmed', {
           description: shopName ? `Logged at ${shopName}` : undefined,
