@@ -2,7 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { House, Package, Storefront as StorefrontIcon, UserCircle, WarningCircle, QrCode } from '@phosphor-icons/react'
+import {
+  House,
+  Package,
+  Storefront as StorefrontIcon,
+  UserCircle,
+  WarningCircle,
+  QrCode,
+  ArrowSquareOut,
+} from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { clearTokens, listMyShops, listPartnerItems, type MinimalUser, type PartnerShopItem, type ShopDto } from '@/lib/api'
 import { kvDelete } from '@/lib/kvStore'
@@ -31,6 +39,13 @@ export function PartnerApp({ route, onNavigate }: PartnerAppProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [scanOpen, setScanOpen] = useState(false)
+
+  const homeHref = useMemo(() => {
+    const base = (import.meta as any).env?.BASE_URL || '/'
+    const baseNormalized = String(base || '/').replace(/\/$/, '')
+    const target = `${baseNormalized}/home`.replace(/\/+/g, '/').replace(/\/$/, '')
+    return target || '/home'
+  }, [])
 
   const navItems: NavItem[] = useMemo(() => [
     { key: 'home', label: 'Overview', icon: House },
@@ -75,11 +90,8 @@ export function PartnerApp({ route, onNavigate }: PartnerAppProps) {
     try { await kvDelete('current-user') } catch {}
     setPartner(null)
     toast.success('Signed out')
-    const base = (import.meta as any).env?.BASE_URL || '/'
-    const baseNormalized = String(base || '/').replace(/\/$/, '')
-    const target = `${baseNormalized}/home`.replace(/\/+/g, '/').replace(/\/$/, '')
-    window.location.href = target
-  }, [setPartner])
+    window.location.href = homeHref
+  }, [homeHref, setPartner])
 
   const activeNav = navItems.find(item => item.key === route) ?? navItems[0]
 
@@ -147,19 +159,27 @@ export function PartnerApp({ route, onNavigate }: PartnerAppProps) {
               <Badge variant="outline" className="ml-2">{partner.firstName}</Badge>
             )}
           </div>
-          <nav className="flex flex-wrap items-center gap-2">
-            {navItems.map(item => (
-              <Button
-                key={item.key}
-                variant={item.key === activeNav.key ? 'secondary' : 'ghost'}
-                className="gap-2"
-                onClick={() => onNavigate(item.key)}
-              >
-                <item.icon size={18} />
-                {item.label}
-              </Button>
-            ))}
-          </nav>
+          <div className="flex flex-wrap items-center gap-2">
+            <nav className="flex flex-wrap items-center gap-2">
+              {navItems.map(item => (
+                <Button
+                  key={item.key}
+                  variant={item.key === activeNav.key ? 'secondary' : 'ghost'}
+                  className="gap-2"
+                  onClick={() => onNavigate(item.key)}
+                >
+                  <item.icon size={18} />
+                  {item.label}
+                </Button>
+              ))}
+            </nav>
+            <Button variant="outline" className="gap-2" asChild>
+              <a href={homeHref}>
+                <ArrowSquareOut size={18} />
+                Exit to home
+              </a>
+            </Button>
+          </div>
         </div>
       </header>
 
