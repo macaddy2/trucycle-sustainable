@@ -34,6 +34,48 @@ interface PartnerScanModalProps {
 
 type ScanMode = 'dropoff' | 'pickup'
 
+const PRE_DROPOFF_STATUSES = new Set(['pending_dropoff', 'active'])
+
+export interface PartnerScanStateInput {
+  pickupStatus?: string | null
+  pickupOption?: string | null
+  hasClaimContext: boolean
+}
+
+export interface PartnerScanStateResult {
+  normalizedStatus: string | null
+  dropoffAllowed: boolean
+  pickupAllowed: boolean
+  actionMode: ScanMode
+}
+
+export function normalizeItemStatus(status?: string | null) {
+  if (!status) return null
+  const normalized = String(status).trim().toLowerCase()
+  return normalized || null
+}
+
+export function computePartnerScanState({
+  pickupStatus,
+  pickupOption,
+  hasClaimContext,
+}: PartnerScanStateInput): PartnerScanStateResult {
+  const normalizedStatus = normalizeItemStatus(pickupStatus)
+  const normalizedPickupOption = pickupOption ? String(pickupOption).trim().toLowerCase() : null
+  const isDonate = normalizedPickupOption === 'donate'
+  const isPreDropoffStatus = !normalizedStatus || PRE_DROPOFF_STATUSES.has(normalizedStatus)
+  const dropoffAllowed = isDonate && (isPreDropoffStatus || !hasClaimContext)
+  const pickupAllowed = normalizedStatus === 'awaiting_collection'
+  const actionMode: ScanMode = dropoffAllowed ? 'dropoff' : pickupAllowed ? 'pickup' : 'dropoff'
+
+  return {
+    normalizedStatus,
+    dropoffAllowed,
+    pickupAllowed,
+    actionMode,
+  }
+}
+
 interface ScanRecord {
   id: string
   mode: ScanMode
@@ -140,18 +182,26 @@ export function PartnerScanModal({ open, onOpenChange, shops }: PartnerScanModal
     return () => cancelAnimationFrame(frame)
   }, [itemId])
 
-  const dropoffAllowed = itemDetails?.status === 'pending_dropoff'
   const pickupStatus = itemDetails?.status ?? itemView?.status
   const pickupOption = itemDetails?.pickup_option ?? itemView?.pickup_option
-  const pickupAllowed = pickupStatus === 'awaiting_collection'
-  const hasStatusContext = Boolean(itemDetails?.status || itemView?.status)
-  const actionMode: ScanMode = dropoffAllowed ? 'dropoff' : (hasStatusContext ? 'pickup' : 'dropoff')
+  const hasClaimContext = Boolean(
+    itemDetails?.claim_id ||
+      itemDetails?.claim?.id ||
+      itemView?.claim?.id ||
+      itemView?.claim_id
+  )
+  const { dropoffAllowed, pickupAllowed, actionMode } = useMemo(
+    () => computePartnerScanState({ pickupStatus, pickupOption, hasClaimContext }),
+    [pickupStatus, pickupOption, hasClaimContext]
+  )
+  const hasStatusContext = Boolean(pickupStatus)
   const confirmDisabled =
     isProcessing ||
     !hasShops ||
     !selectedShopId ||
     !itemId ||
-    (actionMode === 'dropoff' ? !dropoffAllowed : !pickupAllowed)
+    (actionMode === 'dropoff' && !dropoffAllowed) ||
+    (actionMode === 'pickup' && !pickupAllowed)
 
   const extractItemId = useCallback((payload: string): string | null => {
     const match = payload.match(UUID_RE)
