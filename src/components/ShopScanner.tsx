@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,32 +8,16 @@ import { QrCode, Scan, Package, User, MapPin, CheckCircle, X, ArrowRight, Clock,
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import { kvGet, kvSet } from '@/lib/kvStore'
-
-interface QRCodeData {
-  id: string
-  type: 'donor' | 'collector'
-  itemId: string
-  itemTitle: string
-  userId: string
-  userName: string
-  transactionId: string
-  dropOffLocation?: string
-  metadata: {
-    category: string
-    condition: string
-    estimatedWeight?: number
-    co2Impact: number
-    createdAt: string
-    expiresAt: string
-  }
-  status: 'active' | 'scanned' | 'expired' | 'completed'
-}
+import { useExchangeManager } from '@/hooks'
+import type { ManagedListing } from '@/types/listings'
+import type { QRCodeData } from './QRCode'
 
 interface ScannedTransaction {
   qrData: QRCodeData
   scannedAt: string
   shopNotes?: string
   shopAttendant?: string
+  stage: 'dropoff' | 'collection'
 }
 
 interface ShopScannerProps {
@@ -46,11 +30,16 @@ export function ShopScanner({ onClose }: ShopScannerProps = {}) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [shopNotes, setShopNotes] = useState('')
   const [attendantName, setAttendantName] = useState('')
-  
+
   // Shop transaction history
   const [shopTransactions, setShopTransactions] = useKV<ScannedTransaction[]>('shop-transactions', [])
+  const [, setUserListings] = useKV<ManagedListing[]>('user-listings', [])
+  const [, setGlobalListings] = useKV<ManagedListing[]>('global-listings', [])
+  const [, setUserQrCodes] = useKV<QRCodeData[]>('user-qr-codes', [])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const { completeClaimRequest, getRequestsForItem } = useExchangeManager()
 
   const totalTransactions = shopTransactions.length
   const dropOffCount = shopTransactions.filter(transaction => transaction.qrData.type === 'donor').length
@@ -101,6 +90,33 @@ export function ShopScanner({ onClose }: ShopScannerProps = {}) {
     }
   }
 
+  const applyListingPatch = useCallback((itemId: string, patch: Partial<ManagedListing>) => {
+    if (!itemId) return
+    setUserListings(prev => prev.map(listing => listing.id === itemId ? { ...listing, ...patch } : listing))
+    setGlobalListings(prev => prev.map(listing => listing.id === itemId ? { ...listing, ...patch } : listing))
+  }, [setUserListings, setGlobalListings])
+
+  const finalizeClaimForItem = useCallback((itemId: string) => {
+    if (!itemId) return
+    const requests = getRequestsForItem(itemId)
+    const target = requests.find((request) => request.status === 'approved')
+      || requests.find((request) => request.status === 'pending')
+    if (target) {
+      completeClaimRequest(target.id)
+    }
+  }, [getRequestsForItem, completeClaimRequest])
+
+  const syncUserQrCodes = useCallback((transactionId: string, stage: 'dropoff' | 'collection') => {
+    if (!transactionId) return
+    setUserQrCodes(prev => prev.map((qr) => {
+      if (qr.transactionId !== transactionId) return qr
+      if (stage === 'dropoff') {
+        return qr.type === 'donor' ? { ...qr, status: 'scanned' as const } : qr
+      }
+      return { ...qr, status: 'completed' as const }
+    }))
+  }, [setUserQrCodes])
+
   const handleConfirmTransaction = async () => {
     if (!scannedData || !attendantName.trim()) {
       toast.error('Please enter attendant name')
@@ -110,28 +126,44 @@ export function ShopScanner({ onClose }: ShopScannerProps = {}) {
     try {
       // Update QR code status in global registry
       const globalQRCodes = await kvGet<QRCodeData[]>('global-qr-codes') || []
-      const updatedQRCodes = globalQRCodes.map(qr => 
-        qr.transactionId === scannedData.transactionId 
-          ? { 
-              ...qr, 
-              status: (scannedData.type === 'donor' ? 'scanned' : 'completed') as const 
-            }
-          : qr
-      )
+      const stage: 'dropoff' | 'collection' = scannedData.type === 'donor' ? 'dropoff' : 'collection'
+      const updatedQRCodes = globalQRCodes.map(qr => {
+        if (qr.transactionId !== scannedData.transactionId) return qr
+        if (stage === 'dropoff') {
+          return qr.type === 'donor'
+            ? { ...qr, status: 'scanned' as const }
+            : qr
+        }
+        return { ...qr, status: 'completed' as const }
+      })
       await kvSet('global-qr-codes', updatedQRCodes)
+      syncUserQrCodes(scannedData.transactionId, stage)
 
       // Record transaction in shop history
       const transaction: ScannedTransaction = {
         qrData: scannedData,
         scannedAt: new Date().toISOString(),
         shopNotes: shopNotes.trim() || undefined,
-        shopAttendant: attendantName.trim()
+        shopAttendant: attendantName.trim(),
+        stage,
       }
 
       setShopTransactions(prev => [transaction, ...prev])
 
+      if (stage === 'dropoff') {
+        applyListingPatch(scannedData.itemId, { status: 'active' })
+      } else {
+        const completionTimestamp = new Date().toISOString()
+        applyListingPatch(scannedData.itemId, {
+          status: 'collected',
+          claimStatus: 'completed',
+          claimCompletedAt: completionTimestamp,
+        })
+        finalizeClaimForItem(scannedData.itemId)
+      }
+
       // Send notification to relevant users (in real app, this would be through the notification system)
-      if (scannedData.type === 'donor') {
+      if (stage === 'dropoff') {
         toast.success('Item received! Collector will be notified.')
       } else {
         toast.success('Item released to collector!')
