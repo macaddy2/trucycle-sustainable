@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Eye, EyeSlash, EnvelopeSimple } from '@phosphor-icons/react'
 import { login as apiLogin, register as apiRegister, me as apiMe } from '@/lib/api'
 import type { RegisterDto } from '@/lib/api'
+import { sanitizeEmail, sanitizeText, validatePasswordStrength } from '@/lib/validation'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
@@ -60,50 +61,58 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
   }
 
   const validateForm = () => {
-    if (!formData.email || !formData.password) {
+    const email = sanitizeEmail(formData.email)
+    const password = formData.password.trim()
+    const confirmPassword = formData.confirmPassword.trim()
+    const name = sanitizeText(formData.name, { maxLength: 120 })
+
+    if (!email || !password) {
       toast.error('Please fill in all required fields')
       return false
     }
 
-    if (mode === 'signup') {
-      if (!formData.name) {
-        toast.error('Please enter your full name')
-        return false
-      }
-      if (formData.password !== formData.confirmPassword) {
-        toast.error('Passwords do not match')
-        return false
-      }
-      if (formData.password.length < 6) {
-        toast.error('Password must be at least 6 characters long')
-        return false
-      }
-    }
-
-    if (!EMAIL_REGEX.test(formData.email.trim())) {
+    if (!EMAIL_REGEX.test(email)) {
       toast.error('Please enter a valid email address')
       return false
     }
 
-    return true
+    if (mode === 'signup') {
+      if (!name) {
+        toast.error('Please enter your full name')
+        return false
+      }
+      if (password !== confirmPassword) {
+        toast.error('Passwords do not match')
+        return false
+      }
+      const passwordCheck = validatePasswordStrength(password)
+      if (!passwordCheck.valid) {
+        toast.error(passwordCheck.message || 'Password is too weak')
+        return false
+      }
+    }
+
+    return { email, password, confirmPassword, name }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!validateForm()) return
+    const validated = validateForm()
+    if (!validated) return
 
     setIsLoading(true)
 
     try {
-      const normalizedEmail = formData.email.trim().toLowerCase()
+      const normalizedEmail = validated.email
+      const normalizedPassword = validated.password
 
       if (mode === 'signup') {
-        const [first, ...rest] = formData.name.trim().split(' ')
+        const [first, ...rest] = validated.name.split(' ')
         const dto: RegisterDto = {
           first_name: first || '',
           last_name: rest.join(' ') || first || '',
           email: normalizedEmail,
-          password: formData.password,
+          password: normalizedPassword,
           role: 'customer',
         }
         const res = await apiRegister(dto)
@@ -115,7 +124,7 @@ export function AuthDialog({ open, onOpenChange, initialMode = 'signin' }: AuthD
         )
         onOpenChange(false)
       } else {
-        const res = await apiLogin({ email: normalizedEmail, password: formData.password })
+        const res = await apiLogin({ email: normalizedEmail, password: normalizedPassword })
         const user = res?.data?.user as { id: string; email: string; firstName?: string; lastName?: string; status?: string; roles?: string[]; role?: string } | undefined
         if (user) {
           let profile: UserProfile = {

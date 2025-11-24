@@ -22,6 +22,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { uploadImageToCloudinary } from '@/lib/cloudinary'
 import { createItem, updateItem } from '@/lib/api'
 import { LocationSelector } from '@/components/LocationSelector'
+import { sanitizeMultilineText, sanitizeText, validateImageFile } from '@/lib/validation'
+
+const MAX_LISTING_IMAGE_BYTES = 5 * 1024 * 1024
+const LISTING_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
 
 const CONDITIONS = [
   { value: 'excellent', label: 'Excellent', description: 'Like new, minimal wear' },
@@ -326,17 +330,17 @@ export function ItemListingForm({
     setQuickStartIntent(actionType)
     setShowQuickStart(false)
     setFormData({
-      title: editingListing.title ?? '',
-      description: editingListing.description ?? '',
+      title: sanitizeText(editingListing.title ?? '', { maxLength: 120 }),
+      description: sanitizeMultilineText(editingListing.description ?? '', { maxLength: 1200 }),
       category: editingListing.category || DEFAULT_CATEGORY_BY_INTENT[actionType],
       condition: normalizeCondition(editingListing.condition),
       actionType,
       photos: editingListing.photos ?? [],
-      location: method === 'pickup' ? (editingListing.location ?? '') : '',
+      location: method === 'pickup' ? sanitizeText(editingListing.location ?? '', { maxLength: 180 }) : '',
       contactMethod: 'platform',
       fulfillmentMethod: method,
       dropOffLocation: method === 'dropoff' ? editingListing.dropOffLocation ?? null : null,
-      handoverNotes: editingListing.handoverNotes ?? '',
+      handoverNotes: sanitizeMultilineText(editingListing.handoverNotes ?? '', { maxLength: 600 }),
       preferPartnerSupport:
         typeof editingListing.preferPartnerSupport === 'boolean'
           ? editingListing.preferPartnerSupport
@@ -425,9 +429,24 @@ export function ItemListingForm({
     };
   }, [photos, description, title]);
 
+  const sanitizeFieldValue = (field: string, value: string): string => {
+    switch (field) {
+      case 'title':
+        return sanitizeText(value, { maxLength: 120 })
+      case 'description':
+        return sanitizeMultilineText(value, { maxLength: 1200 })
+      case 'handoverNotes':
+        return sanitizeMultilineText(value, { maxLength: 600 })
+      case 'location':
+        return sanitizeText(value, { maxLength: 180 })
+      default:
+        return value
+    }
+  }
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    const sanitizedValue = sanitizeFieldValue(field, value)
+    setFormData(prev => ({ ...prev, [field]: sanitizedValue }))
   }
 
   const handlePhotoUpload = () => {
@@ -438,6 +457,11 @@ export function ItemListingForm({
     const file = event.target.files?.[0]
     if (!file) return
     event.target.value = ''
+    const validation = validateImageFile(file, { maxSizeBytes: MAX_LISTING_IMAGE_BYTES, allowedMimeTypes: LISTING_IMAGE_TYPES })
+    if (!validation.ok) {
+      toast.error(validation.reason || 'This image cannot be uploaded')
+      return
+    }
     try {
       const upload = await uploadImageToCloudinary(file, { alt: formData.title || 'listing-image' })
       setFormData(prev => ({ ...prev, photos: [...prev.photos, upload.secureUrl] }))
@@ -461,7 +485,7 @@ export function ItemListingForm({
     setFormData(prev => ({
       ...prev,
       fulfillmentMethod: 'pickup',
-      location: defaultPickupAddress,
+      location: sanitizeText(defaultPickupAddress, { maxLength: 180 }),
     }))
     toast.success('Pickup area updated from your saved profile details')
   }, [defaultPickupAddress])
@@ -507,7 +531,7 @@ export function ItemListingForm({
     if (!browseLocation?.lat || !browseLocation?.lng) return
     if (pickupLocation) return
 
-    const label = browseLocation.label || ''
+    const label = sanitizeText(browseLocation.label || '', { maxLength: 180 })
     setPickupLocation({ lat: browseLocation.lat, lng: browseLocation.lng, label })
     if (!formData.location && label) {
       setFormData(prev => ({ ...prev, location: label }))
@@ -531,7 +555,7 @@ export function ItemListingForm({
       condition: DEFAULT_CONDITION_BY_INTENT[intent],
       preferPartnerSupport: intent === 'donate' ? true : prev.preferPartnerSupport,
       handoverNotes: prev.handoverNotes,
-      location: intent === 'exchange' && defaultPickupAddress ? defaultPickupAddress : prev.location,
+      location: intent === 'exchange' && defaultPickupAddress ? sanitizeText(defaultPickupAddress, { maxLength: 180 }) : prev.location,
     }))
 
     const nextFulfillment: 'pickup' | 'dropoff' = intent === 'donate' ? 'dropoff' : 'pickup'
@@ -563,7 +587,7 @@ export function ItemListingForm({
       actionType: initialIntent,
       category: DEFAULT_CATEGORY_BY_INTENT[initialIntent],
       condition: DEFAULT_CONDITION_BY_INTENT[initialIntent],
-      location: initialIntent === 'exchange' && defaultPickupAddress ? defaultPickupAddress : prev.location,
+      location: initialIntent === 'exchange' && defaultPickupAddress ? sanitizeText(defaultPickupAddress, { maxLength: 180 }) : prev.location,
     }))
     handleFulfillmentSelect(defaultMethod)
     onIntentHandled?.()
@@ -573,7 +597,7 @@ export function ItemListingForm({
     setFormData(prev => ({
       ...prev,
       dropOffLocation: location,
-      location: location.address,
+      location: sanitizeText(location.address, { maxLength: 180 }),
       fulfillmentMethod: 'dropoff'
     }))
     setShowDropOffSelector(false)
@@ -602,7 +626,7 @@ export function ItemListingForm({
       ...prev,
       fulfillmentMethod: 'dropoff',
       dropOffLocation: prefillDropOffLocation,
-      location: prefillDropOffLocation.address
+      location: sanitizeText(prefillDropOffLocation.address, { maxLength: 180 })
     }))
     setShowDropOffSelector(false)
     onDropOffPrefillHandled?.()
@@ -659,13 +683,18 @@ export function ItemListingForm({
         : undefined
       const rewardPoints = listingValuation?.rewardPoints ?? Math.round(carbonImpact * 8)
 
+      const safeTitle = sanitizeText(formData.title, { maxLength: 120 })
+      const safeDescription = sanitizeMultilineText(formData.description, { maxLength: 1200 })
+      const safeHandover = sanitizeMultilineText(formData.handoverNotes, { maxLength: 600 })
+      const safeLocation = sanitizeText(formData.location, { maxLength: 180 })
+
       const fulfillmentMethod: 'pickup' | 'dropoff' =
         formData.actionType === 'donate' ? 'dropoff' : 'pickup'
       let classification = classificationResult
       if (!classification) {
         classification = await classifyListing({
-          title: formData.title,
-          description: formData.description,
+          title: safeTitle,
+          description: safeDescription,
           category: formData.category,
           condition: formData.condition || 'unspecified',
         })
@@ -676,7 +705,7 @@ export function ItemListingForm({
       if (!moderation) {
         const descriptors = formData.photos.length > 0
           ? formData.photos
-          : [formData.description || formData.title || ''];
+          : [safeDescription || safeTitle || ''];
         moderation = await moderateImages(descriptors)
         setModerationResult(moderation)
       }
@@ -688,7 +717,7 @@ export function ItemListingForm({
           uploadedPhotoUrls.push(p)
         } else {
           // p is a data URL; Cloudinary accepts data URLs as file param
-          const up = await uploadImageToCloudinary(p, { alt: formData.title || 'listing-image' })
+          const up = await uploadImageToCloudinary(p, { alt: safeTitle || 'listing-image' })
           uploadedPhotoUrls.push(up.secureUrl)
         }
       }
@@ -702,9 +731,10 @@ export function ItemListingForm({
       }
 
       const isDropoff = fulfillmentMethod === 'dropoff'
-      const addressLine = isDropoff
-        ? (formData.dropOffLocation?.address || formData.location || '')
-        : (formData.location || '')
+      const addressLineRaw = isDropoff
+        ? (formData.dropOffLocation?.address || safeLocation || '')
+        : (safeLocation || '')
+      const addressLine = sanitizeText(addressLineRaw, { maxLength: 180 })
 
       // Derive postcode (required by API)
       const explicitPostcode = isDropoff
@@ -725,8 +755,8 @@ export function ItemListingForm({
         typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 
       const basePayload = {
-        title: formData.title,
-        description: formData.description || undefined,
+        title: safeTitle,
+        description: safeDescription || undefined,
         condition: conditionMap[formData.condition as keyof typeof conditionMap] || 'good',
         category: formData.category,
         address_line: addressLine,
@@ -734,7 +764,7 @@ export function ItemListingForm({
         images: images.length ? images : undefined,
         // Only include a valid UUID for dropoff_location_id; otherwise omit to avoid backend errors
         dropoff_location_id: isDropoff && isUuid(formData.dropOffLocation?.id) ? formData.dropOffLocation?.id : undefined,
-        delivery_preferences: formData.handoverNotes || undefined,
+        delivery_preferences: safeHandover || undefined,
         metadata: undefined,
         size_unit: 'm' as const,
         size_length: 0,
@@ -932,9 +962,10 @@ export function ItemListingForm({
             const lat = typeof val.lat === 'number' ? Number(val.lat.toFixed(7)) : val.lat
             const lng = typeof val.lng === 'number' ? Number(val.lng.toFixed(7)) : val.lng
             const pc = await reverseGeocodePostcode(lat, lng)
-            setPickupLocation({ lat, lng, label: val.label, postcode: pc })
-            if (val.label) {
-              setFormData(prev => ({ ...prev, location: val.label }))
+            const label = sanitizeText(val.label || '', { maxLength: 180 })
+            setPickupLocation({ lat, lng, label, postcode: pc })
+            if (label) {
+              setFormData(prev => ({ ...prev, location: label }))
             }
           }}
         />

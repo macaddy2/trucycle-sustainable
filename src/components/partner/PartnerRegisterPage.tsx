@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { ArrowLeft, ArrowRight, MapPin, Phone, Storefront, User, Eye, EyeSlash } from '@phosphor-icons/react'
 import { CATEGORIES } from '@/lib/categories'
 import { register as apiRegister, upgradeToPartner, tokens, type RegisterDto, type MinimalUser } from '@/lib/api'
+import { sanitizeEmail, sanitizeText, validatePasswordStrength } from '@/lib/validation'
 import { kvSet } from '@/lib/kvStore'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
@@ -60,49 +61,64 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
+    const sanitizedFirstName = sanitizeText(form.firstName, { maxLength: 60 })
+    const sanitizedLastName = sanitizeText(form.lastName, { maxLength: 60 })
+    const sanitizedEmail = sanitizeEmail(form.email)
+    const sanitizedPassword = form.password.trim()
+    const sanitizedConfirmPassword = form.confirmPassword.trim()
+    const sanitizedShopName = sanitizeText(form.shopName, { maxLength: 120 })
+    const sanitizedPhone = sanitizeText(form.phoneNumber, { maxLength: 32 })
+    const sanitizedAddress = sanitizeText(form.addressLine, { maxLength: 160 })
+    const sanitizedPostcode = sanitizeText(form.postcode, { maxLength: 16 })
+
     if (!isAuthenticated) {
       // Full registration validation
-      if (!form.firstName || !form.lastName || !form.email || !form.password || !form.confirmPassword) {
+      if (!sanitizedFirstName || !sanitizedLastName || !sanitizedEmail || !sanitizedPassword || !sanitizedConfirmPassword) {
         toast.error('Please complete all required partner fields')
         return
       }
-      if (form.password !== form.confirmPassword) {
+      if (sanitizedPassword !== sanitizedConfirmPassword) {
         toast.error('Passwords do not match')
+        return
+      }
+      const passwordCheck = validatePasswordStrength(sanitizedPassword)
+      if (!passwordCheck.valid) {
+        toast.error(passwordCheck.message || 'Password is too weak')
         return
       }
     }
 
     // Shop validation (common to both flows)
-    if (!form.addressLine || !form.postcode || !form.shopName) {
+    if (!sanitizedAddress || !sanitizedPostcode || !sanitizedShopName) {
       toast.error('Shop name, address and postcode are required')
       return
     }
 
     const openingDays = form.openingDays.filter(Boolean)
-    const categories = form.categories.map(c => c.trim()).filter(Boolean)
+    const categories = form.categories.map(c => sanitizeText(c, { maxLength: 60 })).filter(Boolean)
 
     setLoading(true)
     try {
       if (!isAuthenticated) {
         // New partner registration flow
         const dto: RegisterDto = {
-          first_name: form.firstName.trim(),
-          last_name: form.lastName.trim(),
-          email: form.email.trim().toLowerCase(),
-          password: form.password,
+          first_name: sanitizedFirstName,
+          last_name: sanitizedLastName,
+          email: sanitizedEmail,
+          password: sanitizedPassword,
           role: 'partner',
           shop: {
-            name: form.shopName.trim(),
-            phone_number: form.phoneNumber.trim() || undefined,
-            address_line: form.addressLine.trim(),
-            postcode: form.postcode.trim(),
+            name: sanitizedShopName,
+            phone_number: sanitizedPhone || undefined,
+            address_line: sanitizedAddress,
+            postcode: sanitizedPostcode,
             opening_hours:
               openingDays.length > 0 || form.openTime || form.closeTime
                 ? {
                     days: openingDays,
                     open_time: form.openTime || undefined,
-                    close_time: form.closeTime || undefined,
-                  }
+                  close_time: form.closeTime || undefined,
+                }
                 : undefined,
             acceptable_categories: categories.length > 0 ? categories : undefined,
           },
@@ -113,10 +129,10 @@ export function PartnerRegisterPage({ onNavigate }: PartnerRegisterPageProps) {
       } else {
         // Upgrade existing customer to partner with first shop
         const shopDto = {
-          name: form.shopName.trim(),
-          phone_number: form.phoneNumber.trim() || undefined,
-          address_line: form.addressLine.trim(),
-          postcode: form.postcode.trim(),
+          name: sanitizedShopName,
+          phone_number: sanitizedPhone || undefined,
+          address_line: sanitizedAddress,
+          postcode: sanitizedPostcode,
           opening_hours:
             openingDays.length > 0 || form.openTime || form.closeTime
               ? {

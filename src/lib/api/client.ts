@@ -200,6 +200,12 @@ export async function login(dto: LoginDto) {
     method: 'POST',
     body: dto,
   })
+  const user = result?.data?.user
+  const isVerified = Boolean(user?.status === 'active' || user?.verifications?.email_verified)
+  if (user && !isVerified) {
+    try { await clearTokens() } catch {}
+    throw new ApiError('Please verify your email before signing in.', 403)
+  }
   if (result?.data?.tokens) {
     await setTokens(result.data.tokens)
   }

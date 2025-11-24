@@ -1,0 +1,40 @@
+# TruCycle Sustainable Application Loophole Analysis
+
+## 1. Authentication & Authorization
+- No rate limiting, CAPTCHA, or account lockout on login/signup.
+- No two-factor authentication.
+- No explicit enforcement of email verification before login. **FIXED** – Frontend now blocks sign-in when the account is not verified (see `src/lib/api/client.ts`).
+
+## 2. Input Validation & Security
+- Password strength validation is minimal. **FIXED** -- strong password policy (min length, mixed case, number, symbol) enforced across signup and reset flows.
+- No sanitization of user-generated content (title, description, messages) before display or submission. **FIXED** -- shared sanitization guards strip HTML/control chars before storing, rendering, or sending.
+- No explicit file type/size validation for uploads. **FIXED** -- image uploads validated for type and size in listings/chat and Cloudinary client.
+
+## 3. Error Handling
+- Errors are logged to the console, which could expose stack traces in production.
+
+## 4. Sensitive Data Exposure
+- No secrets or credentials found in config files.
+- LocalStorage is used without encryption or expiry.
+
+## 5. Business Logic & Abuse Prevention
+- No rate limiting or spam prevention for forms and messaging.
+- No checks for abusive content in messages or listings beyond basic AI moderation.
+
+## 6. Frontend Security
+- No CSRF protection for form submissions or API calls.
+- No XSS protection for user-generated content.
+
+## 7. Dependency Security
+- No automated dependency vulnerability checks (recommend running `npm audit` regularly).
+
+---
+
+## Recommendations
+- Add rate limiting, CAPTCHA, and account lockout for authentication.
+- Enforce stronger password policies and two-factor authentication.
+- Sanitize all user-generated content before display.
+- Validate file uploads for type and size.
+- Encrypt sensitive data in localStorage and add expiry.
+- Implement CSRF protection for all forms and API calls.
+- Regularly audit dependencies for vulnerabilities.

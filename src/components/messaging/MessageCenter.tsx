@@ -26,6 +26,7 @@ import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import { QRCodeGenerator, QRCodeDisplay, QRCodeData } from '../QRCode'
 import { LocationSelector } from '@/components/LocationSelector'
 import MessageCenterSkeleton from '@/components/skeletons/MessageCenterSkeleton'
+import { sanitizeMultilineText, validateImageFile } from '@/lib/validation'
 
 interface MessageCenterProps {
   open?: boolean
@@ -416,8 +417,9 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   const sendSystemMessage = useCallback(async (chatIdValue: string, content: string, action: string) => {
     try {
       const chat = normalizedChats.find(c => c.id === chatIdValue)
+      const safeContent = sanitizeMultilineText(content, { maxLength: 1000 })
       if (chat?.remoteRoomId) {
-        await sendGeneralMessage(chat.remoteRoomId, { text: content, title: action })
+        await sendGeneralMessage(chat.remoteRoomId, { text: safeContent, title: action })
       }
     } catch {}
   }, [normalizedChats])
@@ -425,7 +427,8 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   const handleSendMessage = async () => {
     if (!selectedChat) return
     const chat = normalizedChats.find(c => c.id === selectedChat.id)
-    const caption = newMessage.trim() || undefined
+    const captionValue = sanitizeMultilineText(newMessage, { maxLength: 1000 })
+    const caption = captionValue || undefined
     const hasText = Boolean(caption)
     const hasFiles = attachments.length > 0
     if (!hasText && !hasFiles) return
@@ -475,7 +478,14 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     if (onlyImages.length !== files.length) toast.error('Only image files are supported')
     const next = [...attachments]
     let skipped = 0
+    let rejectionReason: string | null = null
     for (const f of onlyImages) {
+      const validation = validateImageFile(f, { maxSizeBytes: 3 * 1024 * 1024 })
+      if (!validation.ok) {
+        rejectionReason = rejectionReason || validation.reason || 'Attachment rejected'
+        skipped++
+        continue
+      }
       const url = URL.createObjectURL(f)
       next.push({ file: f, url })
       const total = next.reduce((s, a) => s + a.file.size, 0)
@@ -484,10 +494,11 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
         const removed = next.pop()
         if (removed) URL.revokeObjectURL(removed.url)
         skipped++
+        rejectionReason = rejectionReason || 'Total attachments must stay under 3MB'
       }
     }
     if (skipped > 0) {
-      toast.info(`Removed ${skipped} attachment${skipped > 1 ? 's' : ''} to stay under 3MB total`)
+      toast.info(rejectionReason || `Removed ${skipped} attachment${skipped > 1 ? 's' : ''} to stay under 3MB total`)
     }
     setAttachments(next)
   }
@@ -510,12 +521,13 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     let i = 0
     while (i < list.length) {
       const m = list[i]
+      const sanitizedContent = m.content ? sanitizeMultilineText(m.content, { maxLength: 1200 }) : ''
       if (m.type === 'image' && m.metadata?.imageUrl) {
         const imgs: string[] = [m.metadata.imageUrl]
         const senderId = m.senderId
         const senderName = m.senderName
         const ts0 = new Date(m.timestamp)
-        const caption: string | undefined = m.content || undefined
+        const caption: string | undefined = sanitizedContent || undefined
         let j = i + 1
         while (j < list.length) {
           const n = list[j]
@@ -529,7 +541,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
         i = j
         continue
       }
-      blocks.push({ type: 'message', message: m })
+      blocks.push({ type: 'message', message: { ...m, content: sanitizedContent } })
       i++
     }
     return blocks

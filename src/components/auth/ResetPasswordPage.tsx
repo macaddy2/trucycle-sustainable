@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { resetPassword as apiResetPassword } from '@/lib/api'
+import { validatePasswordStrength } from '@/lib/validation'
 
 export function ResetPasswordPage() {
   const token = useMemo(() => new URLSearchParams(window.location.search).get('token') || '', [])
@@ -19,17 +20,20 @@ export function ResetPasswordPage() {
       toast.error('Missing token')
       return
     }
-    if (password.length < 6) {
-      toast.error('Password must be at least 6 characters')
+    const normalizedPassword = password.trim()
+    const confirmPassword = confirm.trim()
+    const passwordCheck = validatePasswordStrength(normalizedPassword)
+    if (!passwordCheck.valid) {
+      toast.error(passwordCheck.message || 'Choose a stronger password')
       return
     }
-    if (password !== confirm) {
+    if (normalizedPassword !== confirmPassword) {
       toast.error('Passwords do not match')
       return
     }
     setIsSubmitting(true)
     try {
-      await apiResetPassword({ token, new_password: password })
+      await apiResetPassword({ token, new_password: normalizedPassword })
       setDone(true)
       toast.success('Password has been reset')
     } catch (err: any) {
@@ -86,4 +90,3 @@ export function ResetPasswordPage() {
     </div>
   )
 }
-
