@@ -1025,62 +1025,64 @@ function App() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="mt-16 border-t border-border bg-card/30">
-        <div className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <TruCycleGlyph className="h-4 w-4" />
+      {/* Footer (hidden on messages page to keep the inbox full-height) */}
+      {currentTab !== 'messages' && (
+        <footer className="mt-16 border-t border-border bg-card/30">
+          <div className="container mx-auto px-4 py-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+              <div>
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <TruCycleGlyph className="h-4 w-4" />
+                  </div>
+                  <span className="font-medium">TruCycle</span>
                 </div>
-                <span className="font-medium">TruCycle</span>
+                <p className="text-small text-muted-foreground">
+                  Sustainable item exchange platform for London communities
+                </p>
               </div>
-              <p className="text-small text-muted-foreground">
-                Sustainable item exchange platform for London communities
-              </p>
+              
+              <div>
+                <h3 className="font-medium mb-3">Features</h3>
+                <div className="space-y-2 text-small text-muted-foreground">
+                  <p>Item Exchange</p>
+                  <p>Donation Platform</p>
+                  <p>Carbon Tracking</p>
+                  <p>Drop-off Points</p>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="font-medium mb-3">Support</h3>
+                <div className="space-y-2 text-small text-muted-foreground">
+                  <p>Help Center</p>
+                  <p>Community Guidelines</p>
+                  <p>Safety Tips</p>
+                  <p>Contact Us</p>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="font-medium mb-3">Environmental Impact</h3>
+                <div className="flex items-center space-x-4">
+                  <Badge variant="secondary" className="flex items-center space-x-1">
+                    <Leaf size={12} />
+                    <span>CO2 Saved</span>
+                  </Badge>
+                  <Badge variant="secondary" className="flex items-center space-x-1">
+                    <ArrowsClockwise size={12} />
+                    <span>Items Exchanged</span>
+                  </Badge>
+                </div>
+              </div>
             </div>
             
-            <div>
-              <h3 className="font-medium mb-3">Features</h3>
-              <div className="space-y-2 text-small text-muted-foreground">
-                <p>Item Exchange</p>
-                <p>Donation Platform</p>
-                <p>Carbon Tracking</p>
-                <p>Drop-off Points</p>
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="font-medium mb-3">Support</h3>
-              <div className="space-y-2 text-small text-muted-foreground">
-                <p>Help Center</p>
-                <p>Community Guidelines</p>
-                <p>Safety Tips</p>
-                <p>Contact Us</p>
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="font-medium mb-3">Environmental Impact</h3>
-              <div className="flex items-center space-x-4">
-                <Badge variant="secondary" className="flex items-center space-x-1">
-                  <Leaf size={12} />
-                  <span>CO2 Saved</span>
-                </Badge>
-                <Badge variant="secondary" className="flex items-center space-x-1">
-                  <ArrowsClockwise size={12} />
-                  <span>Items Exchanged</span>
-                </Badge>
-              </div>
+            <div className="mt-8 pt-8 border-t border-border text-center text-small text-muted-foreground">
+              <p>&copy; {new Date().getFullYear()} TruCycle. Building sustainable communities in London.</p>
             </div>
           </div>
-          
-          <div className="mt-8 pt-8 border-t border-border text-center text-small text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} TruCycle. Building sustainable communities in London.</p>
-          </div>
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* Authentication Dialogs */}
       <AuthDialog
