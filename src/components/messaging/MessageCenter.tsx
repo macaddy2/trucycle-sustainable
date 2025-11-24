@@ -1105,39 +1105,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                       </div>
                     </ScrollArea>
 
-                    {quickActions.length > 0 && (
-                      <div className="p-3 border-t border-border flex flex-wrap gap-2">
-                        {quickActions.map(action => (
-                          <Button
-                            key={action.label}
-                            variant="outline"
-                            size="sm"
-                            onClick={action.action}
-                            className="flex items-center space-x-1"
-                          >
-                            <action.icon size={14} className={action.color} />
-                            <span className="text-xs">{action.label}</span>
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-
-                    {messageTemplates.length > 0 && (
-                      <div className="px-4 py-2 border-t border-border bg-muted/40 flex flex-wrap gap-2">
-                        {messageTemplates.map(template => (
-                          <Button
-                            key={template}
-                            variant="ghost"
-                            size="sm"
-                            className="text-left whitespace-normal"
-                            onClick={() => setNewMessage(template)}
-                          >
-                            {template}
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-
                     <div className="p-4 border-t border-border">
                       <div className="flex gap-2 items-center">
                         <input

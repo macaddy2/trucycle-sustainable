@@ -911,16 +911,6 @@ if (variant === 'dashboard') {
                 </div>
               )}
 
-              {showCollectorRequests && (
-                <CollectorRequestsSection
-                  requests={listingRequests}
-                  getChatForItem={getChatForItem}
-                  onApprove={handleApproveRequest}
-                  onMarkCollected={handleMarkCollected}
-                  onOpenConversation={handleOpenConversation}
-                  openMessages={openMessages}
-                />
-              )}
               </div>
               <aside className="space-y-4">
                 {isCollector ? (
