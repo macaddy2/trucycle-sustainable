@@ -62,7 +62,6 @@ function HighlightCard({ icon, title, description, action, accent = 'primary' }:
 interface HomepageProps {
   onExploreBrowse: () => void
   onStartListing: () => void
-  onViewImpact: () => void
   onViewPartners: () => void
   onOpenMessages: () => void
   onSearch: () => void
@@ -77,7 +76,6 @@ interface HomepageProps {
 export function Homepage({
   onExploreBrowse,
   onStartListing,
-  onViewImpact,
   onViewPartners,
   onOpenMessages,
   onSearch,
@@ -242,13 +240,6 @@ export function Homepage({
             accent="emerald"
           />
 
-          <HighlightCard
-            icon={<Leaf size={24} className="text-amber-600" />}
-            title="Measure your circular impact"
-            description="Carbon savings, reuse streaks, and neighbourhood milestones make every donation feel meaningful for you and the planet."
-            action={{ label: 'Open impact tracker', onClick: onViewImpact }}
-            accent="amber"
-          />
         </div>
       </section>
 
@@ -345,9 +336,6 @@ export function Homepage({
             </p>
             <div className="flex flex-wrap gap-3">
               <Button onClick={onOpenMessages}>Open message centre</Button>
-              <Button variant="outline" onClick={onViewImpact}>
-                View my impact
-              </Button>
             </div>
           </div>
           <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-background/80 p-6 shadow-inner">

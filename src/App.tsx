@@ -31,7 +31,6 @@ import {
   MyListingsView,
   ProfileDashboard,
   DropOffMap,
-  CarbonTracker,
   ShopScanner,
   DemoGuide,
   Homepage,
@@ -159,7 +158,7 @@ function App() {
   }, [user, getRequestsForDonor])
 
   const allTabs = useMemo(() => new Set([
-    'home', 'browse', 'listings', 'messages', 'dropoff', 'impact', 'profile', 'list'
+    'home', 'browse', 'listings', 'messages', 'dropoff', 'profile', 'list'
   ]), [])
 
   const baseNormalized = useMemo(() => {
@@ -227,7 +226,6 @@ function App() {
       { value: 'browse', label: 'Browse', Icon: Search, show: !isDonor },
       { value: 'listings', label: isCollector ? 'My Collected Items' : 'My Listed Items', Icon: Package, show: true },
       { value: 'dropoff', label: 'Partner Shops', Icon: Storefront, show: !isCollector },
-      { value: 'impact', label: 'Impact', Icon: Leaf, show: true },
     ].filter((tab) => tab.show)
   }, [user])
 
@@ -944,9 +942,8 @@ function App() {
                       handleStartListing('donate')
                     }
                   }}
-                  onViewImpact={() => navigateToTab('impact')}
-                  onViewPartners={() => {
-                    if (hasDropOffTab) {
+                onViewPartners={() => {
+                  if (hasDropOffTab) {
                       navigateToTab('dropoff')
                     } else {
                       handleStartListing('donate')
@@ -1023,10 +1020,6 @@ function App() {
                 />
               </TabsContent>
             )}
-
-            <TabsContent value="impact">
-              <CarbonTracker />
-            </TabsContent>
 
             <TabsContent value="profile">
               {user && showDemoGuide && currentTab === 'profile' && (

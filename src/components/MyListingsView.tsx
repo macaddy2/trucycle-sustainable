@@ -762,11 +762,26 @@ export function MyListingsView({
               onClick={() => handleOpenListingDetails(listing.id)}
             >
               <TableCell>
-                <div className="space-y-1">
-                  <p className="font-medium">{listing.title}</p>
-                  {Boolean(String(listing.category || '').trim()) && String(listing.category).trim().toLowerCase() !== 'other' && (
-                    <p className="text-xs text-muted-foreground capitalize">{String(listing.category).trim()}</p>
-                  )}
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-15 flex-shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/20">
+                    {listing.photos?.[0] ? (
+                      <img
+                        src={listing.photos[0]}
+                        alt={`${listing.title} photo`}
+                        className="h-full w-full rounded-md object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <Package size={20} className="text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-medium">{listing.title}</p>
+                    {Boolean(String(listing.category || '').trim()) && String(listing.category).trim().toLowerCase() !== 'other' && (
+                      <p className="text-xs text-muted-foreground capitalize">{String(listing.category).trim()}</p>
+                    )}
+                  </div>
                 </div>
               </TableCell>
               <TableCell>

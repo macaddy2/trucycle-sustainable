@@ -107,6 +107,20 @@ export function QRCodeDisplay({ qrData, onClose }: QRCodeDisplayProps) {
           </DialogTitle>
         </DialogHeader>
 
+        <div className="flex items-center justify-center py-4">
+          {qrImageUrl ? (
+            <img
+              src={qrImageUrl}
+              alt={`QR code for ${qrData.itemTitle}`}
+              className="h-48 w-48 rounded-md border border-border bg-white p-2 shadow"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">Generating QR code...</p>
+          )}
+        </div>
+
         <div className="grid">
           <div className="space-y-6">
             <div className="flex flex-col gap-4 md:flex-row">
