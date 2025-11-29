@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { QrCode, Download, Share, Clock, MapPin, Package } from '@phosphor-icons/react'
+import { QrCode, Clock, MapPin, Package } from '@phosphor-icons/react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 import { kvGet, kvSet } from '@/lib/kvStore'
@@ -91,84 +91,23 @@ export function QRCodeDisplay({ qrData, onClose }: QRCodeDisplayProps) {
     setQrImageUrl(generateQRCodeImage(qrDataString))
   }, [qrData])
 
-  const handleDownload = async () => {
-    try {
-      const response = await fetch(qrImageUrl)
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `trucycle-qr-${qrData.transactionId}.png`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
-      toast.success('QR code downloaded successfully')
-    } catch (error) {
-      console.error('Failed to download QR code', error)
-      toast.error('Failed to download QR code')
-    }
-  }
-
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        const response = await fetch(qrImageUrl)
-        const blob = await response.blob()
-        const file = new File([blob], `trucycle-qr-${qrData.transactionId}.png`, { type: 'image/png' })
-
-        await navigator.share({
-          title: `TruCycle ${qrData.type === 'donor' ? 'Drop-off' : 'Pickup'} QR Code`,
-          text: `QR code for ${qrData.itemTitle}`,
-          files: [file]
-        })
-      } catch (error) {
-        console.error('Failed to share QR code via Web Share API', error)
-        await navigator.clipboard.writeText(qrImageUrl)
-        toast.success('QR code URL copied to clipboard')
-      }
-    } else {
-      await navigator.clipboard.writeText(qrImageUrl)
-      toast.success('QR code URL copied to clipboard')
-    }
-  }
-
   const isExpired = new Date() > new Date(qrData.metadata.expiresAt)
   const expiryDate = new Date(qrData.metadata.expiresAt)
   const timeUntilExpiry = expiryDate.getTime() - Date.now()
   const hoursUntilExpiry = Math.floor(timeUntilExpiry / (1000 * 60 * 60))
 
-  const resolveInstructionCopy = () => {
-    const action = qrData.metadata.actionType || 'donate'
-    if (action === 'exchange') {
-      return qrData.type === 'donor'
-        ? 'Share this code with the collector when you meet. It confirms the exchange and releases your rewards.'
-        : 'Show this code to the donor or shop assistant at pickup so the exchange can be logged instantly.'
-    }
-    if (action === 'recycle') {
-      return qrData.type === 'donor'
-        ? 'Present this code at the Partner Shop so the recycling team can record the materials drop-off.'
-        : 'Display this code to confirm you are collecting the recycling bundle on behalf of the shop.'
-    }
-    return qrData.type === 'donor'
-      ? 'Bring this code to the Partner Shop counter. Staff will scan it to confirm your donation and add your points.'
-      : 'Show this code at the Partner Shop to collect the donated item. Staff will scan and release it to you.'
-  }
-
-  const instructionCopy = resolveInstructionCopy()
   const displayLocation = qrData.dropOffLocation ?? 'Shared privately once a hand-off is arranged.'
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl w-full">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
-            <QrCode size={24} />
-            <span>{qrData.type === 'donor' ? 'Drop-off' : 'Pickup'} QR Code</span>
+            <span>Congratulations 🎉</span>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-6 md:grid-cols-[5fr_2fr]">
+        <div className="grid">
           <div className="space-y-6">
             <div className="flex flex-col gap-4 md:flex-row">
               <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-lg border bg-muted/40">
@@ -214,59 +153,6 @@ export function QRCodeDisplay({ qrData, onClose }: QRCodeDisplayProps) {
               </div>
             </div>
 
-            <div className="text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Package size={12} /> Transaction {qrData.transactionId}
-              </span>
-            </div>
-
-            <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
-              <h4 className="font-semibold text-sm">Instructions</h4>
-              <p className="text-sm text-muted-foreground">{instructionCopy}</p>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center gap-4 md:items-stretch">
-            <div className="flex justify-center">
-              <div className="p-4 bg-white rounded-lg border-2 border-gray-200">
-                {qrImageUrl ? (
-                  <img
-                    src={qrImageUrl}
-                    alt="QR Code"
-                    className="h-64 w-64 max-w-full"
-                    onError={() => toast.error('Failed to load QR code')}
-                  />
-                ) : (
-                  <div className="h-64 w-64 max-w-full bg-muted rounded-lg flex items-center justify-center">
-                    <QrCode size={64} className="text-muted-foreground animate-pulse" />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <Badge
-              variant={isExpired ? 'destructive' : qrData.status === 'active' ? 'default' : 'secondary'}
-              className="w-full justify-center text-sm"
-            >
-              {isExpired ? 'Expired' : qrData.status.charAt(0).toUpperCase() + qrData.status.slice(1)}
-            </Badge>
-
-            <div className="flex w-full flex-col gap-2">
-              <Button onClick={handleDownload} disabled={!qrImageUrl}>
-                <Download size={16} className="mr-2" />
-                Download
-              </Button>
-              <Button variant="outline" onClick={handleShare} disabled={!qrImageUrl}>
-                <Share size={16} className="mr-2" />
-                Share
-              </Button>
-            </div>
-
-            {isExpired && (
-              <div className="w-full rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                This QR code has expired. Generate a new code to continue the hand-off.
-              </div>
-            )}
           </div>
         </div>
       </DialogContent>
@@ -286,7 +172,7 @@ export function QRCodeGenerator({
   type,
   onGenerated
 }: QRCodeGeneratorProps) {
-  const [currentUser] = useKV('current-user', null)
+  const [currentUser] = useKV<{ id: string; name: string } | null>('current-user', null)
   const [generatedQRCodes, setGeneratedQRCodes] = useKV<QRCodeData[]>('user-qr-codes', [])
   const [isGenerating, setIsGenerating] = useState(false)
 

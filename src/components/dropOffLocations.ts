@@ -5,6 +5,11 @@ export interface DropOffLocation {
   postcode: string
   distance: string
   openHours: string
+  openingHoursRaw?: {
+    days?: string[]
+    open_time?: string
+    close_time?: string
+  } | null
   phone: string
   contactEmail?: string
   acceptedItems: string[]

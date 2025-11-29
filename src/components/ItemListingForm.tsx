@@ -1182,7 +1182,7 @@ export function ItemListingForm({
             <div className="space-y-4">
               <div>
                 <Label>Category *</Label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                <div className="grid grid-cols-4 md:grid-cols-8 gap-2 mt-2">
                   {CATEGORIES.map(category => (
                     <Button
                       key={category}
@@ -1199,7 +1199,7 @@ export function ItemListingForm({
 
               <div>
                 <Label>Condition *</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-2">
                   {CONDITIONS.map(condition => (
                     <Card 
                       key={condition.value}

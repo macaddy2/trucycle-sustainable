@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useKV } from '@/hooks/useKV'
 import { toast } from 'sonner'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Drawer, DrawerContent, DrawerTitle, DrawerClose } from '@/components/ui/drawer'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet'
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { ChatCircle, CheckCircle, Clock, MapPin, Package, PencilSimpleLine, Phone, Plus, QrCode, ShieldCheck, CaretLeft, CaretRight, UserCircle } from '@phosphor-icons/react'
+import { ChatCircle, CheckCircle, Clock, MapPin, Package, PencilSimpleLine, Phone, Plus, QrCode, ShieldCheck, CaretLeft, CaretRight, UserCircle, X } from '@phosphor-icons/react'
 import { useMessaging, useExchangeManager } from '@/hooks'
 import { listMyItems, listMyCollectedItems, createOrFindRoom, collectItem, getItemById } from '@/lib/api'
 import { messageSocket } from '@/lib/messaging/socket'
@@ -32,6 +33,7 @@ interface MyListingsViewProps {
   variant?: 'page' | 'dashboard'
   onOpenMessages?: (options?: { itemId?: string; chatId?: string; initialView?: 'chats' | 'requests' }) => void
   onEditListing?: (draft: ListingEditDraft) => void
+  onDrawerOpenChange?: (open: boolean) => void
 }
 
 
@@ -41,12 +43,12 @@ const CLASSIFICATION_TEXT: Record<'exchange' | 'donate' | 'recycle', string> = {
   recycle: 'Professional recycling',
 }
 
-const statusCopy: Record<ManagedListing['status'], { label: string; tone: 'default' | 'success' | 'warning' | 'outline' }> = {
+const statusCopy: Record<ManagedListing['status'], { label: string; tone: 'default' | 'outline' | 'secondary' | 'destructive' }> = {
   active: { label: 'Active', tone: 'outline' },
-  pending_dropoff: { label: 'Pending drop-off', tone: 'warning' },
-  claimed: { label: 'Claimed', tone: 'warning' },
-  collected: { label: 'Collected', tone: 'success' },
-  expired: { label: 'Expired', tone: 'default' },
+  pending_dropoff: { label: 'Pending drop-off', tone: 'secondary' },
+  claimed: { label: 'Claimed', tone: 'secondary' },
+  collected: { label: 'Collected', tone: 'default' },
+  expired: { label: 'Expired', tone: 'destructive' },
 }
 const REQUEST_STATUS_BADGE: Record<ClaimRequest['status'], { label: string; variant: 'outline' | 'secondary' | 'destructive' | 'default' }> = {
   pending: { label: 'Pending', variant: 'outline' },
@@ -87,11 +89,64 @@ const formatRelativeTime = (value: string) => {
   return date.toLocaleDateString()
 }
 
+type OpeningHoursPayload = {
+  days?: string[]
+  open_time?: string
+  close_time?: string
+}
+
+const formatOpeningHoursValue = (opening?: OpeningHoursPayload | string | null): string | null => {
+  if (!opening) {
+    return null
+  }
+
+  if (typeof opening === 'string') {
+    const trimmed = opening.trim()
+    return trimmed || null
+  }
+
+  const { days, open_time, close_time } = opening
+  const joinedDays = Array.isArray(days) && days.length > 0 ? days.join(', ') : 'Daily'
+  if (open_time && close_time) return `${joinedDays} ${open_time} - ${close_time}`
+  if (open_time) return `${joinedDays} from ${open_time}`
+  if (close_time) return `${joinedDays} until ${close_time}`
+  return joinedDays
+}
+
+function isLocationOpen(opening_hours: OpeningHoursPayload | null | undefined): boolean {
+  if (!opening_hours || !Array.isArray(opening_hours.days) || opening_hours.days.length === 0) {
+    return false
+  }
+  if (!opening_hours.open_time || !opening_hours.close_time) {
+    return false
+  }
+
+  const now = new Date()
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const today = dayNames[now.getDay()]
+  if (!opening_hours.days.includes(today)) return false
+
+  const parseTime = (value: string) => {
+    const [hour = '0', minute = '0'] = value.split(':')
+    return { hour: Number(hour), minute: Number(minute) }
+  }
+
+  const { hour: openHour, minute: openMinute } = parseTime(opening_hours.open_time)
+  const { hour: closeHour, minute: closeMinute } = parseTime(opening_hours.close_time)
+  const open = new Date(now)
+  open.setHours(openHour, openMinute, 0, 0)
+  const close = new Date(now)
+  close.setHours(closeHour, closeMinute, 0, 0)
+
+  return now >= open && now <= close
+}
+
 export function MyListingsView({
   onAddNewItem,
   variant = 'page',
   onOpenMessages,
   onEditListing,
+  onDrawerOpenChange,
 }: MyListingsViewProps) {
   const [currentUser] = useKV<UserProfile | null>('current-user', null)
   const [listings, setListings] = useKV<ManagedListing[]>('user-listings', [])
@@ -109,6 +164,10 @@ export function MyListingsView({
   const [detailsError, setDetailsError] = useState<string | null>(null)
   const [imageViewerOpen, setImageViewerOpen] = useState(false)
   const [activeImageIndex, setActiveImageIndex] = useState(0)
+  const detailDrawerContentRef = useRef<HTMLDivElement | null>(null)
+  const detailDrawerCloseButtonRef = useRef<HTMLButtonElement | null>(null)
+  const viewerContentRef = useRef<HTMLDivElement | null>(null)
+  const viewerCloseButtonRef = useRef<HTMLButtonElement | null>(null)
 
   const sortedListings = useMemo(() => {
     // Show all items for donors and collectors; order by newest first
@@ -118,6 +177,20 @@ export function MyListingsView({
   const activeCount = useMemo(() => sortedListings.filter(listing => listing.status === 'active').length, [sortedListings])
 
   const selectedListing = useMemo(() => listings.find(listing => listing.id === selectedListingId) ?? null, [listings, selectedListingId])
+
+  useEffect(() => {
+    if (showDetailModal) {
+      const focusTarget = detailDrawerCloseButtonRef.current ?? detailDrawerContentRef.current
+      focusTarget?.focus({ preventScroll: true })
+    }
+  }, [showDetailModal])
+
+  useEffect(() => {
+    if (imageViewerOpen) {
+      const focusTarget = viewerCloseButtonRef.current ?? viewerContentRef.current
+      focusTarget?.focus({ preventScroll: true })
+    }
+  }, [imageViewerOpen])
   const listingRequests = useMemo(() => (selectedListing ? getRequestsForItem(selectedListing.id) : []), [selectedListing, getRequestsForItem])
 
   useEffect(() => {
@@ -157,7 +230,7 @@ export function MyListingsView({
     }
   }
 
-  const isCollector = currentUser?.userType === 'collector'
+  const isCollector = (currentUser && 'userType' in currentUser) ? (currentUser as UserProfile).userType === 'collector' : false
   const addFirstItemLabel = isCollector ? 'Add an item' : 'List or donate your first item'
   const addNewItemLabel = isCollector ? 'Add an item' : 'List or donate new item'
   const heading = variant === 'dashboard'
@@ -226,19 +299,32 @@ export function MyListingsView({
       return existing as DropOffLocation
     }
 
-    const latitude = typeof detail?.location?.latitude === 'number' ? detail.location.latitude : 51.5072
-    const longitude = typeof detail?.location?.longitude === 'number' ? detail.location.longitude : -0.1276
+    // Use dropoff_location from detail if available
+    let dropoff: any = null
+    if (detail && 'dropoff_location' in detail && (detail as any).dropoff_location) {
+      dropoff = (detail as any).dropoff_location
+    }
+    const latitude = typeof dropoff?.latitude === 'number' ? dropoff.latitude : 51.5072
+    const longitude = typeof dropoff?.longitude === 'number' ? dropoff.longitude : -0.1276
+    const rawOpeningHours = dropoff?.opening_hours && typeof dropoff.opening_hours === 'object'
+      ? (dropoff.opening_hours as OpeningHoursPayload)
+      : null
+    const formattedOpenHours = formatOpeningHoursValue(rawOpeningHours ?? dropoff?.opening_hours)
+    const resolvedOpenHours = formattedOpenHours && formattedOpenHours.trim()
+      ? formattedOpenHours
+      : 'Hours shared after confirmation'
 
     return {
       id: `${item.id}-dropoff`,
-      name: existing?.name || detail?.location?.address_line || 'Partner shop',
-      address: existing?.address || detail?.location?.address_line || '',
-      postcode: existing?.postcode || detail?.location?.postcode || '',
-      distance: existing?.distance || '—',
-      openHours: existing?.openHours || 'Hours shared after confirmation',
-      phone: existing?.phone || 'Contact provided after booking',
-      acceptedItems: Array.isArray(existing?.acceptedItems) ? existing.acceptedItems : [],
-      specialServices: Array.isArray(existing?.specialServices) ? existing.specialServices : [],
+      name: dropoff?.name || 'Partner shop',
+      address: dropoff?.address || '',
+      postcode: dropoff?.postcode || '',
+      distance: dropoff?.distance || '—',
+      openHours: resolvedOpenHours,
+      openingHoursRaw: rawOpeningHours,
+      phone: dropoff?.phone_number || 'Contact provided after booking',
+      acceptedItems: Array.isArray(existing?.acceptedItems) ? existing.acceptedItems : Array.isArray(dropoff?.acceptedItems) ? dropoff.acceptedItems : [],
+      specialServices: Array.isArray(existing?.specialServices) ? existing.specialServices : Array.isArray(dropoff?.specialServices) ? dropoff.specialServices : [],
       coordinates: { lat: latitude, lng: longitude },
     }
   }
@@ -285,12 +371,14 @@ export function MyListingsView({
       fulfillmentMethod,
       photos: photosFromDetail.length > 0 ? photosFromDetail : selectedListing.photos ?? [],
       location: fulfillmentMethod === 'pickup'
-        ? (detail.location?.address_line || selectedListing.location || '')
+        ? ((detail as any)?.location?.address_line || selectedListing.location || '')
         : undefined,
       dropOffLocation,
       handoverNotes: selectedListing.handoverNotes,
       preferPartnerSupport: selectedListing.preferPartnerSupport,
-      postcode: detail.location?.postcode,
+      postcode: 
+        (detail && 'location' in detail && (detail as any).location?.postcode) ||
+        (detail && 'dropoff_location' in detail && (detail as any).dropoff_location?.postcode),
     }
 
     onEditListing(draft)
@@ -303,6 +391,14 @@ export function MyListingsView({
   const dropOffLocationDetail = useMemo(() => (
     selectedListing ? deriveDropOffLocation(selectedListing, detailItem) : null
   ), [selectedListing, detailItem])
+  const dropOffLocationOpeningHoursRaw = useMemo<OpeningHoursPayload | null>(() => {
+    if (dropOffLocationDetail?.openingHoursRaw) return dropOffLocationDetail.openingHoursRaw
+    if (!detailItem || !('dropoff_location' in detailItem)) return null
+    const raw = (detailItem as any).dropoff_location?.opening_hours
+    if (!raw || typeof raw !== 'object') return null
+    return raw as OpeningHoursPayload
+  }, [dropOffLocationDetail, detailItem])
+  const isDropOffLocationOpen = dropOffLocationOpeningHoursRaw ? isLocationOpen(dropOffLocationOpeningHoursRaw) : null
   const qrImageUrl = isCollector ? null : detailItem?.qr_code ?? null
   const galleryImages = useMemo(() => {
     const detailImages = detailItem?.images?.map((img) => img?.url).filter(Boolean) ?? []
@@ -357,16 +453,16 @@ export function MyListingsView({
 
   const detailDescription = detailItem?.description?.trim() || selectedListing?.description?.trim() || 'No description added yet. Share a few highlights to attract collectors.'
   const handoffDisplay = selectedListing?.fulfillmentMethod === 'dropoff'
-    ? (selectedListing.dropOffLocation
-        ? `${selectedListing.dropOffLocation.name}${selectedListing.dropOffLocation.postcode ? ` — ${selectedListing.dropOffLocation.postcode}` : ''}`
-        : detailItem?.location?.address_line || 'Partner location shared after confirmation')
-    : (selectedListing?.location || detailItem?.location?.address_line || 'Pickup location to be confirmed in chat')
+    ? (dropOffLocationDetail
+      ? `${dropOffLocationDetail.name}${dropOffLocationDetail.postcode ? ` — ${dropOffLocationDetail.postcode}` : ''}`
+      : ((detailItem && 'dropoff_location' in detailItem && (detailItem as any).dropoff_location?.address_line) ? (detailItem as any).dropoff_location.address_line : 'Partner location shared after confirmation'))
+    : (selectedListing?.location || ((detailItem && 'location' in detailItem && (detailItem as any).location?.address_line) ? (detailItem as any).location.address_line : 'Pickup location to be confirmed in chat'))
   const showCollectorRequests = !isCollector
   const detailOwner = detailItem?.owner
 
   const collectorRequestForItem = useMemo(() => {
     if (!selectedListing || !isCollector || !currentUser) return null
-    const existing = listingRequests.find((request) => request.itemId === selectedListing.id && request.collectorId === currentUser.id)
+    const existing = listingRequests.find((request) => request.itemId === selectedListing.id && request.collectorId === (currentUser as UserProfile).id)
     if (existing) return existing
     if (!selectedListing.claimId || !selectedListing.claimStatus) return null
     const donorId = selectedListing.userId || detailOwner?.id
@@ -378,8 +474,8 @@ export function MyListingsView({
       itemImage: selectedListing.photos?.[0],
       donorId,
       donorName: selectedListing.userName || detailOwner?.name || 'Donor',
-      collectorId: currentUser.id,
-      collectorName: currentUser.name || 'You',
+      collectorId: (currentUser as UserProfile).id,
+      collectorName: (currentUser as UserProfile).name || 'You',
       collectorAvatar: undefined,
       note: undefined,
       status: selectedListing.claimStatus,
@@ -396,10 +492,10 @@ export function MyListingsView({
     let room: any = null
     try {
       // Ensure a server-side direct room exists with the collector
-      const otherUserId = currentUser?.userType === 'donor' ? request.collectorId : request.donorId
+      const otherUserId = (currentUser && (currentUser as UserProfile).userType === 'donor') ? request.collectorId : request.donorId
       const roomRes = await createOrFindRoom(otherUserId)
       room = roomRes?.data
-      try { await messageSocket.joinRoom(otherUserId) } catch {}
+      try { await messageSocket.joinRoom(otherUserId) } catch { }
     } catch (e: any) {
       // Non-fatal: still open local chat for UX continuity
       toast.error(e?.message || 'Unable to open conversation room. Opening local chat...')
@@ -407,8 +503,8 @@ export function MyListingsView({
 
     // Open or create a local chat and navigate to Messages
     const listing = listings.find((l) => l.id === request.itemId)
-    const donorId = currentUser?.userType === 'donor' ? currentUser.id : request.donorId
-    const donorName = currentUser?.userType === 'donor' ? (currentUser.name) : request.donorName
+    const donorId = (currentUser && (currentUser as UserProfile).userType === 'donor') ? (currentUser as UserProfile).id : request.donorId
+    const donorName = (currentUser && (currentUser as UserProfile).userType === 'donor') ? (currentUser as UserProfile).name : request.donorName
 
     const chatId = await createOrGetChat(
       request.itemId,
@@ -627,149 +723,149 @@ export function MyListingsView({
   )
 
   const TableView = (
-  <Table>
-    <TableHeader>
-      <TableRow>
-        <TableHead>Item</TableHead>
-        <TableHead>Status</TableHead>
-        <TableHead>Type</TableHead>
-        <TableHead>Listed</TableHead>
-        <TableHead>Reward</TableHead>
-        <TableHead className="text-right">Actions</TableHead>
-      </TableRow>
-    </TableHeader>
-    <TableBody>
-      {sortedListings.map(listing => {
-        const status = statusCopy[listing.status]
-        const chat = getChatForItem(listing.id)
-        const isCollected = listing.status === 'collected' || listing.claimStatus === 'completed'
-        const rewardValue = listing.reward ?? listing.rewardPoints ?? listing.valuation?.rewardPoints
-        const rewardCurrency = listing.reward_currency ?? (typeof rewardValue === 'number' ? 'PTS' : undefined)
-        const requests = getRequestsForItem(listing.id)
-        const approvedRequest = requests.find(r => r.status === 'approved')
-        const collectorsBadgeText = isCollector
-          ? (listing.userName ? `Donor: ${listing.userName}` : 'Donor')
-          : (listing.status === 'collected'
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Item</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead>Listed</TableHead>
+          <TableHead>Reward</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sortedListings.map(listing => {
+          const status = statusCopy[listing.status] ?? { label: 'Unknown', tone: 'default' }
+          const chat = getChatForItem(listing.id)
+          const isCollected = listing.status === 'collected' || listing.claimStatus === 'completed'
+          const rewardValue = listing.reward ?? listing.rewardPoints ?? listing.valuation?.rewardPoints
+          const rewardCurrency = listing.reward_currency ?? (typeof rewardValue === 'number' ? 'PTS' : undefined)
+          const requests = getRequestsForItem(listing.id)
+          const approvedRequest = requests.find(r => r.status === 'approved')
+          const collectorsBadgeText = isCollector
+            ? (listing.userName ? `Donor: ${listing.userName}` : 'Donor')
+            : (listing.status === 'collected'
               ? 'Collected'
               : approvedRequest
                 ? 'Collector approved'
                 : (requests.length > 0
-                    ? `${requests.length} collector${requests.length === 1 ? '' : 's'}`
-                    : 'Waiting for collectors'))
-        const collectorsBadgeVariant: any = listing.status === 'collected'
-          ? 'default'
-          : (approvedRequest ? 'secondary' : 'outline')
-        return (
-          <TableRow
-            key={listing.id}
-            className="cursor-pointer transition-colors hover:bg-muted/40"
-            onClick={() => handleOpenListingDetails(listing.id)}
-          >
-            <TableCell>
-              <div className="space-y-1">
-                <p className="font-medium">{listing.title}</p>
-                {Boolean(String(listing.category || '').trim()) && String(listing.category).trim().toLowerCase() !== 'other' && (
-                  <p className="text-xs text-muted-foreground capitalize">{String(listing.category).trim()}</p>
-                )}
-              </div>
-            </TableCell>
-            <TableCell>
-              <div className="space-y-1">
-                <Badge variant={status.tone === 'default' ? 'default' : status.tone} className="capitalize">
-                  {status.label}
-                </Badge>
-                {listing.aiClassification && (
-                  <p className="text-[11px] text-muted-foreground">
-                    {CLASSIFICATION_TEXT[listing.aiClassification.recommendedAction]} ({listing.aiClassification.confidence} confidence)
-                  </p>
-                )}
-                {listing.moderation?.status === 'flagged' && (
-                  <p className="text-[11px] text-destructive">{listing.moderation.message}</p>
-                )}
-              </div>
-            </TableCell>
-            <TableCell className="capitalize">{listing.actionType}</TableCell>
-            <TableCell>
-              <span className="flex items-center gap-1 text-sm">
-                <Clock size={12} />
-                {formatDate(listing.createdAt)}
-              </span>
-            </TableCell>
-            <TableCell>
-              {!isCollected ? (
-                <span className="text-xs text-muted-foreground">Pending</span>
-              ) : (
-                typeof rewardValue === 'number' ? (
-                  <span className="text-sm font-medium text-primary">+{rewardValue} {rewardCurrency || 'PTS'}</span>
-                ) : (
+                  ? `${requests.length} collector${requests.length === 1 ? '' : 's'}`
+                  : 'Waiting for collectors'))
+          const collectorsBadgeVariant: any = listing.status === 'collected'
+            ? 'default'
+            : (approvedRequest ? 'secondary' : 'outline')
+          return (
+            <TableRow
+              key={listing.id}
+              className="cursor-pointer transition-colors hover:bg-muted/40"
+              onClick={() => handleOpenListingDetails(listing.id)}
+            >
+              <TableCell>
+                <div className="space-y-1">
+                  <p className="font-medium">{listing.title}</p>
+                  {Boolean(String(listing.category || '').trim()) && String(listing.category).trim().toLowerCase() !== 'other' && (
+                    <p className="text-xs text-muted-foreground capitalize">{String(listing.category).trim()}</p>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="space-y-1">
+                  <Badge variant={status?.tone === 'default' ? 'default' : status?.tone ?? 'default'} className="capitalize">
+                    {status?.label ?? 'Unknown'}
+                  </Badge>
+                  {listing.aiClassification && (
+                    <p className="text-[11px] text-muted-foreground">
+                      {CLASSIFICATION_TEXT[listing.aiClassification.recommendedAction]} ({listing.aiClassification.confidence} confidence)
+                    </p>
+                  )}
+                  {listing.moderation?.status === 'flagged' && (
+                    <p className="text-[11px] text-destructive">{listing.moderation.message}</p>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell className="capitalize">{listing.actionType}</TableCell>
+              <TableCell>
+                <span className="flex items-center gap-1 text-sm">
+                  <Clock size={12} />
+                  {formatDate(listing.createdAt)}
+                </span>
+              </TableCell>
+              <TableCell>
+                {!isCollected ? (
                   <span className="text-xs text-muted-foreground">Pending</span>
-                )
-              )}
-            </TableCell>
-            <TableCell className="text-right space-x-2">
-              {chat ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    openMessages({ chatId: chat.id })
-                  }}
-                >
-                  <ChatCircle size={14} className="mr-2" />
-                  Open chat
-                </Button>
-              ) : (
-                <Badge variant={collectorsBadgeVariant} className="text-xs">{collectorsBadgeText}</Badge>
-              )}
-              {listing.status === 'claimed' && listing.actionType !== 'donate' && (
-                <Button
-                  size="sm"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    handleMarkCollected(listing.id)
-                  }}
-                >
-                  <CheckCircle size={14} className="mr-2" />
-                  Mark collected
-                </Button>
-              )}
-            </TableCell>
-          </TableRow>
-        )
-      })}
-    </TableBody>
-    <TableCaption>
-      Approval completes the hand-off. Tap a row to review full listing details.
-    </TableCaption>
-  </Table>
-)
-
-const content = loading
-  ? <ListingsSkeleton rows={3} />
-  : (sortedListings.length === 0
-    ? EmptyState
-    : TableView)
-
-if (variant === 'dashboard') {
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-1">
-          <p className="font-medium">Your listed items</p>
-          <p className="text-sm text-muted-foreground">Select a listing to view full details.</p>
-        </div>
-        {onAddNewItem && (
-          <Button onClick={onAddNewItem}>
-            <Plus size={16} className="mr-2" />
-            {addNewItemLabel}
-          </Button>
-        )}
-      </div>
-      {content}
-    </div>
+                ) : (
+                  typeof rewardValue === 'number' ? (
+                    <span className="text-sm font-medium text-primary">+{rewardValue} {rewardCurrency || 'PTS'}</span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Pending</span>
+                  )
+                )}
+              </TableCell>
+              <TableCell className="text-right space-x-2">
+                {chat ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      openMessages({ chatId: chat.id })
+                    }}
+                  >
+                    <ChatCircle size={14} className="mr-2" />
+                    Open chat
+                  </Button>
+                ) : (
+                  <Badge variant={collectorsBadgeVariant} className="text-xs">{collectorsBadgeText}</Badge>
+                )}
+                {listing.status === 'claimed' && listing.actionType !== 'donate' && (
+                  <Button
+                    size="sm"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      handleMarkCollected(listing.id)
+                    }}
+                  >
+                    <CheckCircle size={14} className="mr-2" />
+                    Mark collected
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          )
+        })}
+      </TableBody>
+      <TableCaption>
+        Approval completes the hand-off. Tap a row to review full listing details.
+      </TableCaption>
+    </Table>
   )
-}
+
+  const content = loading
+    ? <ListingsSkeleton rows={3} />
+    : (sortedListings.length === 0
+      ? EmptyState
+      : TableView)
+
+  if (variant === 'dashboard') {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <p className="font-medium">Your listed items</p>
+            <p className="text-sm text-muted-foreground">Select a listing to view full details.</p>
+          </div>
+          {onAddNewItem && (
+            <Button onClick={onAddNewItem}>
+              <Plus size={16} className="mr-2" />
+              {addNewItemLabel}
+            </Button>
+          )}
+        </div>
+        {content}
+      </div>
+    )
+  }
 
   return (
     <>
@@ -792,10 +888,11 @@ if (variant === 'dashboard') {
         <CardContent>{content}</CardContent>
       </Card>
 
-      <Dialog
+      <Sheet
         open={showDetailModal && Boolean(selectedListing)}
         onOpenChange={(open) => {
           setShowDetailModal(open)
+          if (typeof onDrawerOpenChange === 'function') onDrawerOpenChange(open)
           if (!open) {
             setSelectedListingId(null)
             setSelectedItemDetails(null)
@@ -805,151 +902,194 @@ if (variant === 'dashboard') {
           }
         }}
       >
-        <DialogContent className="w-full max-w-6xl lg:max-w-7xl">
-          <DialogHeader>
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <DialogTitle>{selectedListing?.title ?? 'Listing details'}</DialogTitle>
-                <DialogDescription>Review the full listing, manage collector requests, and keep track of hand-offs.</DialogDescription>
+        <SheetContent
+          side="right"
+          ref={detailDrawerContentRef}
+          tabIndex={-1}
+          aria-label="Listing details"
+          className="h-full w-full max-w-6xl overflow-y-auto p-6 sm:max-w-5xl lg:max-w-6xl lg:p-8"
+        >
+          <div className="relative">
+            <SheetClose
+              ref={detailDrawerCloseButtonRef}
+              className="absolute right-4 top-4 rounded-full bg-muted p-2 text-muted-foreground transition hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-label="Close listing details"
+            >
+              <X size={16} weight="bold" />
+            </SheetClose>
+            <SheetHeader className="pb-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <SheetTitle>{selectedListing?.title ?? 'Listing details'}</SheetTitle>
+                  <SheetDescription>Review the full listing, manage collector requests, and keep track of hand-offs.</SheetDescription>
+                </div>
+                {selectedListing && onEditListing && !isCollector && selectedListing.status !== 'collected' && selectedListing.status !== 'claimed' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleEditInForm}
+                    disabled={detailsLoading || !selectedItemDetails}
+                    className="flex items-center gap-2"
+                  >
+                    <PencilSimpleLine size={14} />
+                    Edit in listing form
+                  </Button>
+                )}
               </div>
-              {selectedListing && onEditListing && !isCollector && selectedListing.status !== 'collected' && selectedListing.status !== 'claimed' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleEditInForm}
-                  disabled={detailsLoading || !selectedItemDetails}
-                  className="flex items-center gap-2"
-                >
-                  <PencilSimpleLine size={14} />
-                  Edit in listing form
-                </Button>
-              )}
-            </div>
-          </DialogHeader>
+            </SheetHeader>
 
-          {selectedListing ? (
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-              <div className="space-y-4">
-              {detailsLoading && (
-                <p className="text-sm text-muted-foreground">Loading latest item details…</p>
-              )}
-              {detailsError && (
-                <p className="text-sm text-destructive">{detailsError}</p>
-              )}
+            {selectedListing ? (
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <div className="space-y-4">
+                  {detailsLoading && (
+                    <p className="text-sm text-muted-foreground">Loading latest item details…</p>
+                  )}
+                  {detailsError && (
+                    <p className="text-sm text-destructive">{detailsError}</p>
+                  )}
 
-              <div className="grid gap-3 md:grid-cols-2 text-sm">
-                <div className="rounded-md border p-3 space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase">Status</p>
-                  <Badge variant="secondary" className="capitalize">{statusCopy[selectedListing.status].label}</Badge>
+                  <div className="grid gap-3 md:grid-cols-2 text-sm">
+                    <div className="rounded-md border p-3 space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase">Status</p>
+                      <Badge variant="secondary" className="capitalize">{statusCopy[selectedListing.status].label}</Badge>
+                    </div>
+                    <div className="rounded-md border p-3 space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase">Action</p>
+                      <span className="capitalize">{selectedListing.actionType}</span>
+                    </div>
+                    <div className="rounded-md border p-3 space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase">Reward</p>
+                      {selectedListing.status !== 'collected' && selectedListing.claimStatus !== 'completed' ? (
+                        <span className="text-muted-foreground">Pending</span>
+                      ) : (
+                        <span>
+                          {(typeof (selectedListing.reward ?? selectedListing.rewardPoints ?? selectedListing.valuation?.rewardPoints) === 'number')
+                            ? `${selectedListing.reward ?? selectedListing.rewardPoints ?? selectedListing.valuation?.rewardPoints} ${selectedListing.reward_currency || 'PTS'}`
+                            : 'Pending'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="rounded-md border p-3 space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase">Listed</p>
+                      <span>{formatDate(selectedListing.createdAt)}</span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border bg-muted/20 p-4 space-y-3 text-sm">
+                    <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                      <h3 className="font-semibold">Listing overview</h3>
+                      {selectedListing.co2Impact && (
+                        <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                          <span>Impact</span>
+                          <span>-{selectedListing.co2Impact}kg CO₂</span>
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-muted-foreground">{detailDescription}</p>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase">Category</p>
+                        <p className="capitalize">{formatCategoryDisplay(detailItem?.category || selectedListing.category)}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase">Hand-off location</p>
+                        <p>{handoffDisplay}</p>
+                        {/* Show open/closed status if opening_hours is available in dropOffLocationDetail */}
+                        {dropOffLocationDetail?.openHours && (
+                          <div className="space-y-1 text-xs mt-1">
+                            <span className="flex items-center gap-2">
+                              <Clock size={14} />
+                              <span>{dropOffLocationDetail.openHours}</span>
+                            </span>
+                            {dropOffLocationOpeningHoursRaw && (
+                              <span className="text-xs text-muted-foreground">
+                                {isDropOffLocationOpen ? 'Open now' : 'Closed now'}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {galleryImages.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-2">Photos</h3>
+                      <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                        {galleryImages.map((photo, index) => (
+                          <button
+                            key={`${photo}-${index}`}
+                            type="button"
+                            onClick={() => openImageViewer(index)}
+                            className="group relative h-32 w-full overflow-hidden rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                          >
+                            <img
+                              src={photo}
+                              alt={`${selectedListing.title} photo ${index + 1}`}
+                              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                            />
+                            <span className="sr-only">View photo {index + 1}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                 </div>
-                <div className="rounded-md border p-3 space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase">Action</p>
-                  <span className="capitalize">{selectedListing.actionType}</span>
-                </div>
-                <div className="rounded-md border p-3 space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase">Reward</p>
-                  {selectedListing.status !== 'collected' && selectedListing.claimStatus !== 'completed' ? (
-                    <span className="text-muted-foreground">Pending</span>
+                <aside className="space-y-4">
+                  {isCollector ? (
+                    <DonorInfoPanel
+                      donorName={detailOwner?.name || selectedListing.userName}
+                      donorAvatar={detailOwner?.profile_image || null}
+                      donorVerification={detailOwner?.verification ?? null}
+                      claimStatus={collectorClaimStatus}
+                      claimApprovedAt={selectedListing.claimApprovedAt ?? null}
+                      claimCompletedAt={selectedListing.claimCompletedAt ?? null}
+                      canOpenConversation={canOpenCollectorChat}
+                      onOpenConversation={handleCollectorConversation}
+                    />
                   ) : (
-                    <span>
-                      {(typeof (selectedListing.reward ?? selectedListing.rewardPoints ?? selectedListing.valuation?.rewardPoints) === 'number')
-                        ? `${selectedListing.reward ?? selectedListing.rewardPoints ?? selectedListing.valuation?.rewardPoints} ${selectedListing.reward_currency || 'PTS'}`
-                        : 'Pending'}
-                    </span>
+                    <DropOffQrPanel
+                      listing={selectedListing}
+                      dropOffLocation={dropOffLocationDetail}
+                      qrImageUrl={qrImageUrl}
+                      isLoading={detailsLoading}
+                    />
                   )}
-                </div>
-                <div className="rounded-md border p-3 space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase">Listed</p>
-                  <span>{formatDate(selectedListing.createdAt)}</span>
-                </div>
-              </div>
-
-              <div className="rounded-lg border bg-muted/20 p-4 space-y-3 text-sm">
-                <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                  <h3 className="font-semibold">Listing overview</h3>
-                  {selectedListing.co2Impact && (
-                    <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                      <span>Impact</span>
-                      <span>-{selectedListing.co2Impact}kg CO₂</span>
-                    </Badge>
+                  {showCollectorRequests && (
+                    <CollectorRequestsPanel
+                      requests={listingRequests}
+                      getChatForItem={getChatForItem}
+                      onApprove={handleApproveRequest}
+                      onMarkCollected={handleMarkCollected}
+                      onOpenConversation={handleOpenConversation}
+                      openMessages={openMessages}
+                    />
                   )}
-                </div>
-                <p className="text-muted-foreground">{detailDescription}</p>
-                <div className="grid gap-2 md:grid-cols-2">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase">Category</p>
-                    <p className="capitalize">{formatCategoryDisplay(detailItem?.category || selectedListing.category)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase">Hand-off location</p>
-                    <p>{handoffDisplay}</p>
-                  </div>
-                </div>
+                </aside>
               </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Select a listing to see details.</p>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
-              {galleryImages.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">Photos</h3>
-                  <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                    {galleryImages.map((photo, index) => (
-                      <button
-                        key={`${photo}-${index}`}
-                        type="button"
-                        onClick={() => openImageViewer(index)}
-                        className="group relative h-32 w-full overflow-hidden rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                      >
-                        <img
-                          src={photo}
-                          alt={`${selectedListing.title} photo ${index + 1}`}
-                          className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                        />
-                        <span className="sr-only">View photo {index + 1}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              </div>
-              <aside className="space-y-4">
-                {isCollector ? (
-                  <DonorInfoPanel
-                    donorName={detailOwner?.name || selectedListing.userName}
-                    donorAvatar={detailOwner?.profile_image || null}
-                    donorVerification={detailOwner?.verification ?? null}
-                    claimStatus={collectorClaimStatus}
-                    claimApprovedAt={selectedListing.claimApprovedAt ?? null}
-                    claimCompletedAt={selectedListing.claimCompletedAt ?? null}
-                    canOpenConversation={canOpenCollectorChat}
-                    onOpenConversation={handleCollectorConversation}
-                  />
-                ) : (
-                  <DropOffQrPanel
-                    listing={selectedListing}
-                    dropOffLocation={dropOffLocationDetail}
-                    qrImageUrl={qrImageUrl}
-                    isLoading={detailsLoading}
-                  />
-                )}
-                {showCollectorRequests && (
-                  <CollectorRequestsPanel
-                    requests={listingRequests}
-                    getChatForItem={getChatForItem}
-                    onApprove={handleApproveRequest}
-                    onMarkCollected={handleMarkCollected}
-                    onOpenConversation={handleOpenConversation}
-                    openMessages={openMessages}
-                  />
-                )}
-              </aside>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Select a listing to see details.</p>
-          )}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={imageViewerOpen} onOpenChange={(open) => setImageViewerOpen(open)}>
-        <DialogContent className="max-w-4xl border-none bg-black p-0 text-white shadow-2xl sm:max-w-5xl max-h-[90vh] overflow-hidden [&>button]:text-white [&>button:hover]:text-white">
+      <Drawer open={imageViewerOpen} onOpenChange={setImageViewerOpen}>
+        <DrawerContent
+          ref={viewerContentRef}
+          tabIndex={-1}
+          aria-label="Listing image viewer"
+          className="max-w-4xl border-none bg-black p-0 text-white shadow-2xl sm:max-w-5xl max-h-[90vh] overflow-hidden [&>button]:text-white [&>button:hover]:text-white"
+        >
+          <DrawerTitle className="sr-only">Listing image viewer</DrawerTitle>
+          <DrawerClose
+            ref={viewerCloseButtonRef}
+            className="absolute right-3 top-3 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/50"
+            aria-label="Close image viewer"
+          >
+            <X size={16} weight="bold" />
+          </DrawerClose>
           {activeImage ? (
             <div className="flex h-full flex-col">
               <div className="relative flex min-h-[50vh] flex-1 items-center justify-center bg-black">
@@ -987,8 +1127,8 @@ if (variant === 'dashboard') {
           ) : (
             <div className="flex h-60 items-center justify-center bg-black text-sm text-white/70">No image selected.</div>
           )}
-        </DialogContent>
-      </Dialog>
+        </DrawerContent>
+      </Drawer>
     </>
   )
 }
@@ -1001,17 +1141,8 @@ interface DropOffQrPanelProps {
 }
 
 function DropOffQrPanel({ listing, dropOffLocation, qrImageUrl, isLoading }: DropOffQrPanelProps) {
-  const actionCopy = listing.actionType === 'exchange'
-    ? 'exchange hand-off'
-    : listing.actionType === 'recycle'
-      ? 'recycling drop-off'
-      : 'donation drop-off'
-
   const isDonation = listing.actionType === 'donate'
-  const heading = 'Item successfully posted'
-  const descriptionCopy = isDonation
-    ? 'Your drop-off QR is ready. Present this code at the partner shop to record your donation.'
-    : 'Share this code with the collector to complete the request.'
+  const heading = 'QR Delivery'
   return (
     <div className="space-y-6 rounded-2xl border bg-background p-6 shadow-sm">
       <div className="space-y-2">
@@ -1019,10 +1150,9 @@ function DropOffQrPanel({ listing, dropOffLocation, qrImageUrl, isLoading }: Dro
           <QrCode size={20} />
           {heading}
         </h3>
-        <p className="text-sm text-muted-foreground">{descriptionCopy}</p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,auto)_minmax(0,1fr)] items-start">
+      <div className="grid gap-6 items-start">
         <div className="flex flex-col items-center gap-4">
           {qrImageUrl ? (
             <div className="rounded-xl border bg-white p-4 shadow-sm">
@@ -1062,6 +1192,16 @@ function DropOffQrPanel({ listing, dropOffLocation, qrImageUrl, isLoading }: Dro
                     )}
                   </div>
                 </div>
+                {/* Show open/closed status if opening_hours is available */}
+                {dropOffLocation.openHours && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <Clock size={14} />
+                    <span>
+                      {/* If openHours is a string, you may need to parse it to use isLocationOpen, otherwise just display it */}
+                      {dropOffLocation.openHours}
+                    </span>
+                  </div>
+                )}
                 {(dropOffLocation.openHours || dropOffLocation.phone) && (
                   <div className="space-y-2 rounded-lg bg-muted/30 p-3 text-xs text-muted-foreground">
                     {dropOffLocation.openHours && (
@@ -1086,11 +1226,6 @@ function DropOffQrPanel({ listing, dropOffLocation, qrImageUrl, isLoading }: Dro
             )}
           </div>
 
-          <div className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-4 text-xs text-muted-foreground">
-            {isDonation
-              ? <>Bring this QR to the partner shop so staff can confirm your {actionCopy} and award your points.</>
-              : 'Share the QR code with the collector when you hand over the item.'}
-          </div>
         </div>
       </div>
     </div>

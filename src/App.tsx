@@ -73,6 +73,8 @@ interface UserProfile {
 
 function App() {
   const [currentTab, setCurrentTabState] = useState('home')
+  // Track if any modal/drawer is open
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [user, setUser] = useKV<UserProfile | null>('current-user', null)
   const [onboardingDismissals, setOnboardingDismissals] = useKV<Record<string, boolean>>('onboarding-dismissals', {})
@@ -94,7 +96,7 @@ function App() {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const themeControls = useThemeMode()
   const isMobile = useIsMobile()
-  
+
   const {
     notifications: systemNotifications,
     markAsRead: markSystemNotificationAsRead,
@@ -149,7 +151,7 @@ function App() {
     }
     syncMe()
     return () => { active = false }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const pendingListingRequests = useMemo(() => {
     if (!user) return 0
@@ -545,7 +547,7 @@ function App() {
 
   const handleToggleUserType = () => {
     if (!user) return
-    
+
     const newUserType: 'donor' | 'collector' = user.userType === 'donor' ? 'collector' : 'donor'
     const updatedUser: UserProfile = { ...user, userType: newUserType }
     setUser(updatedUser)
@@ -588,9 +590,8 @@ function App() {
 
     navigateToTab('listings')
     toast.success(isDropOff ? 'Drop-off QR ready!' : 'Pickup QR ready!', {
-      description: `Transaction ${qrCode.transactionId} for "${listing.title}" is saved under your ${
-        isDropOff ? 'partner shop drop-offs' : 'collection pickups'
-      }.`
+      description: `Transaction ${qrCode.transactionId} for "${listing.title}" is saved under your ${isDropOff ? 'partner shop drop-offs' : 'collection pickups'
+        }.`
     })
   }, [navigateToTab])
 
@@ -602,7 +603,7 @@ function App() {
   }
 
   const handleStartListing = useCallback((intent?: 'exchange' | 'donate' | 'recycle') => {
-    const fallbackIntent: 'exchange' | 'donate' | 'recycle' = intent ?? (user?.userType === 'collector' ? 'exchange' : 'donate')
+    const fallbackIntent: 'exchange' | 'donate' | 'recycle' = intent ?? 'exchange'
 
     setPendingListingIntent(fallbackIntent)
     setPendingFulfillmentMethod(fallbackIntent === 'donate' ? 'dropoff' : 'pickup')
@@ -748,7 +749,7 @@ function App() {
                         <DropdownMenuItem
                           variant="destructive"
                           onSelect={() => {
-                            try { void clearTokens() } catch {}
+                            try { void clearTokens() } catch { }
                             setUser(null as any)
                             navigateToTab('home')
                           }}
@@ -854,7 +855,7 @@ function App() {
                       <DropdownMenuItem
                         variant="destructive"
                         onSelect={() => {
-                          try { void clearTokens() } catch {}
+                          try { void clearTokens() } catch { }
                           setUser(null as any)
                           navigateToTab('home')
                         }}
@@ -904,7 +905,7 @@ function App() {
       </nav>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8" {...(drawerOpen ? { inert: '' } : {})}>
         {currentTab === 'messages' ? (
           <MessageCenter
             mode="page"
@@ -913,134 +914,135 @@ function App() {
             initialView={messageCenterView}
           />
         ) : (
-        <Tabs value={currentTab} onValueChange={navigateToTab}>
-          {hasHomeTab && (
-            <TabsContent value="home">
-              <Homepage
-                onExploreBrowse={() => {
-                  if (user?.userType === 'donor') {
-                    const updated = { ...user, userType: 'collector' as const }
-                    setUser(updated)
-                    setTimeout(() => {
-                      navigateToTab('browse')
-                      document.getElementById('item-listing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    }, 0)
-                  } else {
-                    navigateToTab(hasBrowseTab ? 'browse' : 'listings')
-                    if (hasBrowseTab) {
-                      document.getElementById('item-listing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          <Tabs value={currentTab} onValueChange={navigateToTab}>
+            {hasHomeTab && (
+              <TabsContent value="home">
+                <Homepage
+                  onExploreBrowse={() => {
+                    if (user?.userType === 'donor') {
+                      const updated = { ...user, userType: 'collector' as const }
+                      setUser(updated)
+                      setTimeout(() => {
+                        navigateToTab('browse')
+                        document.getElementById('item-listing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }, 0)
+                    } else {
+                      navigateToTab(hasBrowseTab ? 'browse' : 'listings')
+                      if (hasBrowseTab) {
+                        document.getElementById('item-listing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }
                     }
-                  }
-                }}
-                onStartListing={() => {
-                  if (user?.userType === 'collector') {
-                    const updated = { ...user, userType: 'donor' as const }
-                    setUser(updated)
-                    setTimeout(() => {
+                  }}
+                  onStartListing={() => {
+                    if (user?.userType === 'collector') {
+                      const updated = { ...user, userType: 'donor' as const }
+                      setUser(updated)
+                      setTimeout(() => {
+                        handleStartListing('donate')
+                      }, 0)
+                    } else {
                       handleStartListing('donate')
-                    }, 0)
-                  } else {
-                    handleStartListing('donate')
+                    }
+                  }}
+                  onViewImpact={() => navigateToTab('impact')}
+                  onViewPartners={() => {
+                    if (hasDropOffTab) {
+                      navigateToTab('dropoff')
+                    } else {
+                      handleStartListing('donate')
+                    }
+                  }}
+                  onOpenMessages={handleOpenMessages}
+                  onSearch={handleSearch}
+                  onSearchChange={setSearchQuery}
+                  searchQuery={searchQuery}
+                  isAuthenticated={Boolean(user)}
+                  userName={userFirstName}
+                  onSignIn={handleSignIn}
+                  onSignUp={handleSignUp}
+                />
+              </TabsContent>
+            )}
+
+            {hasBrowseTab && (
+              <TabsContent value="browse">
+                <section id="item-listing-section">
+                  <ItemListing
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    onSearchSubmit={handleSearch}
+                    onOpenMessages={handleOpenMessages}
+                  />
+                </section>
+              </TabsContent>
+            )}
+
+            <TabsContent value="listings">
+              <MyListingsView
+                onAddNewItem={() => {
+                  // From My Collected Items, adding an item should switch to donor mode and open the listing flow.
+                  if (user) {
+                    const next = user.userType === 'collector' ? { ...user, userType: 'donor' as const } : user
+                    if (next !== user) setUser(next)
                   }
-                }}
-                onViewImpact={() => navigateToTab('impact')}
-                onViewPartners={() => {
-                  if (hasDropOffTab) {
-                    navigateToTab('dropoff')
-                  } else {
-                    handleStartListing('donate')
-                  }
+                  handleStartListing('donate')
                 }}
                 onOpenMessages={handleOpenMessages}
-                onSearch={handleSearch}
-                onSearchChange={setSearchQuery}
-                searchQuery={searchQuery}
-                isAuthenticated={Boolean(user)}
-                userName={userFirstName}
-                onSignIn={handleSignIn}
-                onSignUp={handleSignUp}
+                onEditListing={(draft) => {
+                  setPendingListingEdit(draft)
+                  setPendingListingIntent(null)
+                  setPendingFulfillmentMethod(null)
+                  setPendingDropOffLocation(null)
+                  navigateToTab('list')
+                }}
+                onDrawerOpenChange={setDrawerOpen}
               />
             </TabsContent>
-          )}
 
-          {hasBrowseTab && (
-            <TabsContent value="browse">
-              <section id="item-listing-section">
-                <ItemListing
-                  searchQuery={searchQuery}
-                  onSearchChange={setSearchQuery}
-                  onSearchSubmit={handleSearch}
-                  onOpenMessages={handleOpenMessages}
+
+
+            <TabsContent value="list">
+              <ItemListingForm
+                onComplete={handleListingComplete}
+                prefillFulfillmentMethod={pendingListingEdit ? null : pendingFulfillmentMethod}
+                prefillDropOffLocation={pendingListingEdit ? null : pendingDropOffLocation}
+                onFulfillmentPrefillHandled={() => setPendingFulfillmentMethod(null)}
+                onDropOffPrefillHandled={() => setPendingDropOffLocation(null)}
+                initialIntent={pendingListingEdit ? null : pendingListingIntent}
+                onIntentHandled={() => setPendingListingIntent(null)}
+                editingListing={pendingListingEdit}
+                onEditingHandled={() => setPendingListingEdit(null)}
+              />
+            </TabsContent>
+
+            {hasDropOffTab && (
+              <TabsContent value="dropoff">
+                <DropOffMap
+                  onPlanDropOff={handleDropOffPlanned}
+                  highlightGuidedFlow={pendingFulfillmentMethod === 'dropoff'}
                 />
-              </section>
-            </TabsContent>
-          )}
-
-          <TabsContent value="listings">
-            <MyListingsView
-              onAddNewItem={() => {
-                // From My Collected Items, adding an item should switch to donor mode and open the listing flow.
-                if (user) {
-                  const next = user.userType === 'collector' ? { ...user, userType: 'donor' as const } : user
-                  if (next !== user) setUser(next)
-                }
-                handleStartListing('donate')
-              }}
-              onOpenMessages={handleOpenMessages}
-              onEditListing={(draft) => {
-                setPendingListingEdit(draft)
-                setPendingListingIntent(null)
-                setPendingFulfillmentMethod(null)
-                setPendingDropOffLocation(null)
-                navigateToTab('list')
-              }}
-            />
-          </TabsContent>
-
-          
-
-          <TabsContent value="list">
-            <ItemListingForm
-              onComplete={handleListingComplete}
-              prefillFulfillmentMethod={pendingListingEdit ? null : pendingFulfillmentMethod}
-              prefillDropOffLocation={pendingListingEdit ? null : pendingDropOffLocation}
-              onFulfillmentPrefillHandled={() => setPendingFulfillmentMethod(null)}
-              onDropOffPrefillHandled={() => setPendingDropOffLocation(null)}
-              initialIntent={pendingListingEdit ? null : pendingListingIntent}
-              onIntentHandled={() => setPendingListingIntent(null)}
-              editingListing={pendingListingEdit}
-              onEditingHandled={() => setPendingListingEdit(null)}
-            />
-          </TabsContent>
-
-          {hasDropOffTab && (
-            <TabsContent value="dropoff">
-              <DropOffMap
-                onPlanDropOff={handleDropOffPlanned}
-                highlightGuidedFlow={pendingFulfillmentMethod === 'dropoff'}
-              />
-            </TabsContent>
-          )}
-
-          <TabsContent value="impact">
-            <CarbonTracker />
-          </TabsContent>
-
-          <TabsContent value="profile">
-            {user && showDemoGuide && currentTab === 'profile' && (
-              <DemoGuide
-                onSwitchProfile={handleToggleUserType}
-                currentUserType={user.userType}
-                userName={userFirstName ?? 'User'}
-                onComplete={handleDemoGuideComplete}
-              />
+              </TabsContent>
             )}
-            <ProfileDashboard
-              onCreateListing={() => handleStartListing()}
-              onOpenMessages={handleOpenMessages}
-            />
-          </TabsContent>
-        </Tabs>
+
+            <TabsContent value="impact">
+              <CarbonTracker />
+            </TabsContent>
+
+            <TabsContent value="profile">
+              {user && showDemoGuide && currentTab === 'profile' && (
+                <DemoGuide
+                  onSwitchProfile={handleToggleUserType}
+                  currentUserType={user.userType}
+                  userName={userFirstName ?? 'User'}
+                  onComplete={handleDemoGuideComplete}
+                />
+              )}
+              <ProfileDashboard
+                onCreateListing={() => handleStartListing()}
+                onOpenMessages={handleOpenMessages}
+              />
+            </TabsContent>
+          </Tabs>
         )}
       </main>
 
@@ -1060,7 +1062,7 @@ function App() {
                   Sustainable item exchange platform for London communities
                 </p>
               </div>
-              
+
               <div>
                 <h3 className="font-medium mb-3">Features</h3>
                 <div className="space-y-2 text-small text-muted-foreground">
@@ -1070,7 +1072,7 @@ function App() {
                   <p>Drop-off Points</p>
                 </div>
               </div>
-              
+
               <div>
                 <h3 className="font-medium mb-3">Support</h3>
                 <div className="space-y-2 text-small text-muted-foreground">
@@ -1080,7 +1082,7 @@ function App() {
                   <p>Contact Us</p>
                 </div>
               </div>
-              
+
               <div>
                 <h3 className="font-medium mb-3">Environmental Impact</h3>
                 <div className="flex items-center space-x-4">
@@ -1095,7 +1097,7 @@ function App() {
                 </div>
               </div>
             </div>
-            
+
             <div className="mt-8 pt-8 border-t border-border text-center text-small text-muted-foreground">
               <p>&copy; {new Date().getFullYear()} TruCycle. Building sustainable communities in London.</p>
             </div>

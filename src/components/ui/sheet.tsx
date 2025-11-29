@@ -1,4 +1,4 @@
-import { ComponentProps } from "react"
+import { ComponentProps, ComponentPropsWithoutRef, ElementRef, forwardRef } from "react"
 import * as SheetPrimitive from "@radix-ui/react-dialog"
 import XIcon from "lucide-react/dist/esm/icons/x"
 
@@ -14,11 +14,13 @@ function SheetTrigger({
   return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />
 }
 
-function SheetClose({
-  ...props
-}: ComponentProps<typeof SheetPrimitive.Close>) {
-  return <SheetPrimitive.Close data-slot="sheet-close" {...props} />
-}
+const SheetClose = forwardRef<
+  ElementRef<typeof SheetPrimitive.Close>,
+  ComponentPropsWithoutRef<typeof SheetPrimitive.Close>
+>(({ ...props }, ref) => {
+  return <SheetPrimitive.Close ref={ref} data-slot="sheet-close" {...props} />
+})
+SheetClose.displayName = 'SheetClose'
 
 function SheetPortal({
   ...props
@@ -26,12 +28,13 @@ function SheetPortal({
   return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />
 }
 
-function SheetOverlay({
-  className,
-  ...props
-}: ComponentProps<typeof SheetPrimitive.Overlay>) {
+const SheetOverlay = forwardRef<
+  ElementRef<typeof SheetPrimitive.Overlay>,
+  ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>
+>(({ className, ...props }, ref) => {
   return (
     <SheetPrimitive.Overlay
+      ref={ref}
       data-slot="sheet-overlay"
       className={cn(
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
@@ -40,20 +43,20 @@ function SheetOverlay({
       {...props}
     />
   )
-}
+})
+SheetOverlay.displayName = 'SheetOverlay'
 
-function SheetContent({
-  className,
-  children,
-  side = "right",
-  ...props
-}: ComponentProps<typeof SheetPrimitive.Content> & {
-  side?: "top" | "right" | "bottom" | "left"
-}) {
+const SheetContent = forwardRef<
+  ElementRef<typeof SheetPrimitive.Content>,
+  ComponentPropsWithoutRef<typeof SheetPrimitive.Content> & {
+    side?: "top" | "right" | "bottom" | "left"
+  }
+>(({ className, children, side = "right", ...props }, ref) => {
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Content
+        ref={ref}
         data-slot="sheet-content"
         className={cn(
           "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
@@ -77,7 +80,8 @@ function SheetContent({
       </SheetPrimitive.Content>
     </SheetPortal>
   )
-}
+})
+SheetContent.displayName = "SheetContent"
 
 function SheetHeader({ className, ...props }: ComponentProps<"div">) {
   return (
