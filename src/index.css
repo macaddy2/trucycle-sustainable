@@ -8,38 +8,25 @@
 }
 
 :root {
-  /* TruCycle sustainable theme colors */
-  --background: oklch(0.98 0 0);
-  --foreground: oklch(0.2 0 0);
-
-  --card: oklch(0.85 0.05 140);
-  --card-foreground: oklch(0.2 0 0);
-  --popover: oklch(0.98 0 0);
-  --popover-foreground: oklch(0.2 0 0);
-
-  /* Primary Forest Green */
-  --primary: oklch(0.45 0.15 145);
-  --primary-foreground: oklch(0.98 0 0);
-  
-  /* Sage Green for secondary */
-  --secondary: oklch(0.65 0.08 135);
-  --secondary-foreground: oklch(0.2 0 0);
-  
-  /* Light green backgrounds */
-  --muted: oklch(0.85 0.05 140);
-  --muted-foreground: oklch(0.45 0 0);
-  
-  /* Teal accent */
-  --accent: oklch(0.55 0.12 180);
-  --accent-foreground: oklch(0.98 0 0);
-  
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.98 0 0);
-  
-  --border: oklch(0.75 0.05 135);
-  --input: oklch(0.75 0.05 135);
-  --ring: oklch(0.55 0.12 180);
-
+  --background: #f6f7fb;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #16a34a;
+  --primary-foreground: #f0fdf4;
+  --secondary: #e5e7eb;
+  --secondary-foreground: #0f172a;
+  --muted: #e8ecf3;
+  --muted-foreground: #3f4d5f;
+  --accent: #22c55e;
+  --accent-foreground: #052e16;
+  --destructive: #ef4444;
+  --destructive-foreground: #f8fafc;
+  --border: #d7dce3;
+  --input: #d7dce3;
+  --ring: #86efac;
   --radius: 0.5rem;
 }
 

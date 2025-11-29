@@ -361,7 +361,6 @@ export function MyListingsView({
         ? `${selectedListing.dropOffLocation.name}${selectedListing.dropOffLocation.postcode ? ` — ${selectedListing.dropOffLocation.postcode}` : ''}`
         : detailItem?.location?.address_line || 'Partner location shared after confirmation')
     : (selectedListing?.location || detailItem?.location?.address_line || 'Pickup location to be confirmed in chat')
-  const isDonation = selectedListing?.actionType === 'donate'
   const showCollectorRequests = !isCollector
   const detailOwner = detailItem?.owner
 
@@ -1185,20 +1184,6 @@ interface CollectorRequestsSharedProps {
   onMarkCollected: (itemId: string) => void | Promise<void>
   onOpenConversation: (request: ClaimRequest) => void | Promise<void>
   openMessages?: (options?: { chatId?: string }) => void
-}
-
-function CollectorRequestsSection(props: CollectorRequestsSharedProps) {
-  const { requests } = props
-  return (
-    <div>
-      <h3 className="text-sm font-semibold mb-2">Collector requests</h3>
-      {requests.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No collectors have requested this item yet.</p>
-      ) : (
-        <CollectorRequestsList {...props} />
-      )}
-    </div>
-  )
 }
 
 function CollectorRequestsPanel(props: CollectorRequestsSharedProps) {

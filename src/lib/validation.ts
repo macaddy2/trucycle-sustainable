@@ -1,4 +1,6 @@
 const STRIP_TAGS_REGEX = /<\/?[^>]+>/g
+// Intentionally matches control characters for sanitization
+// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS_REGEX = /[\u0000-\u0009\u000B-\u000C\u000E-\u001F\u007F]/g
 
 export const SAFE_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']

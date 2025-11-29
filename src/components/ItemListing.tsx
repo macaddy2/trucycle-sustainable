@@ -92,6 +92,84 @@ const actionIcon = {
   recycle: Recycle,
 } as const
 
+const formatPartnerOpeningHours = (
+  opening?: { days?: string[]; open_time?: string | null; close_time?: string | null } | null
+): string | null => {
+  if (!opening) return null
+  const days = Array.isArray(opening.days) && opening.days.length > 0 ? opening.days.join(' · ') : null
+  const base = days ?? 'Daily'
+  if (opening.open_time && opening.close_time) return `${base} ${opening.open_time} - ${opening.close_time}`
+  if (opening.open_time) return `${base} from ${opening.open_time}`
+  if (opening.close_time) return `${base} until ${opening.close_time}`
+  return days
+}
+
+function mapPublicItemToListingItem(it: any): ListingItem {
+  const cond = String(it?.condition || '').toLowerCase()
+  const condition: ListingItem['condition'] = cond === 'new' || cond === 'like_new'
+    ? 'excellent'
+    : (['good', 'fair', 'poor'].includes(cond) ? (cond as ListingItem['condition']) : 'good')
+
+  const owner = it?.owner || {}
+  const verification = owner?.verification || {}
+  const ownerVerificationLevel: VerificationLevel = {
+    email: Boolean(verification.email_verified),
+    identity: Boolean(verification.identity_verified),
+    address: Boolean(verification.address_verified),
+  }
+
+  const photos = Array.isArray(it?.images) ? it.images.map((img: any) => img?.url).filter(Boolean) : []
+  const distance = typeof it?.distance_km === 'number'
+    ? `${(it.distance_km * 0.621371).toFixed(1)} mi`
+    : ''
+  const actionType = (it?.pickup_option || 'donate') as ListingItem['actionType']
+  const claimRaw = it?.claim
+  const claim = claimRaw
+    ? {
+        status: String(claimRaw.status || ''),
+        requestedAt: claimRaw.requested_at ? String(claimRaw.requested_at) : undefined,
+        claimedAt: claimRaw.claimed_at === null
+          ? null
+          : (typeof claimRaw.claimed_at === 'string' ? String(claimRaw.claimed_at) : undefined),
+      }
+    : null
+
+  const dropLocation = it?.dropoff_location
+  const partnerLocation = dropLocation
+    ? {
+        id: dropLocation.id ? String(dropLocation.id) : undefined,
+        name: dropLocation.name || 'Partner shop',
+        addressLine: dropLocation.address_line ?? null,
+        postcode: dropLocation.postcode ?? null,
+        phoneNumber: dropLocation.phone_number ?? null,
+        openingHours: formatPartnerOpeningHours(dropLocation.opening_hours ?? null),
+        operationalNotes: dropLocation.operational_notes ?? null,
+      }
+    : null
+
+  return {
+    id: String(it?.id || crypto.randomUUID()),
+    title: String(it?.title || 'Untitled'),
+    description: String(it?.description || ''),
+    category: String(it?.category || 'Other'),
+    condition,
+    location: it?.location?.postcode || '',
+    distance,
+    actionType,
+    photos,
+    createdAt: String(it?.created_at || new Date().toISOString()),
+    co2Impact: typeof it?.estimated_co2_saved_kg === 'number' ? it.estimated_co2_saved_kg : 0,
+    verified: Boolean(verification?.email_verified) || Boolean(verification?.identity_verified) || Boolean(verification?.address_verified),
+    ownerId: String(owner?.id || ''),
+    ownerName: [owner?.first_name, owner?.last_name].filter(Boolean).join(' ') || owner?.name || 'Donor',
+    ownerAvatar: owner?.avatar_url,
+    ownerRating: typeof owner?.rating === 'number' ? owner.rating : undefined,
+    ownerVerificationLevel,
+    partnerLocation,
+    claim,
+  }
+}
+
 interface ItemListingProps {
   searchQuery: string
   onSearchChange?: (query: string) => void
@@ -162,70 +240,7 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
     }
     load()
     return () => { cancelled = true }
-  }, [selectedCategory, currentUser, locationFilter?.lat, locationFilter?.lng, locationFilter?.radiusKm])
-
-  function mapPublicItemToListingItem(it: any): ListingItem {
-    const cond = String(it?.condition || '').toLowerCase()
-    const condition: ListingItem['condition'] = cond === 'new' || cond === 'like_new' ? 'excellent' : (['good','fair','poor'].includes(cond) ? (cond as any) : 'good')
-    const owner = it?.owner || {}
-    const verification = owner?.verification || {}
-    const ownerVerificationLevel: VerificationLevel = {
-      email: Boolean(verification.email_verified),
-      identity: Boolean(verification.identity_verified),
-      address: Boolean(verification.address_verified),
-    }
-    const photos = Array.isArray(it?.images) ? it.images.map((img: any) => img?.url).filter(Boolean) : []
-    // Display distance in miles (backend supplies km)
-    const distance = typeof it?.distance_km === 'number'
-      ? `${(it.distance_km * 0.621371).toFixed(1)} mi`
-      : ''
-    const actionType = (it?.pickup_option || 'donate') as ListingItem['actionType']
-    // Map server claim field if present
-    const claimRaw = it?.claim
-    const claim = claimRaw
-      ? {
-          status: String(claimRaw.status || ''),
-          requestedAt: claimRaw.requested_at ? String(claimRaw.requested_at) : undefined,
-          claimedAt: claimRaw.claimed_at === null
-            ? null
-            : (typeof claimRaw.claimed_at === 'string' ? String(claimRaw.claimed_at) : undefined),
-        }
-      : null
-    const dropLocation = it?.dropoff_location
-    const partnerLocation = dropLocation
-      ? {
-          id: dropLocation.id ? String(dropLocation.id) : undefined,
-          name: dropLocation.name || 'Partner shop',
-          addressLine: dropLocation.address_line ?? null,
-          postcode: dropLocation.postcode ?? null,
-          phoneNumber: dropLocation.phone_number ?? null,
-          openingHours: formatPartnerOpeningHours(dropLocation.opening_hours ?? null),
-          operationalNotes: dropLocation.operational_notes ?? null,
-        }
-      : null
-
-    return {
-      id: String(it?.id || crypto.randomUUID()),
-      title: String(it?.title || 'Untitled'),
-      description: String(it?.description || ''),
-      category: String(it?.category || 'Other'),
-      condition,
-      location: it?.location?.postcode || '',
-      distance,
-      actionType,
-      photos,
-      createdAt: String(it?.created_at || new Date().toISOString()),
-      co2Impact: typeof it?.estimated_co2_saved_kg === 'number' ? it.estimated_co2_saved_kg : 0,
-      verified: Boolean(verification?.email_verified) || Boolean(verification?.identity_verified) || Boolean(verification?.address_verified),
-      ownerId: String(owner?.id || ''),
-      ownerName: String(owner?.name || 'User'),
-      ownerAvatar: owner?.profile_image || undefined,
-      ownerRating: typeof owner?.rating === 'number' ? owner.rating : undefined,
-      ownerVerificationLevel,
-      partnerLocation,
-      claim,
-    }
-  }
+  }, [currentUser, locationFilter?.lat, locationFilter?.lng, locationFilter?.radiusKm, selectedCategory])
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -286,18 +301,6 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
     if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
     const days = Math.floor(hours / 24)
     return `${days} day${days === 1 ? '' : 's'} ago`
-  }
-
-  const formatPartnerOpeningHours = (
-    opening?: { days?: string[]; open_time?: string | null; close_time?: string | null } | null
-  ): string | null => {
-    if (!opening) return null
-    const days = Array.isArray(opening.days) && opening.days.length > 0 ? opening.days.join(' · ') : null
-    const base = days ?? 'Daily'
-    if (opening.open_time && opening.close_time) return `${base} ${opening.open_time} - ${opening.close_time}`
-    if (opening.open_time) return `${base} from ${opening.open_time}`
-    if (opening.close_time) return `${base} until ${opening.close_time}`
-    return days
   }
 
   const handleSearchInputChange = (event: ChangeEvent<HTMLInputElement>) => {

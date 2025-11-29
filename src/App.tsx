@@ -40,6 +40,7 @@ import {
 } from './components'
 import { ShopScannerOverview } from './components/ShopScannerOverview'
 import { TruCycleGlyph } from './components/icons/TruCycleGlyph'
+import { ThemeToggle } from './components/ThemeToggle'
 import type { Notification } from './components/NotificationList'
 import type { DropOffLocation } from './components/dropOffLocations'
 import { AuthDialog, ProfileOnboarding } from './components/auth'
@@ -50,6 +51,7 @@ import { me as apiMe, clearTokens } from '@/lib/api'
 import type { ClaimRequest } from '@/hooks/useExchangeManager'
 import { useRecommendationNotifications, useNotifications, useExchangeManager, usePresence } from '@/hooks'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useThemeMode } from '@/hooks/useThemeMode'
 import type { ListingCompletionDetails, ListingEditDraft } from './components/ItemListingForm'
 
 interface UserProfile {
@@ -90,6 +92,7 @@ function App() {
   const [messageCenterItemId, setMessageCenterItemId] = useState<string | undefined>()
   const [messageCenterChatId, setMessageCenterChatId] = useState<string | undefined>()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const themeControls = useThemeMode()
   const isMobile = useIsMobile()
   
   const {
@@ -399,7 +402,6 @@ function App() {
     return map
   }, [trayNotifications])
 
-  const hasUnreadNotifications = user ? trayNotifications.some(({ notification }) => !notification.read) : false
   const totalUnreadNotifications = user ? systemUnreadCount + recommendationUnreadCount : 0
 
   const handleNotificationMarkAsRead = useCallback((id: string) => {
@@ -625,31 +627,33 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background font-raleway">
+    <div className="min-h-screen bg-background text-foreground font-raleway">
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container max-w-screen-2xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={handleLogoClick}
-                className="group flex items-center space-x-3 rounded-full border border-transparent px-2 py-1 transition hover:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/40"
-                title="Go to homepage"
-              >
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-primary/80 to-emerald-500 text-primary-foreground shadow-lg ring-2 ring-primary/30 transition-transform group-hover:scale-105">
-                  <TruCycleGlyph className="h-8 w-8 drop-shadow-sm" />
-                </div>
-                <h1 className="text-h2 text-foreground drop-shadow-sm">TruCycle</h1>
-              </button>
-            </div>
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/85 backdrop-blur-md">
+        <div className="container max-w-screen-2xl mx-auto px-4 sm:px-6 py-3">
+          <div className="flex items-center gap-4 md:gap-6">
+            <button
+              type="button"
+              onClick={handleLogoClick}
+              className="group inline-flex items-center gap-3 rounded-full border border-border/60 bg-card/80 px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              title="Go to homepage"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-transform group-hover:scale-105">
+                <TruCycleGlyph className="h-6 w-6" />
+              </div>
+              <h1 className="text-h2 font-semibold tracking-tight text-foreground">TruCycle</h1>
+            </button>
 
             {/* Desktop Navigation Tabs */}
             <div className="hidden md:flex flex-1 justify-center">
               <Tabs value={currentTab} onValueChange={navigateToTab}>
-                <TabsList className="gap-3 sm:gap-4 lg:gap-6 px-1">
+                <TabsList className="gap-2 rounded-full border border-border/60 bg-card/70 px-2 py-1 shadow-sm">
                   {navTabs.map(({ value, label, Icon }) => (
-                    <TabsTrigger key={value} value={value} className="flex items-center space-x-2 px-3 sm:px-4 py-1.5">
+                    <TabsTrigger
+                      key={value}
+                      value={value}
+                      className="flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-sm font-medium transition data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+                    >
                       <Icon size={16} />
                       <span className="hidden lg:inline">{label}</span>
                       {value === 'listings' && user?.userType === 'donor' && pendingListingRequests > 0 && (
@@ -663,52 +667,55 @@ function App() {
               </Tabs>
             </div>
 
-            <div className="hidden md:flex items-center space-x-6">
+            <div className="ml-auto hidden md:flex items-center gap-2 rounded-full border border-border/60 bg-card/70 px-2 py-1 shadow-sm">
               {user ? (
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
+                  <ThemeToggle mode={themeControls.mode} toggleMode={themeControls.toggleMode} />
                   <MessageNotification onOpenMessages={handleOpenMessages} />
                   {!isMobile && (
-                  <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="icon" aria-label="Notifications">
-                        <div className="relative">
-                          <Bell size={18} />
-                          {totalUnreadNotifications > 0 && (
-                            <span className="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] px-1.5 h-4 min-w-4">
-                              {totalUnreadNotifications}
-                            </span>
-                          )}
-                        </div>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="w-[420px] p-0">
-                      <NotificationList
-                        notifications={trayNotifications.map(t => t.notification)}
-                        onMarkAsRead={handleNotificationMarkAsRead}
-                        onMarkAllAsRead={handleNotificationsMarkAll}
-                        onDeleteNotification={handleNotificationDelete}
-                        onClickNotification={handleNotificationOpen}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                    <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" aria-label="Notifications" className="rounded-full">
+                          <div className="relative">
+                            <Bell size={18} />
+                            {totalUnreadNotifications > 0 && (
+                              <span className="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] px-1.5 h-4 min-w-4">
+                                {totalUnreadNotifications}
+                              </span>
+                            )}
+                          </div>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-[420px] p-0">
+                        <NotificationList
+                          notifications={trayNotifications.map(t => t.notification)}
+                          onMarkAsRead={handleNotificationMarkAsRead}
+                          onMarkAllAsRead={handleNotificationsMarkAll}
+                          onDeleteNotification={handleNotificationDelete}
+                          onClickNotification={handleNotificationOpen}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   )}
 
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setShowClaimScanner(true)}
                     title="Open scanner"
+                    className="rounded-full"
                   >
                     <QrCode size={16} />
                   </Button>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="icon"
                           aria-label="Profile menu"
+                          className="rounded-full"
                         >
                           <User size={18} />
                         </Button>
@@ -756,7 +763,8 @@ function App() {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-card/70 px-2 py-1 shadow-sm">
+                  <ThemeToggle mode={themeControls.mode} toggleMode={themeControls.toggleMode} />
                   <Button size="sm" onClick={handleSignIn}>
                     Get Started
                   </Button>
@@ -766,41 +774,43 @@ function App() {
             </div>
 
             {/* Mobile Actions (Profile, Messages, Notifications, QR) */}
-            <div className="flex md:hidden items-center space-x-2">
+            <div className="flex md:hidden items-center gap-2">
               {user ? (
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-card/80 px-2 py-1 shadow-sm">
+                  <ThemeToggle mode={themeControls.mode} toggleMode={themeControls.toggleMode} />
                   <MessageNotification onOpenMessages={handleOpenMessages} />
                   {isMobile && (
-                  <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="icon" aria-label="Notifications">
-                        <div className="relative">
-                          <Bell size={18} />
-                          {totalUnreadNotifications > 0 && (
-                            <span className="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] px-1.5 h-4 min-w-4">
-                              {totalUnreadNotifications}
-                            </span>
-                          )}
-                        </div>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="w-[420px] p-0">
-                      <NotificationList
-                        notifications={trayNotifications.map(t => t.notification)}
-                        onMarkAsRead={handleNotificationMarkAsRead}
-                        onMarkAllAsRead={handleNotificationsMarkAll}
-                        onDeleteNotification={handleNotificationDelete}
-                        onClickNotification={handleNotificationOpen}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                    <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" aria-label="Notifications" className="rounded-full">
+                          <div className="relative">
+                            <Bell size={18} />
+                            {totalUnreadNotifications > 0 && (
+                              <span className="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] px-1.5 h-4 min-w-4">
+                                {totalUnreadNotifications}
+                              </span>
+                            )}
+                          </div>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-[420px] p-0">
+                        <NotificationList
+                          notifications={trayNotifications.map(t => t.notification)}
+                          onMarkAsRead={handleNotificationMarkAsRead}
+                          onMarkAllAsRead={handleNotificationsMarkAll}
+                          onDeleteNotification={handleNotificationDelete}
+                          onClickNotification={handleNotificationOpen}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   )}
 
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
                     onClick={() => setShowClaimScanner(true)}
                     title="Open scanner"
+                    className="rounded-full"
                   >
                     <QrCode size={16} />
                   </Button>
@@ -808,9 +818,10 @@ function App() {
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="icon"
                         aria-label="Profile menu"
+                        className="rounded-full"
                       >
                         <User size={18} />
                       </Button>
@@ -854,22 +865,30 @@ function App() {
                   </DropdownMenu>
                 </div>
               ) : (
-                <Button size="sm" onClick={handleSignIn}>
-                  Get Started
-                </Button>
+                <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-card/80 px-2 py-1 shadow-sm">
+                  <ThemeToggle mode={themeControls.mode} toggleMode={themeControls.toggleMode} />
+                  <Button size="sm" onClick={handleSignIn}>
+                    Get Started
+                  </Button>
+                </div>
               )}
+
             </div>
           </div>
         </div>
       </header>
 
       {/* Mobile Navigation Tabs */}
-      <nav className="border-b border-border bg-background md:hidden">
-        <div className="container max-w-screen-2xl mx-auto px-4">
+      <nav className="md:hidden border-t border-border/60 bg-card/90 backdrop-blur-md">
+        <div className="container max-w-screen-2xl mx-auto px-4 py-2">
           <Tabs value={currentTab} onValueChange={navigateToTab} className="w-full">
-            <TabsList className="grid w-full grid-flow-col auto-cols-fr gap-1.5">
+            <TabsList className="grid w-full grid-flow-col auto-cols-fr gap-1 rounded-full border border-border/60 bg-card/80 p-1 shadow-sm">
               {navTabs.map(({ value, label, Icon }) => (
-                <TabsTrigger key={value} value={value} className="flex items-center space-x-2 py-2">
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="flex items-center justify-center gap-2 rounded-full px-3 py-2 text-sm font-medium data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+                >
                   <Icon size={16} />
                   <span className="hidden sm:inline">{label}</span>
                   {value === 'listings' && user?.userType === 'donor' && pendingListingRequests > 0 && (

@@ -8,10 +8,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   PaperPlaneTilt,
-  CheckCircle,
   MapPin,
   Package,
-  CalendarCheck,
   Paperclip,
   ArrowLeft
 } from '@phosphor-icons/react'
@@ -110,8 +108,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
   } = useMessaging()
   const {
     confirmClaimRequest,
-    completeClaimRequest,
-    getClaimRequestById,
     getRequestsForDonor,
     getRewardBalance
   } = useExchangeManager()
@@ -197,11 +193,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     return groupedRequests.find(group => group.itemId === selectedRequestItem) ?? null
   }, [groupedRequests, selectedRequestItem])
 
-  const linkedRequest = useMemo(() => {
-    if (!selectedChat?.linkedRequestId) return null
-    return getClaimRequestById(selectedChat.linkedRequestId)
-  }, [selectedChat, getClaimRequestById])
-
   const listingForChat = useMemo(() => {
     if (!selectedChat) return null
     return globalListings.find(listing => listing.id === selectedChat.itemId) ?? null
@@ -220,29 +211,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
 
     return undefined
   }, [listingForChat, selectedDropOffLocation])
-
-  const isNewChat = useMemo(() => currentMessages.every(m => m.type === 'system'), [currentMessages])
-
-  const messageTemplates = useMemo(() => {
-    if (!selectedChat || !currentUser || !isNewChat) return [] as string[]
-    const otherName = currentUser.id === selectedChat.donorId
-      ? selectedChat.collectorName
-      : selectedChat.donorName
-
-    if (currentUser.id === selectedChat.donorId) {
-      return [
-        `Thanks for requesting this item, ${otherName}! It is still available.`,
-        'Could we meet at the TruCycle partner hub this weekend to hand it over?',
-        'I will prepare the item for collection. Let me know if you need any help with transport.'
-      ]
-    }
-
-    return [
-      `Hi ${otherName}, I love this item. Is it still available?`,
-      'I can collect tomorrow afternoon if that works for you.',
-      'Could you please share the pickup address when convenient?'
-    ]
-  }, [currentUser, isNewChat, selectedChat])
 
   useEffect(() => {
     setActivePanel(initialView)
@@ -547,27 +515,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     return blocks
   }
 
-  const shareLocation = useCallback(() => {
-    if (!selectedChat) return
-    if (!navigator.geolocation) {
-      toast.error('Location sharing is not supported on this device')
-      return
-    }
-
-    navigator.geolocation.getCurrentPosition((position) => {
-      dispatchMessage(selectedChat.id, 'Shared location', 'location', {
-        location: {
-          lat: Number(position.coords.latitude.toFixed(7)),
-          lng: Number(position.coords.longitude.toFixed(7)),
-          address: 'Current location'
-        }
-      })
-      toast.success('Location shared')
-    }, () => {
-      toast.error('Could not access location')
-    })
-  }, [dispatchMessage, selectedChat])
-
   const handleApproveRequest = async (request: ClaimRequest) => {
     if (!currentUser) return
     const approved = await confirmClaimRequest(request.id)
@@ -615,36 +562,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
     }
   }
 
-  const handleConfirmCollection = useCallback(() => {
-    if (!selectedChat || !currentUser) return
-
-    if (linkedRequest) {
-      if (selectedChat.donorId !== currentUser.id && selectedChat.collectorId !== currentUser.id) {
-        toast.error('Only the donor or collector can complete this exchange.')
-        return
-      }
-
-      const result = completeClaimRequest(linkedRequest.id)
-      if (!result) return
-      if (result.alreadyCompleted) {
-        toast.info('This exchange has already been marked as collected.')
-        return
-      }
-
-      updateChatStatus(selectedChat.id, 'completed')
-      sendSystemMessage(
-        selectedChat.id,
-        `Collection confirmed. ${result.rewardPoints} GreenPoints have been awarded to the donor.`,
-        'collection_confirmed'
-      )
-      return
-    }
-
-    updateChatStatus(selectedChat.id, 'completed')
-    sendSystemMessage(selectedChat.id, 'Collection has been confirmed by both parties.', 'collection_confirmed')
-    toast.success('Collection confirmed')
-  }, [completeClaimRequest, currentUser, linkedRequest, selectedChat, sendSystemMessage, updateChatStatus])
-
   const handleQRCodeGenerated = (qrData: QRCodeData) => {
     setShowQRCode(qrData)
     const message = qrData.type === 'donor'
@@ -654,44 +571,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
       sendSystemMessage(selectedChat.id, message, 'qr_generated')
     }
   }
-
-  const quickActions = useMemo(() => {
-    const actions = [
-      {
-        label: 'Share Location',
-        icon: MapPin,
-        action: shareLocation,
-        color: 'text-blue-600',
-        visible: Boolean(selectedChat)
-      },
-      {
-        label: 'Schedule Pickup',
-        icon: CalendarCheck,
-        action: () => setShowScheduleSheet(true),
-        color: 'text-orange-600',
-        visible: Boolean(selectedChat)
-      }
-    ]
-
-    if (
-      linkedRequest &&
-      currentUser &&
-      selectedChat &&
-      listingForChat?.actionType !== 'donate' &&
-      linkedRequest.status === 'approved' &&
-      (selectedChat.donorId === currentUser.id || selectedChat.collectorId === currentUser.id)
-    ) {
-      actions.push({
-        label: 'Mark collected',
-        icon: CheckCircle,
-        action: handleConfirmCollection,
-        color: 'text-green-600',
-        visible: true
-      })
-    }
-
-    return actions.filter(action => action.visible)
-  }, [currentUser, handleConfirmCollection, linkedRequest, listingForChat, selectedChat, shareLocation])
 
   if (!currentUser) {
     if (isPage) {

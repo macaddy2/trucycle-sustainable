@@ -74,10 +74,6 @@ const verificationSteps: VerificationStep[] = [
 export function VerificationCenter({ currentVerification, onVerificationUpdate }: VerificationCenterProps) {
   const [selectedStep, setSelectedStep] = useState<VerificationStep | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [formData, setFormData] = useState({
-    addressDoc: null as File | null,
-    identityDoc: null as File | null
-  })
 
   const completedSteps = Object.values(currentVerification || {}).filter(Boolean).length
   const totalSteps = Object.keys(currentVerification || {}).length

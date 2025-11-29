@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computePartnerScanState } from './PartnerScanModal'
+import { computePartnerScanState } from './partnerScanUtils'
 
 describe('computePartnerScanState', () => {
   it('prefers drop-off for donate items in pre-dropoff states', () => {
