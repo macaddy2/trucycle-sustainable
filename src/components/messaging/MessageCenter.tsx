@@ -616,11 +616,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
           <div className="flex items-center justify-between border-b border-border p-4">
             <div>
               <h2 className="text-h3 font-medium">Messages</h2>
-              <p className="text-small text-muted-foreground">
-                {normalizedChats.length} active conversation{normalizedChats.length === 1 ? '' : 's'}
-              </p>
             </div>
-            {/* Requests tab removed: requests are managed in My Listings */}
           </div>
 
           {false ? (
@@ -777,7 +773,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                       {normalizedChats.map(chat => (
                         <Card
                           key={chat.id}
-                          className={`cursor-pointer transition-colors ${
+                          className={`cursor-pointer transition-colors py-4 px-2 ${
                             selectedChatId === chat.id ? 'bg-muted border-primary' : 'hover:bg-muted/50'
                           }`}
                           onClick={() => {
@@ -787,7 +783,7 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                             }
                           }}
                         >
-                          <CardContent className="p-3">
+                          <CardContent className='px-1'>
                             <div className="flex items-start space-x-3">
                               <Avatar className="w-10 h-10">
                                 <AvatarImage src={currentUser.id === chat.donorId ? chat.collectorAvatar : chat.donorAvatar} />
@@ -816,7 +812,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                                     </Badge>
                                   )}
                                 </div>
-                                <p className="text-xs text-muted-foreground truncate">{chat.itemTitle}</p>
                                 {chat.lastMessage && (
                                   <p className="text-xs text-muted-foreground truncate mt-1">
                                     {chat.lastMessage.content}
@@ -883,7 +878,6 @@ export function MessageCenter({ open = false, onOpenChange, itemId, chatId, init
                               {currentUser.id === selectedChat.donorId ? selectedChat.collectorName : selectedChat.donorName}
                             </h3>
                           </div>
-                          <p className="text-small text-muted-foreground">About: {selectedChat.itemTitle}</p>
                         </div>
                       </div>
                       <Badge variant={selectedChat.status === 'active' ? 'secondary' : 'outline'}>

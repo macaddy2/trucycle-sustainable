@@ -157,9 +157,6 @@ export function NotificationList({
                 </Badge>
               )}
             </CardTitle>
-            <CardDescription>
-              Stay updated with your TruCycle activity
-            </CardDescription>
           </div>
           {unreadCount > 0 && onMarkAllAsRead && (
             <Button variant="outline" size="sm" onClick={onMarkAllAsRead}>

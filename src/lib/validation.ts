@@ -9,25 +9,31 @@ export const DEFAULT_MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5MB per image by defau
 type SanitizeOptions = {
   maxLength?: number
   allowNewlines?: boolean
+  preserveTrailingWhitespace?: boolean
 }
 
 export function sanitizeText(input: string, options: SanitizeOptions = {}): string {
   const maxLength = Math.max(1, options.maxLength ?? 500)
   const allowNewlines = options.allowNewlines ?? false
+  const preserveTrailingWhitespace = options.preserveTrailingWhitespace ?? false
   let value = (input ?? '').replace(STRIP_TAGS_REGEX, ' ')
   value = value.replace(CONTROL_CHARS_REGEX, ' ')
 
   if (allowNewlines) {
     value = value
       .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
+      .map((line) => {
+        const collapsed = line.replace(/\s+/g, ' ')
+        return preserveTrailingWhitespace ? collapsed : collapsed.trim()
+      })
       .join('\n')
   } else {
     value = value.replace(/\s+/g, ' ')
   }
 
-  value = value.trim()
+  if (!preserveTrailingWhitespace) {
+    value = value.trim()
+  }
   if (value.length > maxLength) {
     value = value.slice(0, maxLength)
   }

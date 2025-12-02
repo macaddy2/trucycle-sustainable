@@ -33,12 +33,10 @@ interface Chat {
 export function MessageNotification({ onOpenMessages }: MessageNotificationProps) {
   const [currentUser] = useKV('current-user', null)
   const { chats, refreshActiveRooms, getTotalUnreadCount } = useMessaging()
-  const [showTooltip, setShowTooltip] = useState(false)
   const { pendingRequestCountByItem } = useExchangeManager()
 
   useEffect(() => {
     if (currentUser) {
-      // Ensure we load active rooms from backend for the header tooltip
       refreshActiveRooms()
     }
   }, [currentUser, refreshActiveRooms])
@@ -49,80 +47,27 @@ export function MessageNotification({ onOpenMessages }: MessageNotificationProps
     ? Object.values(pendingRequestCountByItem).reduce((sum, count) => sum + count, 0)
     : 0
 
-  // Show notification tooltip for new messages
-  useEffect(() => {
-    if (totalUnread > 0) {
-      setShowTooltip(true)
-      const timer = setTimeout(() => setShowTooltip(false), 3000)
-      return () => clearTimeout(timer)
-    }
-  }, [totalUnread])
+  // ...existing code...
 
   if (!currentUser) return null
 
   return (
-    <TooltipProvider>
-      <Tooltip open={showTooltip} onOpenChange={setShowTooltip}>
-        <TooltipTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onOpenMessages}
-            className="relative"
-          >
-            <ChatCircle size={16} className="mr-2" />
-            Messages
-            {totalUnread > 0 && (
-              <Badge
-                variant="destructive"
-                className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-              >
-                {totalUnread > 9 ? '9+' : totalUnread}
-              </Badge>
-            )}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" className="max-w-sm">
-          <div className="space-y-2">
-            <p className="font-medium">
-              {totalUnread > 0 ? `${totalUnread} new messages` : 'No new messages'}
-            </p>
-            {pendingRequests > 0 && (
-              <p className="text-xs text-amber-600">
-                {pendingRequests} claim request{pendingRequests === 1 ? '' : 's'} waiting for your review.
-              </p>
-            )}
-            {activeChats.slice(0, 3).map(chat => (
-              <div key={chat.id} className="flex items-center space-x-2 text-sm">
-                <Avatar className="w-6 h-6">
-                  <AvatarFallback className="text-xs">
-                    {((currentUser.id === chat.donorId ? chat.collectorName : chat.donorName) || '?')[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="truncate">
-                    {currentUser.id === chat.donorId ? chat.collectorName : chat.donorName}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {chat.itemTitle}
-                  </p>
-                </div>
-                {chat.unreadCount > 0 && (
-                  <Badge variant="secondary" className="text-xs">
-                    {chat.unreadCount}
-                  </Badge>
-                )}
-              </div>
-            ))}
-            {activeChats.length > 3 && (
-              <p className="text-xs text-muted-foreground">
-                +{activeChats.length - 3} more conversations
-              </p>
-            )}
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={onOpenMessages}
+      className="relative rounded-full"
+    >
+      <ChatCircle size={16} />
+      {totalUnread > 0 && (
+        <Badge
+          variant="destructive"
+          className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+        >
+          {totalUnread > 9 ? '9+' : totalUnread}
+        </Badge>
+      )}
+    </Button>
   )
 }
 
@@ -135,9 +80,9 @@ interface InlineMessageProps {
 export function InlineMessage({ itemId, isOwner, onStartChat }: InlineMessageProps) {
   const [currentUser] = useKV('current-user', null)
   const [chats] = useKV('user-chats', [] as Chat[])
-  
+
   const existingChat = chats.find(chat => chat.itemId === itemId)
-  
+
   if (!currentUser || isOwner) return null
 
   return (
@@ -155,7 +100,7 @@ export function InlineMessage({ itemId, isOwner, onStartChat }: InlineMessagePro
               </p>
             </div>
           </div>
-          
+
           {existingChat ? (
             <div className="flex items-center space-x-2">
               {existingChat.unreadCount > 0 && (
@@ -168,7 +113,7 @@ export function InlineMessage({ itemId, isOwner, onStartChat }: InlineMessagePro
               </Button>
             </div>
           ) : (
-            <Button 
+            <Button
               size="sm"
               onClick={() => onStartChat('donor_id', 'Item Owner')}
             >

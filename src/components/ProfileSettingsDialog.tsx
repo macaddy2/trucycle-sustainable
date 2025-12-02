@@ -267,7 +267,6 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
               <TabsList className="grid grid-cols-2">
                 <TabsTrigger value="account">Account</TabsTrigger>
-                <TabsTrigger value="partner">Partner</TabsTrigger>
               </TabsList>
 
               <TabsContent value="account" className="space-y-4 pt-4">
@@ -322,29 +321,6 @@ export function ProfileSettingsDialog({ open, onOpenChange }: ProfileSettingsDia
                       Stored in km internally for search; displayed here in miles.
                     </p>
                   </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="partner" className="space-y-4 pt-4">
-                <div className="rounded-lg border border-border p-4 flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Partner shop</p>
-                    <p className="text-sm text-muted-foreground">
-                      Access partner tools for QR check-in and collection logs.
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      const base = (import.meta as any).env?.BASE_URL || '/'
-                      if (user?.partnerAccess) {
-                        window.location.assign(String(base || '/').replace(/\/$/, '') + '/partner')
-                      } else {
-                        window.location.assign(String(base || '/').replace(/\/$/, '') + '/partner/register')
-                      }
-                    }}
-                  >
-                    {user?.partnerAccess ? 'Go to Shop' : 'Become a Partner'}
-                  </Button>
                 </div>
               </TabsContent>
             </Tabs>

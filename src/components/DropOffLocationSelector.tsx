@@ -137,19 +137,14 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
   }, [activeLocationId, remoteLocations])
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-start justify-center bg-background/80 backdrop-blur-sm p-4 md:p-10 overflow-y-auto">
-      <Card className="w-full max-w-6xl shadow-2xl border-primary/30">
+    <div className="fixed inset-0 z-[70] flex items-start justify-center bg-background/80 backdrop-blur-sm p-4 md:p-10 overflow-y-auto pointer-events-none">
+      <Card className="w-full max-w-6xl shadow-2xl border-primary/30 pointer-events-auto">
         <CardHeader className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div>
             <CardTitle className="text-h2 flex items-center space-x-2">
               <Storefront size={28} className="text-primary" />
               <span>Select a drop-off partner</span>
             </CardTitle>
-            <CardDescription className="mt-2 space-y-1">
-              <span>
-                Explore trusted TruCycle partners with real-time availability, amenities, and travel-friendly insights.
-              </span>
-            </CardDescription>
           </div>
           <Button variant="ghost" onClick={onClose} className="self-end md:self-start">
             <XCircle size={22} className="mr-2" /> Close
@@ -180,7 +175,6 @@ export function DropOffLocationSelector({ selectedLocation, onSelect, onClose }:
                   className="h-[360px] w-full"
                 >
                   <TileLayer
-                    attribution="&copy; OpenStreetMap contributors"
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
                   {remoteLocations.map(location => {

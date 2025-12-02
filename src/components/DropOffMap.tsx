@@ -199,33 +199,9 @@ function RecenterMap({ center }: { center: [number, number] }) {
             <Badge variant="secondary" className="uppercase tracking-wide">Guided flow</Badge>
           )}
         </div>
-        <p className="text-body text-muted-foreground">
-          Explore our Partner Shop network, confirm a convenient location, and continue to your listing with everything pre-filled.
-        </p>
       </div>
 
       <Card className="border-primary/30 bg-primary/5">
-        <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-h3 flex items-center gap-2">
-              <Storefront size={22} className="text-primary" />
-              Choose a TruCycle Partner Shop
-            </CardTitle>
-            <CardDescription>
-              Tap a location pin to preview opening hours, accepted items, and services. Confirm the Partner Shop to continue your donation.
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="w-max">
-              Availability verified hourly
-            </Badge>
-            {loadingNearby && (
-              <Badge variant="secondary" className="animate-pulse">
-                Refreshing partner network…
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
         <CardContent className="space-y-6">
           {nearbyError && (
             <Alert variant="destructive" className="border-destructive/40 bg-destructive/10">
@@ -250,9 +226,6 @@ function RecenterMap({ center }: { center: [number, number] }) {
                 <div className="overflow-hidden rounded-2xl border border-primary/30 bg-background shadow-sm">
                   <div className="flex flex-col gap-2 border-b border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-primary/90">
-                        Interactive Partner Shop map
-                      </p>
                       <p className="text-sm text-muted-foreground">
                         Select a pin to preview partner details and confirm your preferred shop.
                       </p>
@@ -313,10 +286,6 @@ function RecenterMap({ center }: { center: [number, number] }) {
                         </div>
                       </div>
                       <div className="flex flex-col gap-2 sm:justify-self-end">
-                        <Button variant="outline">
-                          <NavigationArrow size={16} className="mr-2" />
-                          Get directions
-                        </Button>
                         <Button onClick={() => onPlanDropOff?.(activeLocation)}>
                           <ArrowRight size={16} className="mr-2" />
                           Use location in listing

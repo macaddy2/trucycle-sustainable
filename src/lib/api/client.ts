@@ -435,6 +435,13 @@ export async function createShop(dto: CreateShopDto) {
   })
 }
 
+export async function deleteShop(id: string) {
+  return request<ApiEnvelope<{ success: boolean }>>(`/shops/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    auth: true,
+  })
+}
+
 export async function listPartnerItems(params?: {
   status?: string
   pickup_option?: PickupOption

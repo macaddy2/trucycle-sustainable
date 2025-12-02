@@ -19,7 +19,7 @@ export function PartnerProfile({ partner, shops, items, onSignOut }: PartnerProf
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="text-h3">Partner profile</CardTitle>
+            <CardTitle className="text-h3">Account details</CardTitle>
             <CardDescription>Control your partner access, contact details, and sustainability stats.</CardDescription>
           </div>
           <Button variant="outline" onClick={onSignOut}>
@@ -31,10 +31,6 @@ export function PartnerProfile({ partner, shops, items, onSignOut }: PartnerProf
 
       <div className="grid gap-4">
         <Card className="h-full">
-          <CardHeader>
-            <CardTitle className="text-lg">Account details</CardTitle>
-            <CardDescription>Information shown to TruCycle admin teams.</CardDescription>
-          </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">

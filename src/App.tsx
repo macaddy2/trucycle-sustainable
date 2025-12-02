@@ -166,6 +166,14 @@ function App() {
     return base.replace(/\/$/, '')
   }, [])
 
+  const blurActiveElement = useCallback(() => {
+    if (typeof document === 'undefined') return
+    const active = document.activeElement as HTMLElement | null
+    if (active && typeof active.blur === 'function') {
+      active.blur()
+    }
+  }, [])
+
   const pathToTab = useCallback((pathname: string) => {
     let path = pathname
     if (baseNormalized && path.startsWith(baseNormalized)) {
@@ -197,13 +205,14 @@ function App() {
   }, [baseNormalized])
 
   const navigateToTab = useCallback((nextTab: string) => {
+    blurActiveElement()
     setCurrentTabState(nextTab)
     const targetPath = tabToPath(nextTab)
     const withQuery = `${targetPath}${window.location.search}${window.location.hash}`
     if (window.location.pathname !== targetPath) {
       window.history.pushState({ tab: nextTab }, '', withQuery)
     }
-  }, [tabToPath])
+  }, [blurActiveElement, tabToPath])
 
   const navigateToMessages = useCallback((chatId?: string) => {
     setCurrentTabState('messages')
@@ -313,6 +322,12 @@ function App() {
       navigateToTab('list')
     }
   }, [user, shouldResumeListingAfterAuth, navigateToTab])
+
+  useEffect(() => {
+    if (drawerOpen) {
+      blurActiveElement()
+    }
+  }, [blurActiveElement, drawerOpen])
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -630,7 +645,7 @@ function App() {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/85 backdrop-blur-md">
         <div className="container max-w-screen-2xl mx-auto px-4 sm:px-6 py-3">
-          <div className="flex items-center gap-4 md:gap-6">
+          <div className="flex justify-between items-center gap-4 md:gap-6">
             <button
               type="button"
               onClick={handleLogoClick}
@@ -640,18 +655,18 @@ function App() {
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-transform group-hover:scale-105">
                 <TruCycleGlyph className="h-6 w-6" />
               </div>
-              <h1 className="text-h2 font-semibold tracking-tight text-foreground">TruCycle</h1>
+              {/* <h1 className="text-h2 font-semibold tracking-tight text-foreground">TruCycle</h1> */}
             </button>
 
             {/* Desktop Navigation Tabs */}
             <div className="hidden md:flex flex-1 justify-center">
               <Tabs value={currentTab} onValueChange={navigateToTab}>
-                <TabsList className="gap-2 rounded-full border border-border/60 bg-card/70 px-2 py-1 shadow-sm">
+                <TabsList className="gap-2 rounded-full border border-border/60 bg-card/70 px-2 py-7 shadow-sm">
                   {navTabs.map(({ value, label, Icon }) => (
                     <TabsTrigger
                       key={value}
                       value={value}
-                      className="flex items-center gap-2 rounded-full px-3 sm:px-4 py-2 text-sm font-medium transition data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+                      className="flex items-center gap-2 rounded-full px-3 sm:px-4 py-4 text-sm font-medium transition data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
                     >
                       <Icon size={16} />
                       <span className="hidden lg:inline">{label}</span>
@@ -666,10 +681,10 @@ function App() {
               </Tabs>
             </div>
 
-            <div className="ml-auto hidden md:flex items-center gap-2 rounded-full border border-border/60 bg-card/70 px-2 py-1 shadow-sm">
+            <div className="ml-auto hidden md:flex items-center gap-2 rounded-full border border-border/60 bg-card/70 px-2 py-2 shadow-sm">
               {user ? (
                 <div className="flex items-center gap-2">
-                  <ThemeToggle mode={themeControls.mode} toggleMode={themeControls.toggleMode} />
+                  
                   <MessageNotification onOpenMessages={handleOpenMessages} />
                   {!isMobile && (
                     <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
@@ -756,18 +771,12 @@ function App() {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
-                    {userFirstName && (
-                      <span className="hidden sm:inline text-sm text-muted-foreground">{userFirstName}</span>
-                    )}
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-card/70 px-2 py-1 shadow-sm">
-                  <ThemeToggle mode={themeControls.mode} toggleMode={themeControls.toggleMode} />
-                  <Button size="sm" onClick={handleSignIn}>
-                    Get Started
-                  </Button>
-                </div>
+                <Button size="sm" className='rounded-full' onClick={handleSignIn}>
+                  Get Started
+                </Button>
               )}
 
             </div>
@@ -775,8 +784,8 @@ function App() {
             {/* Mobile Actions (Profile, Messages, Notifications, QR) */}
             <div className="flex md:hidden items-center gap-2">
               {user ? (
-                <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-card/80 px-2 py-1 shadow-sm">
-                  <ThemeToggle mode={themeControls.mode} toggleMode={themeControls.toggleMode} />
+                <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-card/80 px-2 py-2 shadow-sm">
+                  {/* <ThemeToggle mode={themeControls.mode} toggleMode={themeControls.toggleMode} /> */}
                   <MessageNotification onOpenMessages={handleOpenMessages} />
                   {isMobile && (
                     <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
@@ -864,12 +873,9 @@ function App() {
                   </DropdownMenu>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 rounded-full border border-border/60 bg-card/80 px-2 py-1 shadow-sm">
-                  <ThemeToggle mode={themeControls.mode} toggleMode={themeControls.toggleMode} />
-                  <Button size="sm" onClick={handleSignIn}>
-                    Get Started
-                  </Button>
-                </div>
+                <Button size="sm" onClick={handleSignIn}>
+                  Get Started
+                </Button>
               )}
 
             </div>
@@ -1049,7 +1055,7 @@ function App() {
                   <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <TruCycleGlyph className="h-4 w-4" />
                   </div>
-                  <span className="font-medium">TruCycle</span>
+                  {/* <span className="font-medium">TruCycle</span> */}
                 </div>
                 <p className="text-small text-muted-foreground">
                   Sustainable item exchange platform for London communities

@@ -95,7 +95,7 @@ export function PartnerApp({ route, onNavigate }: PartnerAppProps) {
 
   const activeNav = navItems.find(item => item.key === route) ?? navItems[0]
 
-  let content = null
+  let content: React.ReactNode = null
   if (!partner) {
     content = (
       <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">

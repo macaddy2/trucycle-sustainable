@@ -432,9 +432,9 @@ export function ItemListingForm({
   const sanitizeFieldValue = (field: string, value: string): string => {
     switch (field) {
       case 'title':
-        return sanitizeText(value, { maxLength: 120 })
+        return sanitizeText(value, { maxLength: 120, preserveTrailingWhitespace: true })
       case 'description':
-        return sanitizeMultilineText(value, { maxLength: 1200 })
+        return sanitizeMultilineText(value, { maxLength: 1200, preserveTrailingWhitespace: true })
       case 'handoverNotes':
         return sanitizeMultilineText(value, { maxLength: 600 })
       case 'location':
@@ -1086,7 +1086,7 @@ export function ItemListingForm({
           </div>
         </section>
 
-        <Card id="listing-form-steps">
+        <Card id="listing-form-steps max-w-3xl mx-auto" ref={formContainerRef} className="scroll-mt-20">
           <CardHeader>
             <CardTitle className="text-h2 flex items-center space-x-2">
               <Plus size={24} className="text-primary" />
@@ -1095,7 +1095,7 @@ export function ItemListingForm({
             <CardDescription>
               Step {currentStep} of {totalSteps}: Help reduce waste by listing your item
             </CardDescription>
-            <div className="mt-2 rounded-md border bg-muted/40 p-3 text-sm">
+            <div className="mt-2 rounded-md border bg-muted/40 p-3 text-sm w-fit mx-auto">
               <div className="flex flex-wrap items-center gap-3">
                 <span><span className="font-semibold">Action:</span> {formData.actionType === 'donate' ? 'Donate' : 'Exchange'}</span>
                 <span><span className="font-semibold">Category:</span> {formData.category || 'Not set'}</span>

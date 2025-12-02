@@ -18,10 +18,15 @@ interface PartnerHomeProps {
 }
 
 function formatDate(date?: string) {
-  if (!date) return '—'
+  if (!date) return '--'
   const parsed = new Date(date)
-  if (Number.isNaN(parsed.getTime())) return '—'
+  if (Number.isNaN(parsed.getTime())) return '--'
   return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function formatCategory(value?: string | null) {
+  if (!value) return '--'
+  return value.replace(/_/g, ' ')
 }
 
 export function PartnerHome({ partner, shops, items, loading, onRefresh, onOpenScan }: PartnerHomeProps) {
@@ -42,9 +47,9 @@ export function PartnerHome({ partner, shops, items, loading, onRefresh, onOpenS
   }, [items, shops])
 
   const recentItems = useMemo(() => {
-    return [...items]
-      .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
-      .slice(0, 5)
+    return [...items].sort(
+      (a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime(),
+    ).slice(0, 3)
   }, [items])
 
   return (
@@ -55,7 +60,7 @@ export function PartnerHome({ partner, shops, items, loading, onRefresh, onOpenS
           <h2 className="text-h2 text-foreground">
             Welcome back{partner?.firstName ? `, ${partner.firstName}` : ''}!
           </h2>
-          <p className="text-sm text-muted-foreground max-w-xl">
+          <p className="max-w-xl text-sm text-muted-foreground">
             Track activity across your shops, scan drop-offs in moments, and keep sustainability metrics up to date.
           </p>
         </div>
@@ -71,9 +76,9 @@ export function PartnerHome({ partner, shops, items, loading, onRefresh, onOpenS
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Active listings</CardTitle>
             <Package size={22} className="text-primary" />
           </CardHeader>
@@ -83,7 +88,7 @@ export function PartnerHome({ partner, shops, items, loading, onRefresh, onOpenS
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Drop-offs this week</CardTitle>
             <Storefront size={22} className="text-primary" />
           </CardHeader>
@@ -93,7 +98,7 @@ export function PartnerHome({ partner, shops, items, loading, onRefresh, onOpenS
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Pickups scheduled</CardTitle>
             <QrCode size={22} className="text-primary" />
           </CardHeader>
@@ -103,7 +108,7 @@ export function PartnerHome({ partner, shops, items, loading, onRefresh, onOpenS
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Avg. items per shop</CardTitle>
             <Leaf size={22} className="text-primary" />
           </CardHeader>
@@ -114,11 +119,10 @@ export function PartnerHome({ partner, shops, items, loading, onRefresh, onOpenS
         </Card>
       </div>
 
-      <Card>
+      <Card className='h-full'>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-lg">Recent activity</CardTitle>
-            <p className="text-sm text-muted-foreground">Latest partner-managed listings across your network.</p>
           </div>
           <Badge variant="secondary">{recentItems.length} items</Badge>
         </CardHeader>
@@ -126,7 +130,7 @@ export function PartnerHome({ partner, shops, items, loading, onRefresh, onOpenS
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, index) => (
-                <Skeleton key={index} className="h-16 w-full rounded-xl" />
+                <Skeleton key={index} className="w-full rounded-xl" />
               ))}
             </div>
           ) : recentItems.length === 0 ? (
@@ -134,29 +138,32 @@ export function PartnerHome({ partner, shops, items, loading, onRefresh, onOpenS
               No partner items yet. Create a listing or register a new shop to get started.
             </div>
           ) : (
-            <ScrollArea className="max-h-[320px] pr-4">
+            <ScrollArea className="pr-4">
               <div className="space-y-4">
-                {recentItems.map(item => (
-                  <div key={item.id} className="rounded-2xl border border-border bg-muted/30 p-4 shadow-sm">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{item.title ?? 'Untitled item'}</p>
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                          {item.shop?.name ?? 'Unassigned shop'} · {item.pickup_option ?? 'donate'}
-                        </p>
+                {recentItems.map(item => {
+                  const locationName = item.dropoff_location?.name ?? item.shop?.name ?? 'Unassigned location'
+                  return (
+                    <div key={item.id} className="rounded-2xl border border-border bg-muted/30 p-4 shadow-sm">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{item.title ?? 'Untitled item'}</p>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            {locationName} - {item.pickup_option ?? 'donate'}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="w-max capitalize">
+                          {item.status ?? 'pending'}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="w-max capitalize">
-                        {item.status ?? 'pending'}
-                      </Badge>
+                      <Separator className="my-3" />
+                      <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-3">
+                        <span>Created: {formatDate(item.created_at)}</span>
+                        <span>Category: {formatCategory(item.category)}</span>
+                        <span>Donated on: {formatDate(item.created_at)}</span>
+                      </div>
                     </div>
-                    <Separator className="my-3" />
-                    <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-3">
-                      <span>Created: {formatDate(item.created_at)}</span>
-                      <span>Category: {item.category ?? 'General goods'}</span>
-                      <span>Last updated: {formatDate(item.updated_at)}</span>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </ScrollArea>
           )}

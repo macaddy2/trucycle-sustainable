@@ -94,6 +94,7 @@ export interface CreateShopDto {
   longitude?: number
   opening_hours?: OpeningHoursDto | null
   acceptable_categories?: string[]
+  operational_notes?: string | null
 }
 
 export interface ShopDto {
@@ -106,6 +107,7 @@ export interface ShopDto {
   longitude?: number | null
   opening_hours?: OpeningHoursDto | null
   acceptable_categories?: string[]
+  operational_notes?: string | null
   active?: boolean
   distanceMeters?: number | null
 }
@@ -123,6 +125,9 @@ export interface PartnerShopItem {
   created_at?: string
   updated_at?: string
   shop?: { id?: string; name?: string | null } | null
+  // Prefer dropoff_location when showing the associated shop/location for the item
+  dropoff_location?: ShopDto | null
+  images?: Array<{ url?: string; alt_text?: string | null }> | null
   claim_status?: string | null
   metadata?: Record<string, unknown> | null
 }
