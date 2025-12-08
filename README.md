@@ -559,7 +559,7 @@ Custom hook in `src/hooks/useMessaging.ts`:
 - Messages are automatically marked with direction (`incoming`/`outgoing`) per viewer
 - Presence is tracked per socket (user online if any socket connected)
 
-See full documentation: `backend_docs/messaging_websocket.md`
+See full documentation: [`backend_docs/messaging_websocket.md`](backend_docs/messaging_websocket.md)
 
 ### Notification System
 
@@ -623,7 +623,7 @@ Custom hook in `src/hooks/useNotifications.ts`:
 - Sound file: `src/lib/notificationSound.ts` (uses Web Audio API)
 - Desktop notifications not implemented (only in-app)
 
-See full documentation: `backend_docs/notification_websocket.md`
+See full documentation: [`backend_docs/notification_websocket.md`](backend_docs/notification_websocket.md)
 
 ---
 
@@ -1186,13 +1186,14 @@ Consider adding:
 3. **Understand Backend**: Read `backend_docs/` for API docs
 4. **Code Walkthrough**: Start with `App.tsx`, then explore components
 5. **Common Tasks**: See [Common Tasks](#common-tasks) section
-6. **Ask Questions**: Document maintainer: [Your Contact Info]
+6. **Ask Questions**: Document maintainer: _[Add contact information]_
 
 #### Key Contacts
-- **Backend API**: [Backend team contact]
-- **Cloudinary**: [Account owner]
-- **Domain/Hosting**: [DevOps contact]
-- **Product Owner**: [Product contact]
+> ⚠️ **Note**: Replace these placeholders with actual contact information before handover
+- **Backend API**: [Backend team contact - Add name and email]
+- **Cloudinary**: [Account owner - Add name and email]
+- **Domain/Hosting**: [DevOps contact - Add name and email]
+- **Product Owner**: [Product contact - Add name and email]
 
 #### Critical Files to Understand
 1. `src/App.tsx` - Main app orchestration
@@ -1208,10 +1209,11 @@ Consider adding:
 - **Backend API**: Custom Node.js/Express API (separate repo)
 
 #### Passwords & Credentials
-- **Cloudinary**: [Store in password manager]
-- **Domain Registrar**: [Store in password manager]
-- **Hosting Service**: [Store in password manager]
-- **Backend Database**: [Backend team manages]
+> ⚠️ **Note**: All credentials should be stored in a secure password manager
+- **Cloudinary**: [Add link to password manager entry]
+- **Domain Registrar**: [Add link to password manager entry]
+- **Hosting Service**: [Add link to password manager entry]
+- **Backend Database**: [Backend team manages - contact backend team for access]
 
 ### Future Enhancements (Roadmap)
 1. **PWA Support**: Service worker for offline access
@@ -1257,11 +1259,13 @@ SOFTWARE.
 
 For questions, issues, or contributions:
 - **GitHub Issues**: [Repository Issues](https://github.com/macaddy2/trucycle-sustainable/issues)
-- **Email**: [Your contact email]
+- **Email**: _[Update with project maintainer email]_
 - **Documentation**: This README and files in `backend_docs/`
+
+> ⚠️ **Note**: Update the email and maintainer information before handover
 
 ---
 
 **Last Updated**: December 2024  
 **Version**: 0.0.0  
-**Maintainer**: [Your Name]
+**Maintainer**: _[Add maintainer name and contact]_
