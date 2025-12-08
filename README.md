@@ -1233,7 +1233,7 @@ Consider adding:
 
 This project is licensed under the MIT License.
 
-Copyright (c) 2024 TruCycle
+Copyright (c) 2025 TruCycle
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -1259,13 +1259,11 @@ SOFTWARE.
 
 For questions, issues, or contributions:
 - **GitHub Issues**: [Repository Issues](https://github.com/macaddy2/trucycle-sustainable/issues)
-- **Email**: _[Update with project maintainer email]_
+- **Email**: _akinyemisamuel170@gmail.com_
 - **Documentation**: This README and files in `backend_docs/`
-
-> ⚠️ **Note**: Update the email and maintainer information before handover
 
 ---
 
-**Last Updated**: December 2024  
-**Version**: 0.0.0  
-**Maintainer**: _[Add maintainer name and contact]_
+**Last Updated**: December 2025  
+**Version**: 1.0.0  
+**Maintainer**: _Samuel Akinyemi_
