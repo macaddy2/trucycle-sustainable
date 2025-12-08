@@ -219,7 +219,9 @@ export function useExchangeManager() {
       }))
 
       if (approvedRequest) {
-        toast.success(`${approvedRequest.collectorName} has been approved for this exchange.`)
+        if (approvedRequest) {
+          toast.success(`${approvedRequest.collectorName} has been approved for this exchange.`)
+        }
 
         const relatedListing = globalListings.find(listing => listing.id === approvedRequest!.itemId)
           || userListings.find(listing => listing.id === approvedRequest!.itemId)

@@ -217,7 +217,8 @@ export function ItemListingForm({
   editingListing,
   onEditingHandled
 }: ItemListingFormProps) {
-  const [user] = useKV('current-user', null)
+  type CurrentUser = { id: string; name?: string; email?: string; area?: string; district?: string; postcode?: string }
+  const [user] = useKV<CurrentUser | null>('current-user', null)
   // Removed local demo listings persistence
   const [currentStep, setCurrentStep] = useState(1)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -267,7 +268,8 @@ export function ItemListingForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showDropOffSelector, setShowDropOffSelector] = useState(false)
   const [showPickupLocationSelector, setShowPickupLocationSelector] = useState(false)
-  const [pickupLocation, setPickupLocation] = useState<{ lat?: number; lng?: number; label?: string; postcode?: string } | null>(null)
+  type PickupLocation = { lat?: number; lng?: number; label?: string; postcode?: string }
+  const [pickupLocation, setPickupLocation] = useState<PickupLocation | null>(null)
   const [generatedQRCode, setGeneratedQRCode] = useState<QRCodeData | null>(null)
   const [lastCreatedListing, setLastCreatedListing] = useState<CreatedListing | null>(null)
   const [editingListingId, setEditingListingId] = useState<string | null>(null)
@@ -332,7 +334,9 @@ export function ItemListingForm({
     setFormData({
       title: sanitizeText(editingListing.title ?? '', { maxLength: 120 }),
       description: sanitizeMultilineText(editingListing.description ?? '', { maxLength: 1200 }),
-      category: editingListing.category || DEFAULT_CATEGORY_BY_INTENT[actionType],
+      category: CATEGORIES.includes(editingListing.category as typeof CATEGORIES[number])
+        ? (editingListing.category as typeof CATEGORIES[number])
+        : DEFAULT_CATEGORY_BY_INTENT[actionType],
       condition: normalizeCondition(editingListing.condition),
       actionType,
       photos: editingListing.photos ?? [],
@@ -785,7 +789,7 @@ export function ItemListingForm({
         id: listingId,
         ...formData,
         fulfillmentMethod,
-        dropOffLocation: formData.dropOffLocation,
+        dropOffLocation: formData.dropOffLocation ?? undefined,
         userId: user.id,
         userName: user.name || 'Anonymous User',
         status: mapServerStatusToClient(server?.status) as CreatedListing['status'],
@@ -812,7 +816,7 @@ export function ItemListingForm({
             id: newListing.id,
             title: newListing.title,
             category: newListing.category,
-            description: newListing.description,
+            description: newListing.description ?? '',
             fulfillmentMethod: formData.fulfillmentMethod,
             dropOffLocation: formData.dropOffLocation
           }

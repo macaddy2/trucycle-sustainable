@@ -29,6 +29,7 @@ import type { VerificationLevel } from './verificationBadgeUtils'
 import { RatingDisplay } from './RatingSystem'
 import { toast } from 'sonner'
 import { searchItems } from '@/lib/api'
+import { QRCodeDisplay } from './QRCode'
 import BrowseSkeleton from '@/components/skeletons/BrowseSkeleton'
 
 interface UserProfile {
@@ -37,6 +38,7 @@ interface UserProfile {
   userType: 'donor' | 'collector'
   avatar?: string
   partnerAccess?: boolean
+  postcode?: string
 }
 
 export interface ListingItem {
@@ -126,25 +128,25 @@ function mapPublicItemToListingItem(it: any): ListingItem {
   const claimRaw = it?.claim
   const claim = claimRaw
     ? {
-        status: String(claimRaw.status || ''),
-        requestedAt: claimRaw.requested_at ? String(claimRaw.requested_at) : undefined,
-        claimedAt: claimRaw.claimed_at === null
-          ? null
-          : (typeof claimRaw.claimed_at === 'string' ? String(claimRaw.claimed_at) : undefined),
-      }
+      status: String(claimRaw.status || ''),
+      requestedAt: claimRaw.requested_at ? String(claimRaw.requested_at) : undefined,
+      claimedAt: claimRaw.claimed_at === null
+        ? null
+        : (typeof claimRaw.claimed_at === 'string' ? String(claimRaw.claimed_at) : undefined),
+    }
     : null
 
   const dropLocation = it?.dropoff_location
   const partnerLocation = dropLocation
     ? {
-        id: dropLocation.id ? String(dropLocation.id) : undefined,
-        name: dropLocation.name || 'Partner shop',
-        addressLine: dropLocation.address_line ?? null,
-        postcode: dropLocation.postcode ?? null,
-        phoneNumber: dropLocation.phone_number ?? null,
-        openingHours: formatPartnerOpeningHours(dropLocation.opening_hours ?? null),
-        operationalNotes: dropLocation.operational_notes ?? null,
-      }
+      id: dropLocation.id ? String(dropLocation.id) : undefined,
+      name: dropLocation.name || 'Partner shop',
+      addressLine: dropLocation.address_line ?? null,
+      postcode: dropLocation.postcode ?? null,
+      phoneNumber: dropLocation.phone_number ?? null,
+      openingHours: formatPartnerOpeningHours(dropLocation.opening_hours ?? null),
+      operationalNotes: dropLocation.operational_notes ?? null,
+    }
     : null
 
   return {
@@ -179,7 +181,7 @@ interface ItemListingProps {
 
 export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpenMessages }: ItemListingProps) {
   const [currentUser] = useKV<UserProfile | null>('current-user', null)
-  
+
   const [items, setItems] = useState<ListingItem[]>([])
   const [activeItem, setActiveItem] = useState<ListingItem | null>(null)
   const [submittingRequests, setSubmittingRequests] = useState<Set<string>>(new Set())
@@ -287,10 +289,10 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
   const activeItemRequestLabel = activeItem?.actionType === 'recycle'
     ? 'Arrange recycling'
     : (activeItem?.claim
-        ? formatClaimStatus(activeItem.claim.status)
-        : ((hasRequestedActive || (activeItem ? submittingRequests.has(activeItem.id) : false))
-            ? 'Request sent to Donor'
-            : 'Request a Claim'))
+      ? formatClaimStatus(activeItem.claim.status)
+      : ((hasRequestedActive || (activeItem ? submittingRequests.has(activeItem.id) : false))
+        ? 'Request sent to Donor'
+        : 'Request a Claim'))
   const activeItemOwnerLabel = activeItem?.actionType === 'donate' ? 'Pickup Shop' : 'Item owner'
 
   const formatTimeAgo = (createdAt: string) => {
@@ -502,9 +504,9 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                         <CrosshairSimple size={16} />
                       </Button>
                     </TooltipTrigger>
-                  <TooltipContent>Use my location</TooltipContent>
-                </Tooltip>
-              </div>
+                    <TooltipContent>Use my location</TooltipContent>
+                  </Tooltip>
+                </div>
               </div>
 
               {/* Clear filters at far right */}
@@ -571,8 +573,8 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
             const requestButtonLabel = item.actionType === 'recycle'
               ? 'Arrange recycling'
               : (hasServerClaim
-                  ? formatClaimStatus(item.claim?.status)
-                  : ((hasRequested || isSubmitting) ? 'Request sent to Donor' : 'Request a Claim'))
+                ? formatClaimStatus(item.claim?.status)
+                : ((hasRequested || isSubmitting) ? 'Request sent to Donor' : 'Request a Claim'))
 
             return (
               <Card
@@ -744,10 +746,10 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     {false && (
-                    <div>
-                      <h4 className="font-medium mb-2">Description</h4>
-                      <p className="text-muted-foreground">{activeItem.description}</p>
-                    </div>
+                      <div>
+                        <h4 className="font-medium mb-2">Description</h4>
+                        <p className="text-muted-foreground">{activeItem?.description}</p>
+                      </div>
                     )}
 
                     <div className="space-y-2 text-sm">
@@ -846,8 +848,8 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                             {activeItemPendingCount > 0
                               ? `${activeItemPendingCount} pending ${activeItemPendingCount > 1 ? 'requests' : 'request'} awaiting your review.`
                               : activeItemRequests.length > 0
-                              ? 'No pending decisions. You can review previous requests below.'
-                              : 'No requests yet.'}
+                                ? 'No pending decisions. You can review previous requests below.'
+                                : 'No requests yet.'}
                           </p>
                         </div>
                         <Button
@@ -861,8 +863,8 @@ export function ItemListing({ searchQuery, onSearchChange, onSearchSubmit, onOpe
                           {activeItemPendingCount > 0
                             ? `Review ${activeItemPendingCount} pending request${activeItemPendingCount > 1 ? 's' : ''}`
                             : activeItemRequests.length > 0
-                            ? 'View requests'
-                            : 'Manage requests'}
+                              ? 'View requests'
+                              : 'Manage requests'}
                         </Button>
                       </div>
                     ) : (

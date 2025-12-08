@@ -45,4 +45,5 @@ export interface ManagedListing {
   claimCreatedAt?: string
   claimApprovedAt?: string
   claimCompletedAt?: string
+  qrImageUrl?: string // Optional QR code image URL
 }

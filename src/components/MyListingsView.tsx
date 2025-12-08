@@ -376,7 +376,7 @@ export function MyListingsView({
       dropOffLocation,
       handoverNotes: selectedListing.handoverNotes,
       preferPartnerSupport: selectedListing.preferPartnerSupport,
-      postcode: 
+      postcode:
         (detail && 'location' in detail && (detail as any).location?.postcode) ||
         (detail && 'dropoff_location' in detail && (detail as any).dropoff_location?.postcode),
     }
@@ -572,6 +572,7 @@ export function MyListingsView({
               claimCreatedAt: e?.claim_created_at ? String(e.claim_created_at) : undefined,
               claimApprovedAt: e?.claim_approved_at ? String(e.claim_approved_at) : undefined,
               claimCompletedAt: e?.claim_completed_at ? String(e.claim_completed_at) : undefined,
+              qrImageUrl: typeof it.qr_code === 'string' ? it.qr_code : undefined,
             }
           })
           if (!cancelled) {
@@ -611,6 +612,7 @@ export function MyListingsView({
             co2Impact: typeof it.estimated_co2_saved_kg === 'number' ? it.estimated_co2_saved_kg : undefined,
             aiClassification: undefined,
             moderation: undefined,
+            qrImageUrl: typeof it.qr_code === 'string' ? it.qr_code : undefined,
           }))
           if (!cancelled) {
             const byId = new Map<string, ManagedListing>()
@@ -1062,6 +1064,7 @@ export function MyListingsView({
                       claimCompletedAt={selectedListing.claimCompletedAt ?? null}
                       canOpenConversation={canOpenCollectorChat}
                       onOpenConversation={handleCollectorConversation}
+                      activeItem={selectedListing}
                     />
                   ) : (
                     <DropOffQrPanel
@@ -1247,6 +1250,7 @@ function DropOffQrPanel({ listing, dropOffLocation, qrImageUrl, isLoading }: Dro
   )
 }
 
+
 interface DonorInfoPanelProps {
   donorName?: string | null
   donorAvatar?: string | null
@@ -1256,7 +1260,26 @@ interface DonorInfoPanelProps {
   claimCompletedAt?: string | null
   canOpenConversation: boolean
   onOpenConversation: () => void
+  activeItem?: any
+  currentUser?: any
 }
+
+// Simple QR image display for donor panel
+function DonorQRImage({ activeItem }: { activeItem: any }) {
+  if (!activeItem) return null;
+  // Use qrImageUrl from activeItem, only show if present
+  if (!activeItem.qrImageUrl) return null;
+  return (
+    <div className="mb-4 flex justify-center">
+      <img
+        src={activeItem.qrImageUrl}
+        alt="QR code"
+        className="h-60 w-60 rounded border bg-white p-2 shadow"
+      />
+    </div>
+  );
+}
+
 
 function DonorInfoPanel({
   donorName,
@@ -1267,17 +1290,18 @@ function DonorInfoPanel({
   claimCompletedAt,
   canOpenConversation,
   onOpenConversation,
+  activeItem,
 }: DonorInfoPanelProps) {
-  const status = claimStatus ?? 'pending'
-  const badgeMeta = REQUEST_STATUS_BADGE[status] ?? REQUEST_STATUS_BADGE.pending
-  const statusCopy = CLAIM_STATUS_DESCRIPTION[status]
-  const verified = Boolean(donorVerification?.identity_verified || donorVerification?.address_verified || donorVerification?.email_verified)
-  const approvedDate = claimApprovedAt ? new Date(claimApprovedAt).toLocaleString() : null
-  const completedDate = claimCompletedAt ? new Date(claimCompletedAt).toLocaleString() : null
+  const status = claimStatus ?? 'pending';
+  const badgeMeta = REQUEST_STATUS_BADGE[status] ?? REQUEST_STATUS_BADGE.pending;
+  const statusCopy = CLAIM_STATUS_DESCRIPTION[status];
+  const verified = Boolean(donorVerification?.identity_verified || donorVerification?.address_verified || donorVerification?.email_verified);
+  const approvedDate = claimApprovedAt ? new Date(claimApprovedAt).toLocaleString() : null;
+  const completedDate = claimCompletedAt ? new Date(claimCompletedAt).toLocaleString() : null;
 
   const chatHelperText = status === 'declined'
     ? 'Messaging is unavailable because this request was declined.'
-    : 'Messaging unlocks once the donor approves your request.'
+    : 'Messaging unlocks once the donor approves your request.';
 
   return (
     <div className="space-y-4 rounded-lg border bg-background p-4 shadow-sm">
@@ -1299,6 +1323,9 @@ function DonorInfoPanel({
           )}
         </div>
       </div>
+
+      {/* QR image for approved donated items in collected list */}
+      <DonorQRImage activeItem={activeItem} />
 
       <div className="space-y-2 rounded-md border bg-muted/30 p-3 text-sm">
         <div className="flex items-center justify-between">
@@ -1324,7 +1351,7 @@ function DonorInfoPanel({
         )}
       </div>
     </div>
-  )
+  );
 }
 
 interface CollectorRequestsSharedProps {
