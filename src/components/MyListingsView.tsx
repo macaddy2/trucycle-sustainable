@@ -1065,6 +1065,7 @@ export function MyListingsView({
                       canOpenConversation={canOpenCollectorChat}
                       onOpenConversation={handleCollectorConversation}
                       activeItem={selectedListing}
+                      currentUser={currentUser}
                     />
                   ) : (
                     <DropOffQrPanel
@@ -1265,9 +1266,12 @@ interface DonorInfoPanelProps {
 }
 
 // Simple QR image display for donor panel
-function DonorQRImage({ activeItem }: { activeItem: any }) {
+function DonorQRImage({ activeItem, currentUser }: { activeItem: any; currentUser?: any }) {
   if (!activeItem) return null;
-  // Use qrImageUrl from activeItem, only show if present
+  // Only show QR for donated items if claim is approved
+  if (activeItem.actionType !== 'donate' && activeItem.claimStatus !== 'approved') {
+    return null;
+  }
   if (!activeItem.qrImageUrl) return null;
   return (
     <div className="mb-4 flex justify-center">
@@ -1291,6 +1295,7 @@ function DonorInfoPanel({
   canOpenConversation,
   onOpenConversation,
   activeItem,
+  currentUser,
 }: DonorInfoPanelProps) {
   const status = claimStatus ?? 'pending';
   const badgeMeta = REQUEST_STATUS_BADGE[status] ?? REQUEST_STATUS_BADGE.pending;
